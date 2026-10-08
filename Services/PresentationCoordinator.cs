@@ -257,7 +257,14 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     {
         if (Status == PresentationStatus.Active)
         {
-            await _outputRenderer.RenderFrameAsync(e.Frame).ConfigureAwait(false);
+            if (e.SoftwareBitmap is not null)
+            {
+                await _outputRenderer.RenderBitmapAsync(e.SoftwareBitmap).ConfigureAwait(false);
+            }
+            else if (e.Frame is not null)
+            {
+                await _outputRenderer.RenderFrameAsync(e.Frame).ConfigureAwait(false);
+            }
         }
     }
 

@@ -7,7 +7,7 @@ using Windows.Graphics.Imaging;
 namespace SwitchCast.Services.Capture;
 
 /// <summary>
-/// GPU-backed preview renderer converting Direct3D 11 capture surfaces to WinUI 3 SoftwareBitmapSource.
+/// GPU-backed preview renderer presenting capture frames onto WinUI 3 SoftwareBitmapSource.
 /// </summary>
 public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
 {
@@ -25,6 +25,52 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
 
     public ImageSource PreviewImageSource => _softwareBitmapSource;
 
+    public async Task RenderBitmapAsync(SoftwareBitmap bitmap)
+    {
+        ArgumentNullException.ThrowIfNull(bitmap);
+
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        // Frame dropping / pacing: If previous frame is still being presented, skip to keep real-time performance
+        if (Interlocked.CompareExchange(ref _isProcessingFrame, 1, 0) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var tcs = new TaskCompletionSource();
+            _dispatcherQueue.TryEnqueue(async () =>
+            {
+                try
+                {
+                    if (!_isDisposed)
+                    {
+                        await _softwareBitmapSource.SetBitmapAsync(bitmap);
+                    }
+                    tcs.TrySetResult();
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            });
+
+            await tcs.Task.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Ignore transient render errors during window resize or shutdown
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _isProcessingFrame, 0);
+        }
+    }
+
     public async Task RenderFrameAsync(Direct3D11CaptureFrame frame)
     {
         ArgumentNullException.ThrowIfNull(frame);
@@ -34,7 +80,6 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
             return;
         }
 
-        // Frame dropping / pacing: If the previous frame is still being copied or rendered, skip to stay in real-time
         if (Interlocked.CompareExchange(ref _isProcessingFrame, 1, 0) != 0)
         {
             return;
@@ -48,20 +93,15 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
                 return;
             }
 
-            // Copy GPU Direct3D surface to SoftwareBitmap
             using var softwareBitmap = await SoftwareBitmap.CreateCopyFromSurfaceAsync(surface);
-
             if (_isDisposed || softwareBitmap is null)
             {
                 return;
             }
 
-            // Ensure pixel format is BGRA8 with Premultiplied alpha for WinUI rendering
             SoftwareBitmap displayBitmap;
-            var needsConversion = softwareBitmap.BitmapPixelFormat != BitmapPixelFormat.Bgra8 ||
-                                  softwareBitmap.BitmapAlphaMode == BitmapAlphaMode.Straight;
-
-            if (needsConversion)
+            if (softwareBitmap.BitmapPixelFormat != BitmapPixelFormat.Bgra8 ||
+                softwareBitmap.BitmapAlphaMode == BitmapAlphaMode.Straight)
             {
                 displayBitmap = SoftwareBitmap.Convert(
                     softwareBitmap,
@@ -73,7 +113,7 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
                 displayBitmap = SoftwareBitmap.Copy(softwareBitmap);
             }
 
-            // Dispatch frame presentation to UI thread
+            var tcs = new TaskCompletionSource();
             _dispatcherQueue.TryEnqueue(async () =>
             {
                 try
@@ -82,20 +122,23 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
                     {
                         await _softwareBitmapSource.SetBitmapAsync(displayBitmap);
                     }
+                    tcs.TrySetResult();
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignore transient render errors during window resize or shutdown
+                    tcs.TrySetException(ex);
                 }
                 finally
                 {
                     displayBitmap.Dispose();
                 }
             });
+
+            await tcs.Task.ConfigureAwait(false);
         }
         catch
         {
-            // Ignore capture frame acquisition errors during source closure
+            // Ignore transient render errors during window resize or shutdown
         }
         finally
         {
@@ -107,7 +150,6 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
     {
         _dispatcherQueue.TryEnqueue(() =>
         {
-            // Create a small empty 1x1 transparent bitmap to reset the image cleanly
             try
             {
                 using var emptyBitmap = new SoftwareBitmap(BitmapPixelFormat.Bgra8, 1, 1, BitmapAlphaMode.Premultiplied);

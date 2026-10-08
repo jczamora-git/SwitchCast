@@ -1,6 +1,7 @@
 using Windows.Graphics;
 using Windows.Graphics.Capture;
 using Windows.Graphics.DirectX;
+using Windows.Graphics.Imaging;
 
 namespace SwitchCast.Services.Capture;
 
@@ -17,6 +18,7 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
     private SizeInt32 _lastSize;
     private bool _isCapturing;
     private bool _isDisposed;
+    private int _isProcessingFrame;
 
     public event EventHandler<FrameArrivedEventArgs>? FrameArrived;
     public event EventHandler? SourceClosed;
@@ -55,6 +57,7 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
                 _item = item;
                 _deviceProvider = deviceProvider;
                 _lastSize = item.Size;
+                Interlocked.Exchange(ref _isProcessingFrame, 0);
 
                 // Ensure Direct3D 11 device is active
                 _deviceProvider.EnsureDevice();
@@ -106,6 +109,7 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
     private void StopCaptureInternal()
     {
         _isCapturing = false;
+        Interlocked.Exchange(ref _isProcessingFrame, 0);
 
         if (_item is not null)
         {
@@ -115,51 +119,127 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
 
         if (_session is not null)
         {
-            _session.Dispose();
+            try
+            {
+                _session.Dispose();
+            }
+            catch { }
             _session = null;
         }
 
         if (_framePool is not null)
         {
             _framePool.FrameArrived -= OnFrameArrived;
-            _framePool.Dispose();
+            try
+            {
+                _framePool.Dispose();
+            }
+            catch { }
             _framePool = null;
         }
     }
 
     private void OnFrameArrived(Direct3D11CaptureFramePool sender, object args)
     {
-        try
+        // Pacing & Backpressure: If previous frame conversion is still running, drain and drop this frame
+        if (Interlocked.CompareExchange(ref _isProcessingFrame, 1, 0) != 0)
         {
-            using var frame = sender.TryGetNextFrame();
-            if (frame is null)
+            try
             {
-                return;
+                using var skipped = sender.TryGetNextFrame();
             }
+            catch { }
+            return;
+        }
 
-            // Check if captured surface dimensions changed (window resize, display rotation)
-            if (frame.ContentSize.Width != _lastSize.Width || frame.ContentSize.Height != _lastSize.Height)
+        _ = Task.Run(async () =>
+        {
+            try
             {
+                Direct3D11CaptureFrame? frame = null;
                 lock (_syncLock)
                 {
-                    if (_isCapturing && _framePool is not null && _deviceProvider is not null)
+                    if (!_isCapturing || _framePool is null)
                     {
-                        _lastSize = frame.ContentSize;
-                        _framePool.Recreate(
-                            _deviceProvider.Device,
-                            DirectXPixelFormat.B8G8R8A8UIntNormalized,
-                            2,
-                            _lastSize);
+                        return;
+                    }
+                    frame = sender.TryGetNextFrame();
+                }
+
+                if (frame is null)
+                {
+                    return;
+                }
+
+                // Check if captured surface dimensions changed (window resize, display rotation)
+                if (frame.ContentSize.Width != _lastSize.Width || frame.ContentSize.Height != _lastSize.Height)
+                {
+                    lock (_syncLock)
+                    {
+                        if (_isCapturing && _framePool is not null && _deviceProvider is not null)
+                        {
+                            _lastSize = frame.ContentSize;
+                            _framePool.Recreate(
+                                _deviceProvider.Device,
+                                DirectXPixelFormat.B8G8R8A8UIntNormalized,
+                                2,
+                                _lastSize);
+                        }
                     }
                 }
-            }
 
-            FrameArrived?.Invoke(this, new FrameArrivedEventArgs(frame));
-        }
-        catch (Exception ex)
-        {
-            CaptureError?.Invoke(this, ex);
-        }
+                // Keep frame alive throughout surface copy to prevent premature WinRT COM destruction
+                SoftwareBitmap? softwareBitmap = null;
+                try
+                {
+                    var surface = frame.Surface;
+                    if (surface is not null)
+                    {
+                        softwareBitmap = await SoftwareBitmap.CreateCopyFromSurfaceAsync(surface);
+                    }
+                }
+                finally
+                {
+                    frame.Dispose();
+                    frame = null;
+                }
+
+                if (softwareBitmap is null)
+                {
+                    return;
+                }
+
+                // Ensure pixel format is BGRA8 with Premultiplied alpha for WinUI rendering
+                SoftwareBitmap displayBitmap;
+                if (softwareBitmap.BitmapPixelFormat != BitmapPixelFormat.Bgra8 ||
+                    softwareBitmap.BitmapAlphaMode == BitmapAlphaMode.Straight)
+                {
+                    displayBitmap = SoftwareBitmap.Convert(
+                        softwareBitmap,
+                        BitmapPixelFormat.Bgra8,
+                        BitmapAlphaMode.Premultiplied);
+                    softwareBitmap.Dispose();
+                }
+                else
+                {
+                    displayBitmap = softwareBitmap;
+                }
+
+                FrameArrived?.Invoke(this, new FrameArrivedEventArgs(displayBitmap));
+            }
+            catch (Exception ex) when (ex is ObjectDisposedException or OperationCanceledException or System.Runtime.InteropServices.COMException)
+            {
+                // Expected during session stop, window closure, or resolution switch
+            }
+            catch (Exception ex)
+            {
+                CaptureError?.Invoke(this, ex);
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _isProcessingFrame, 0);
+            }
+        });
     }
 
     private void OnItemClosed(GraphicsCaptureItem sender, object args)

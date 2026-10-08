@@ -35,6 +35,7 @@ public partial class App : Application
         services.AddSingleton<IMonitorDiscoveryService, Win32MonitorDiscoveryService>();
 
         // Native Capture Pipeline Services
+        services.AddSingleton<IWin32DiagnosticCaptureService, Win32DiagnosticCaptureService>();
         services.AddSingleton<IDirect3D11DeviceProvider, Direct3D11DeviceProvider>();
         services.AddSingleton<IGraphicsCaptureItemFactory, GraphicsCaptureItemFactory>();
         services.AddSingleton<ICaptureSessionManager, CaptureSessionManager>();

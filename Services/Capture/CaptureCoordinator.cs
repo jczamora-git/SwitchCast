@@ -152,7 +152,15 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
     {
         if (State == CaptureState.Capturing)
         {
-            await _previewRenderer.RenderFrameAsync(e.Frame).ConfigureAwait(false);
+            if (e.SoftwareBitmap is not null)
+            {
+                await _previewRenderer.RenderBitmapAsync(e.SoftwareBitmap).ConfigureAwait(false);
+            }
+            else if (e.Frame is not null)
+            {
+                await _previewRenderer.RenderFrameAsync(e.Frame).ConfigureAwait(false);
+            }
+
             FrameArrived?.Invoke(this, e);
         }
     }

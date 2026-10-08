@@ -40,6 +40,9 @@
     <Compile Include="..\Services\Capture\IGraphicsCaptureItemFactory.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\IDirect3D11DeviceProvider.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\FrameArrivedEventArgs.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Capture\IWin32DiagnosticCaptureService.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Capture\Win32DiagnosticCaptureService.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Capture\Interop\NativeCaptureMethods.cs" Link="Linked\Services\Capture\Interop\%(Filename)%(Extension)" />
     <Compile Include="..\ViewModels\DashboardViewModel.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />
     <Compile Include="..\ViewModels\PresentationViewModel.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />
     <Compile Include="..\ViewModels\SourcesViewModel.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />

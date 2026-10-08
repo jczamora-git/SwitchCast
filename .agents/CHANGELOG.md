@@ -7,6 +7,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Stabilization & Capture Recovery] - 2026-10-08
+
+### Fixed (fix / perf / test)
+- **Direct3D11CaptureFrame Premature Disposal & Exception Storms**:
+  - Eliminated synchronous `using var frame` disposal in `CaptureSessionManager.cs` that previously destroyed native WinRT `IDirect3DSurface` COM objects during asynchronous `SoftwareBitmap.CreateCopyFromSurfaceAsync` surface extraction.
+  - Bound frame lifetime to complete surface copies, eliminating downstream `ObjectDisposedException`, `ArgumentException`, and `TaskCanceledException` storms.
+  - Implemented `Interlocked.CompareExchange` backpressure pacing with frame pool draining to prevent threadpool starvation and real-time lag.
+- **Unified Owned SoftwareBitmap Distribution**:
+  - Upgraded `FrameArrivedEventArgs` to deliver independently owned `SoftwareBitmap` instances.
+  - Added `RenderBitmapAsync(SoftwareBitmap)` to `ICapturePreviewRenderer` and `IPresentationOutputRenderer`, allowing both dashboard preview and presentation output to share a single GPU-to-CPU copy without redundant concurrent surface reads.
+- **Accurate Presentation Status**:
+  - Ensured `PresentationCoordinator` and `DashboardViewModel` transition cleanly from `Starting` to `Active` only when capture frames are confirmed.
+
+### Added (feat / test)
+- **Win32 GDI Diagnostic Capture Service**:
+  - Implemented [IWin32DiagnosticCaptureService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/IWin32DiagnosticCaptureService.cs) and [Win32DiagnosticCaptureService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Win32DiagnosticCaptureService.cs) based on reference patterns from AutoSnap (`PrintWindow` with `PW_RENDERFULLCONTENT (0x02)` and `BitBlt` fallbacks) with direct conversion of 32-bit DIB sections into WinUI 3 `SoftwareBitmap`.
+- **Automated Unit Tests**:
+  - Added [SwitchCast.Tests/Services/Win32DiagnosticCaptureServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/Win32DiagnosticCaptureServiceTests.cs) and expanded `CaptureCoordinatorTests.cs`, bringing the test suite to 61 tests (100% pass rate).
+
+---
+
 ## [Phase 4] - 2026-10-08
 
 ### Added (feat / test / docs)

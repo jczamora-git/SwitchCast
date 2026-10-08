@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml.Media;
 using Windows.Graphics.Capture;
+using Windows.Graphics.Imaging;
 
 namespace SwitchCast.Services.Capture;
 
@@ -22,6 +23,11 @@ public interface IPresentationOutputRenderer : IDisposable
     /// Processes and renders an acquired Direct3D 11 capture frame to the presentation output surface.
     /// </summary>
     Task RenderFrameAsync(Direct3D11CaptureFrame frame);
+
+    /// <summary>
+    /// Renders an independently owned SoftwareBitmap directly to the presentation output surface.
+    /// </summary>
+    Task RenderBitmapAsync(SoftwareBitmap bitmap);
 
     /// <summary>
     /// Freezes the current frame on screen (for pause).

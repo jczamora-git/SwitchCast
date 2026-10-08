@@ -55,4 +55,103 @@ public static class NativeCaptureMethods
 
     [DllImport("user32.dll", ExactSpelling = true)]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    public const int PW_CLIENTONLY = 0x00000001;
+    public const int PW_RENDERFULLCONTENT = 0x00000002;
+    public const int SRCCOPY = 0x00CC0020;
+    public const uint DIB_RGB_COLORS = 0;
+    public const int BI_RGB = 0;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+
+        public int Width => Right - Left;
+        public int Height => Bottom - Top;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct BITMAPINFOHEADER
+    {
+        public uint biSize;
+        public int biWidth;
+        public int biHeight;
+        public ushort biPlanes;
+        public ushort biBitCount;
+        public uint biCompression;
+        public uint biSizeImage;
+        public int biXPelsPerMeter;
+        public int biYPelsPerMeter;
+        public uint biClrUsed;
+        public uint biClrImportant;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct BITMAPINFO
+    {
+        public BITMAPINFOHEADER bmiHeader;
+        public uint bmiColors;
+    }
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    public static extern IntPtr GetWindowDC(IntPtr hWnd);
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    public static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+
+    [DllImport("gdi32.dll", ExactSpelling = true)]
+    public static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+
+    [DllImport("gdi32.dll", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool DeleteDC(IntPtr hdc);
+
+    [DllImport("gdi32.dll", ExactSpelling = true)]
+    public static extern IntPtr SelectObject(IntPtr hdc, IntPtr hgdiobj);
+
+    [DllImport("gdi32.dll", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool DeleteObject(IntPtr hObject);
+
+    [DllImport("gdi32.dll", ExactSpelling = true)]
+    public static extern IntPtr CreateDIBSection(
+        IntPtr hdc,
+        ref BITMAPINFO pbmi,
+        uint iUsage,
+        out IntPtr ppvBits,
+        IntPtr hSection,
+        uint dwOffset);
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool PrintWindow(IntPtr hwnd, IntPtr hdcBmp, uint nFlags);
+
+    [DllImport("gdi32.dll", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool BitBlt(
+        IntPtr hdcDest,
+        int nXDest,
+        int nYDest,
+        int nWidth,
+        int nHeight,
+        IntPtr hdcSrc,
+        int nXSrc,
+        int nYSrc,
+        int dwRop);
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsIconic(IntPtr hWnd);
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
 }

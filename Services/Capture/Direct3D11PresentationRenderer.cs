@@ -7,7 +7,7 @@ using Windows.Graphics.Imaging;
 namespace SwitchCast.Services.Capture;
 
 /// <summary>
-/// GPU-backed presentation renderer converting Direct3D 11 capture surfaces to WinUI 3 SoftwareBitmapSource for the Presentation Output Window.
+/// GPU-backed presentation renderer presenting capture frames onto WinUI 3 SoftwareBitmapSource for the Presentation Output Window.
 /// </summary>
 public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
 {
@@ -28,6 +28,52 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
 
     public bool IsFrozen => _isFrozen;
 
+    public async Task RenderBitmapAsync(SoftwareBitmap bitmap)
+    {
+        ArgumentNullException.ThrowIfNull(bitmap);
+
+        if (_isDisposed || _isFrozen)
+        {
+            return;
+        }
+
+        // Frame dropping / pacing: Skip if previous frame is still being presented to preserve real-time playback
+        if (Interlocked.CompareExchange(ref _isProcessingFrame, 1, 0) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var tcs = new TaskCompletionSource();
+            _dispatcherQueue.TryEnqueue(async () =>
+            {
+                try
+                {
+                    if (!_isDisposed && !_isFrozen)
+                    {
+                        await _softwareBitmapSource.SetBitmapAsync(bitmap);
+                    }
+                    tcs.TrySetResult();
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            });
+
+            await tcs.Task.ConfigureAwait(false);
+        }
+        catch
+        {
+            // Ignore transient render errors during window resize or shutdown
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _isProcessingFrame, 0);
+        }
+    }
+
     public async Task RenderFrameAsync(Direct3D11CaptureFrame frame)
     {
         ArgumentNullException.ThrowIfNull(frame);
@@ -37,7 +83,6 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
             return;
         }
 
-        // Frame dropping / pacing: Skip if the previous frame is still being copied/rendered to preserve real-time playback
         if (Interlocked.CompareExchange(ref _isProcessingFrame, 1, 0) != 0)
         {
             return;
@@ -51,20 +96,15 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
                 return;
             }
 
-            // Copy GPU Direct3D surface to SoftwareBitmap
             using var softwareBitmap = await SoftwareBitmap.CreateCopyFromSurfaceAsync(surface);
-
             if (_isDisposed || _isFrozen || softwareBitmap is null)
             {
                 return;
             }
 
-            // Ensure pixel format is BGRA8 with Premultiplied alpha for WinUI rendering
             SoftwareBitmap displayBitmap;
-            var needsConversion = softwareBitmap.BitmapPixelFormat != BitmapPixelFormat.Bgra8 ||
-                                  softwareBitmap.BitmapAlphaMode == BitmapAlphaMode.Premultiplied;
-
-            if (needsConversion)
+            if (softwareBitmap.BitmapPixelFormat != BitmapPixelFormat.Bgra8 ||
+                softwareBitmap.BitmapAlphaMode == BitmapAlphaMode.Straight)
             {
                 displayBitmap = SoftwareBitmap.Convert(
                     softwareBitmap,
@@ -76,7 +116,7 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
                 displayBitmap = SoftwareBitmap.Copy(softwareBitmap);
             }
 
-            // Dispatch frame presentation to UI thread
+            var tcs = new TaskCompletionSource();
             _dispatcherQueue.TryEnqueue(async () =>
             {
                 try
@@ -85,20 +125,23 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
                     {
                         await _softwareBitmapSource.SetBitmapAsync(displayBitmap);
                     }
+                    tcs.TrySetResult();
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignore transient render errors during window resize or shutdown
+                    tcs.TrySetException(ex);
                 }
                 finally
                 {
                     displayBitmap.Dispose();
                 }
             });
+
+            await tcs.Task.ConfigureAwait(false);
         }
         catch
         {
-            // Ignore capture frame acquisition errors during source closure
+            // Ignore transient render errors during window resize or shutdown
         }
         finally
         {

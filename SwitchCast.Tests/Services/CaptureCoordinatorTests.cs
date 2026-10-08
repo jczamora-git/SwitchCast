@@ -105,4 +105,26 @@ public class CaptureCoordinatorTests
         Assert.Equal(CaptureState.Failed, coordinator.State);
         Assert.Contains("closed or removed", coordinator.LastErrorMessage);
     }
+
+    [Fact]
+    public async Task SwitchPreviewSourceAsync_ValidSource_SwitchesSession()
+    {
+        var source1 = new WindowSource { Id = "win-1", Title = "Window 1", IsAvailable = true };
+        var source2 = new WindowSource { Id = "win-2", Title = "Window 2", IsAvailable = true };
+
+        using var coordinator = new CaptureCoordinator(
+            _mockItemFactory.Object,
+            _mockDeviceProvider.Object,
+            _mockSessionManager.Object,
+            _mockPreviewRenderer.Object,
+            _mockPresentationStateService.Object);
+
+        await coordinator.StartPreviewAsync(source1);
+        Assert.Equal(CaptureState.Capturing, coordinator.State);
+
+        await coordinator.SwitchPreviewSourceAsync(source2);
+        Assert.Equal(CaptureState.Capturing, coordinator.State);
+        Assert.Equal(source2.Id, coordinator.CurrentPreviewSource?.Id);
+        _mockPresentationStateService.Verify(s => s.SetActiveSource(source2), Times.Once);
+    }
 }
