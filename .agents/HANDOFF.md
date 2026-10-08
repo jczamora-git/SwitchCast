@@ -3,51 +3,54 @@
 ---
 
 ## Task Details
-- **Task**: Dynamic Application Icons Runtime Fix
-- **Date**: 2026-10-09T04:00:00+08:00 (UTC+8)
+- **Task**: Window Positioning & Native Application Icon (Centered Presentation Output + Native Branding)
+- **Date**: 2026-10-09T05:30:00+08:00 (UTC+8)
 - **Status**: Completed
 
 ---
 
 ## 1. Objective
-Fix SwitchCast's Sources page so authentic Windows application icons (Google Chrome, Visual Studio, File Explorer, Antigravity IDE, etc.) are extracted and rendered in the source list rows instead of the generic orange fallback monitor icon.
+1. Make the Presentation Output window open automatically centered within the usable work area of the appropriate monitor (the monitor containing `MainWindow`, or fallback primary monitor), supporting multi-monitor configurations with negative virtual coordinates, DPI scaling, and work-area clamping.
+2. Create and configure a proper native Windows application icon using the existing SwitchCast logo (`#FF7A59` coral badge with `\uE7F4` screen-share glyph) across `SwitchCast.exe`, `MainWindow`, `PresentationWindow`, Windows Taskbar, and Alt+Tab.
 
 ---
 
-## 2. Root Cause Analysis & Architecture Fixes
+## 2. Architecture & Implementation Details
 
-1. **WinUI 3 Thread Affinity (`RPC_E_WRONG_THREAD`)**:
-   - **Root Cause**: `Win32WindowIconService.GetIconForSourceAsync` extracted pixel data on a background thread via `await Task.Run(...).ConfigureAwait(false)` and then constructed `new SoftwareBitmapSource()` and invoked `await sourceImage.SetBitmapAsync(...)` on the ThreadPool worker thread. In WinUI 3, `SoftwareBitmapSource` is a `DependencyObject` requiring creation and manipulation on the UI thread (`DispatcherQueue`). The call threw a COM thread-affinity exception that was caught and silently returned `null`, leaving all UI rows permanently on the fallback `<FontIcon>` glyph.
-   - **Fix**: Captured `DispatcherQueue` and marshalled `SoftwareBitmap` copy and `SoftwareBitmapSource.SetBitmapAsync` onto the UI thread via `_dispatcherQueue.TryEnqueue(...)`.
+1. **Presentation Output Centering ([Views/PresentationWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml.cs))**:
+   - Centering is performed during `InitializeAppWindow()` on first open/construction of `PresentationWindow`.
+   - Monitor detection: Inspects `App.Current.MainWindow?.WindowHandle` or fallback `WindowHandle` using `MonitorFromWindow(targetHwnd, MONITOR_DEFAULTTOPRIMARY)`.
+   - Work area querying: Retrieves `MONITORINFO.rcWork` via `GetMonitorInfo`, accounting for taskbar positions (bottom, top, left, right) and multi-monitor offsets.
+   - Geometry calculation in pure helper [Services/WindowPositioningHelper.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/WindowPositioningHelper.cs):
+     `centerX = workArea.Left + (workArea.Width - pixelWidth) / 2`
+     `centerY = workArea.Top + (workArea.Height - pixelHeight) / 2`
+   - DPI scaling: Scales base 1280x720 DIP dimensions to physical pixels via `GetDpiForWindow(WindowHandle)` (`scale = dpi / 96.0`), clamping if work area is smaller than the requested size.
+   - Single-instance lifecycle preserved: Selecting "Presentation Output" when already open invokes `IWindowActivationService` to bring the window forward without recentering. Moving the window or switching sources preserves user placement and HWND stability.
 
-2. **Process Path Extraction Access Denied**:
-   - **Root Cause**: `Win32WindowDiscoveryService` attempted `Process.GetProcessById(pid).MainModule?.FileName`, which throws `Win32Exception` (Access Denied) for 32/64-bit cross-architecture processes or non-elevated callers, leaving `ProcessPath = null` for many running applications.
-   - **Fix**: Added native Win32 `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid)` and `QueryFullProcessImageNameW`, allowing reliable executable path queries across all user-space processes.
+2. **Native Windows Application Icon ([Assets/SwitchCast.ico](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Assets/SwitchCast.ico))**:
+   - Generated multi-resolution Windows ICO asset matching the title bar coral badge (`#FF7A59`) with the white screen-share / cast symbol (`\uE7F4`).
+   - Contains 7 standard resolutions (16x16, 24x24, 32x32, 48x48, 64x64, 128x128, 256x256) with 32-bit ARGB alpha transparency and crisp downscaling.
+   - Configured `<ApplicationIcon>Assets\SwitchCast.ico</ApplicationIcon>` and `<Content Include="Assets\SwitchCast.ico"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>` in [SwitchCast.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.csproj).
+   - Applied `_appWindow.SetIcon(iconPath)` in both `MainWindow.xaml.cs` and `Views/PresentationWindow.xaml.cs` with reliable base directory resolution (`AppContext.BaseDirectory`).
 
-3. **Multi-Tier Native Win32 Icon Resolution**:
-   - Extraction sequence in [Services/Win32WindowIconService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowIconService.cs):
-     1. Window-specific icon via `SendMessageTimeout` (`WM_GETICON` with `ICON_SMALL2` -> `ICON_SMALL` -> `ICON_BIG`) with 100ms timeout.
-     2. Window class icon via `GetClassLongPtr` (`GCLP_HICONSM` -> `GCLP_HICON`).
-     3. Shell/Executable icon extraction via `ExtractIconExW` (32x32) -> `SHGetFileInfoW` (`SHGFI_LARGEICON` / `SHGFI_SMALLICON`).
-   - Resource lifecycle: `DestroyIcon` is strictly called on owned shell/executable handles, never on borrowed window/class handles.
-
-4. **Accurate Alpha Transparency & DIB Rendering**:
-   - Inspected icon bit depth via `GetIconInfo` (`hbmColor` bit count). Modern 32-bit ARGB icons preserve true alpha; legacy masked icons have opaque alpha assigned to content pixels, eliminating black/transparent box artifacts.
-
-5. **Dual-Key Caching & Bounded Concurrency**:
-   - Dual-keyed `ConcurrentDictionary` by window source ID and `exe_{ProcessPath.ToLowerInvariant()}`, reusing process-level icons across multiple windows (e.g. multi-window Chrome or Explorer) in 0ms.
-   - [ViewModels/SourcesViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SourcesViewModel.cs) `LoadIconsAsync` upgraded with `SemaphoreSlim(8)` to load icons in parallel without blocking the UI thread.
+3. **Single Source of Truth for Window Centering**:
+   - `MainWindow.xaml.cs` startup positioning and `PresentationWindow.xaml.cs` both delegate centering calculations to [Services/WindowPositioningHelper.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/WindowPositioningHelper.cs).
 
 ---
 
 ## 3. Files Modified
 
+### Added Files
+- [Assets/SwitchCast.ico](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Assets/SwitchCast.ico)
+- [Services/WindowPositioningHelper.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/WindowPositioningHelper.cs)
+- [SwitchCast.Tests/Services/WindowPositioningHelperTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/WindowPositioningHelperTests.cs)
+- [SwitchCast.Tests/Services/ApplicationBrandingTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/ApplicationBrandingTests.cs)
+
 ### Modified Files
-- [Services/Win32WindowDiscoveryService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowDiscoveryService.cs)
-- [Services/Win32WindowIconService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowIconService.cs)
-- [ViewModels/SourcesViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SourcesViewModel.cs)
-- [SwitchCast.Tests/Services/WindowIconServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/WindowIconServiceTests.cs)
-- [SwitchCast.Tests/Stubs/XamlStubs.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Stubs/XamlStubs.cs)
+- [SwitchCast.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.csproj)
+- [MainWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/MainWindow.xaml.cs)
+- [Views/PresentationWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml.cs)
+- [SwitchCast.Tests/SwitchCast.Tests.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/SwitchCast.Tests.csproj)
 - [.agents/PROJECT_STATE.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/PROJECT_STATE.md)
 - [.agents/HANDOFF.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/HANDOFF.md)
 - [.agents/CHANGELOG.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/CHANGELOG.md)
@@ -55,16 +58,13 @@ Fix SwitchCast's Sources page so authentic Windows application icons (Google Chr
 ---
 
 ## 4. Validation Performed
-- **Level 1 (Build)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 2.51s).
+- **Level 1 (Build)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 3.09s).
 - **Level 2 (Static Analysis)**: Analyzers and nullable reference checks -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (156 passed, 0 failed, 0 skipped in 434ms).
-- **Level 4 (Dynamic Application Icons & Real Windows Extraction)**: Verified real `explorer.exe` icon extraction and process-level cache reuse in automated test suite.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (167 passed, 0 failed, 0 skipped in 410ms).
+- **Level 4 (Executable & Asset Resource Extraction)**: Verified `SwitchCast.ico` file header integrity, 7 embedded resolution frames, and extracted embedded icon from `SwitchCast.exe` via `[System.Drawing.Icon]::ExtractAssociatedIcon`.
 
 ---
 
 ## 5. Next Steps
 - **Next Task**: **Phase 6 — Stability & Performance Optimization**
 - Implement Direct3D 11 device loss resilience, dynamic multi-monitor DPI scaling adaptation, and extended load verification.
-
-
-

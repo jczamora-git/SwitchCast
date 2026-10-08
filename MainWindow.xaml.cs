@@ -61,10 +61,39 @@ public sealed partial class MainWindow : Window
         {
             _appWindow.Title = _viewModel.WindowTitle;
 
+            ApplyAppIcon();
             ApplyStartupWindowPlacement();
             _appWindow.Closing += OnAppWindowClosing;
 
             UpdateTitleBarColors(_viewModel.CurrentTheme);
+        }
+    }
+
+    private void ApplyAppIcon()
+    {
+        if (_appWindow is null)
+        {
+            return;
+        }
+
+        try
+        {
+            string primaryPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "SwitchCast.ico");
+            if (System.IO.File.Exists(primaryPath))
+            {
+                _appWindow.SetIcon(primaryPath);
+                return;
+            }
+
+            string fallbackPath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "Assets", "SwitchCast.ico");
+            if (System.IO.File.Exists(fallbackPath))
+            {
+                _appWindow.SetIcon(fallbackPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MainWindow] ApplyAppIcon failed: {ex.Message}");
         }
     }
 
@@ -131,10 +160,15 @@ public sealed partial class MainWindow : Window
                 int workAreaWidth = info.rcWork.Right - info.rcWork.Left;
                 int workAreaHeight = info.rcWork.Bottom - info.rcWork.Top;
 
-                int centerX = info.rcWork.Left + (workAreaWidth - pixelWidth) / 2;
-                int centerY = info.rcWork.Top + (workAreaHeight - pixelHeight) / 2;
+                var (centerX, centerY, width, height) = WindowPositioningHelper.CalculateCenteredPosition(
+                    info.rcWork.Left,
+                    info.rcWork.Top,
+                    workAreaWidth,
+                    workAreaHeight,
+                    pixelWidth,
+                    pixelHeight);
 
-                _appWindow.MoveAndResize(new RectInt32(centerX, centerY, pixelWidth, pixelHeight));
+                _appWindow.MoveAndResize(new RectInt32(centerX, centerY, width, height));
             }
             else
             {

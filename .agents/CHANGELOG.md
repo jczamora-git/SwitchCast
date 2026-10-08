@@ -7,6 +7,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Window Positioning & Native Application Icon] - 2026-10-09
+
+### Added / Improved (feat / UI / test / docs)
+- **Centered Presentation Output Window Positioning**:
+  - Implemented automatic, DPI-aware initial centering for `PresentationWindow` in [Views/PresentationWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml.cs) using [Services/WindowPositioningHelper.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/WindowPositioningHelper.cs).
+  - Determines target monitor from `MainWindow` (if active) with fallback to primary display (`MonitorFromWindow`), retrieving usable work area (`MONITORINFO.rcWork`) excluding taskbar offsets.
+  - Supports multi-monitor configurations with arbitrary or negative virtual coordinates, arbitrary DPI scale factors (100%, 125%, 150%), and work-area boundary clamping if requested dimensions exceed the screen.
+  - Preserved single-instance lifecycle: centering applies strictly on initial window open; existing open windows are brought forward via `IWindowActivationService` without recentering or interrupting ongoing screen shares.
+- **Native Windows Application Icon & Consistent Branding**:
+  - Created high-quality multi-resolution Windows icon asset at [Assets/SwitchCast.ico](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Assets/SwitchCast.ico) matching the custom title-bar coral badge (`#FF7A59`) and screen-share glyph (`\uE7F4`). Contains 7 standard resolutions (16x16, 24x24, 32x32, 48x48, 64x64, 128x128, 256x256) with 32-bit ARGB alpha transparency.
+  - Configured `<ApplicationIcon>Assets\SwitchCast.ico</ApplicationIcon>` and `<Content Include="Assets\SwitchCast.ico"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>` in [SwitchCast.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.csproj) to embed the icon in `SwitchCast.exe` for Windows Explorer, Taskbar, and Task Manager.
+  - Configured native window icons on `MainWindow` and `PresentationWindow` using `_appWindow.SetIcon(...)`, ensuring crisp branded identities in Alt+Tab, Taskbar entries, and window titles.
+- **Automated Unit & Regression Tests**:
+  - Created [SwitchCast.Tests/Services/WindowPositioningHelperTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/WindowPositioningHelperTests.cs) verifying centering math across 1080p, 1440p, 1366x768, negative coordinates, DPI scaling, and work-area clamping.
+  - Created [SwitchCast.Tests/Services/ApplicationBrandingTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/ApplicationBrandingTests.cs) verifying `Assets/SwitchCast.ico` file header integrity, 7 embedded resolution frames, and `.csproj` build configuration.
+  - All 167 unit and regression tests passing (100% pass rate).
+
+---
+
 ## [Dynamic Application Icons Runtime Fix] - 2026-10-09
 
 ### Fixed / Added (fix / UI / test / docs)

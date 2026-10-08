@@ -41,6 +41,7 @@
     <Compile Include="..\Services\Win32HotkeyService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IPresentationCoordinator.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\PresentationCoordinator.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\WindowPositioningHelper.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\CaptureState.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\ICaptureCoordinator.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\CaptureCoordinator.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />

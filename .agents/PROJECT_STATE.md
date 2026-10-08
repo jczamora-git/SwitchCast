@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Dynamic Application Icons Runtime Fix (Real Windows App Icons in Sources List)
+- **Current Phase**: Window Positioning & Native Application Icon (Centered Presentation Output + Native Branding)
 - **Overall Status**: **Completed (Ready for Phase 6)**
-- **Last Updated**: 2026-10-09T04:00:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-09T05:30:00+08:00 (UTC+8)
 
 ---
 
@@ -17,6 +17,15 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ### Implemented & Verified
 - [x] **Strict AI Development Harness (Phase 0)**: Standardized rules ([AGENTS.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/AGENTS.md)), 6 domain skills, architecture specifications, coding standards, and [.editorconfig](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.editorconfig).
+- [x] **Centered Presentation Output Window Positioning**:
+  - Implemented DPI-aware initial centering for `PresentationWindow` in [PresentationWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml.cs) using pure math helper [WindowPositioningHelper.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/WindowPositioningHelper.cs).
+  - Determines target monitor from `MainWindow` (with fallback to primary monitor), retrieving usable work area (`MONITORINFO.rcWork`) excluding taskbars.
+  - Handles multi-monitor configurations with arbitrary or negative coordinates, DPI scaling factors, and work-area boundary clamping.
+  - Centering runs only on new window initialization; existing instances are activated via `IWindowActivationService` without repositioning or disrupting active screen-sharing streams.
+- [x] **Native Windows Application Icon & Consistent Branding**:
+  - Generated multi-resolution Windows ICO asset at [Assets/SwitchCast.ico](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Assets/SwitchCast.ico) containing 7 frames (16x16, 24x24, 32x32, 48x48, 64x64, 128x128, 256x256) matching the custom title-bar coral badge (`#FF7A59`) and screen-share glyph (`\uE7F4`).
+  - Configured `<ApplicationIcon>Assets\SwitchCast.ico</ApplicationIcon>` and `<Content Include="Assets\SwitchCast.ico"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>` in [SwitchCast.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.csproj) for embedding into `SwitchCast.exe` (Windows Explorer, Taskbar, Task Manager).
+  - Configured native window icons on `MainWindow` and `PresentationWindow` via `_appWindow.SetIcon(iconPath)` for consistent taskbar and Alt+Tab branding.
 - [x] **Dynamic Native Application Icons Engine (Runtime Fix)**:
   - Fixed WinUI 3 `SoftwareBitmapSource` thread affinity by marshalling `SetBitmapAsync` to the UI thread via `DispatcherQueue`, resolving the root cause where background thread creation threw `RPC_E_WRONG_THREAD` and defaulted all items to fallback glyphs.
   - Implemented multi-tier icon extraction: `WM_GETICON` -> `GetClassLongPtr` (`GCLP_HICONSM`/`GCLP_HICON`) -> `ExtractIconExW` (32x32) -> `SHGetFileInfoW` (`SHGFI_LARGEICON`/`SHGFI_SMALLICON`).
@@ -93,7 +102,7 @@ This is the authoritative progress, state, and environmental tracking document f
   - Three source switching modes: `ActiveAndLive` (A+L), `ActiveOnly` (A), `LiveOnly` (L, default).
   - Minimal single-row floating presenter dock in Expanded and Compact modes.
   - Unclipped external dropdown host [PresenterDockMenuWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml) with DPI-aware positioning.
-- [x] **Automated Unit & Regression Test Suite**: 152 comprehensive unit & regression tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) with 100% pass rate.
+- [x] **Automated Unit & Regression Test Suite**: 167 comprehensive unit & regression tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) with 100% pass rate.
 
 ### Planned (Upcoming)
 - [ ] **Phase 6**: Stability & Performance Optimization (Device loss recovery, leak audits, DPI dynamic multi-monitor adaptation).
@@ -127,10 +136,10 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ## 6. VERIFICATION RECORD
 
-- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 2.51s).
+- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 3.09s).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (156 passed, 0 failed, 0 skipped in 434ms).
-- **Level 4 (Dynamic Application Icons & Real Windows Extraction)**: UI thread marshalling, multi-tier icon resolution (`WM_GETICON`, `GetClassLongPtr`, `ExtractIconExW`, `SHGetFileInfoW`), process path query, alpha channel extraction, cache reuse, and live explorer.exe icon extraction verified.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (167 passed, 0 failed, 0 skipped in 410ms).
+- **Level 4 (Window Positioning & Native Application Branding)**: Presentation output monitor work-area centering, negative virtual coordinates, DPI scaling, multi-resolution `SwitchCast.ico` asset (7 frames), executable embedded icon (`ExtractAssociatedIcon`), and `_appWindow.SetIcon` configured and verified.
 
 ---
 
@@ -138,6 +147,7 @@ This is the authoritative progress, state, and environmental tracking document f
 
 **Task**: **Phase 6 — Stability & Performance Optimization**
 - **Objective**: Direct3D 11 device loss resilience, DPI dynamic scaling across multi-monitor setups, and extended presentation load tests.
+
 
 
 

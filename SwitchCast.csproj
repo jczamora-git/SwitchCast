@@ -21,7 +21,14 @@
     <VCInstallPath32 Condition="'$(VCInstallPath32)' == ''">none</VCInstallPath32>
     <VCInstallPath64 Condition="'$(VCInstallPath64)' == ''">none</VCInstallPath64>
     <VCToolsInstallDir Condition="'$(VCToolsInstallDir)' == ''">none</VCToolsInstallDir>
+    <ApplicationIcon>Assets\SwitchCast.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\SwitchCast.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
   <ItemGroup>
     <Compile Remove="SwitchCast.Tests\**" />

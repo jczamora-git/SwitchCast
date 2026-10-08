@@ -50,16 +50,86 @@ public sealed partial class PresentationWindow : Window
         {
             _appWindow.Title = "SwitchCast Presentation Output";
 
-            uint dpi = GetDpiForWindow(WindowHandle);
-            if (dpi == 0)
-            {
-                dpi = 96;
-            }
-            double scale = dpi / 96.0;
-
-            _appWindow.Resize(new SizeInt32((int)Math.Round(1280 * scale), (int)Math.Round(720 * scale)));
+            ApplyAppIcon();
+            CenterPresentationWindow();
 
             UpdateTitleBarColors(_settingsService.CurrentSettings.Theme);
+        }
+    }
+
+    private void ApplyAppIcon()
+    {
+        if (_appWindow is null)
+        {
+            return;
+        }
+
+        try
+        {
+            string primaryPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "SwitchCast.ico");
+            if (System.IO.File.Exists(primaryPath))
+            {
+                _appWindow.SetIcon(primaryPath);
+                return;
+            }
+
+            string fallbackPath = System.IO.Path.Combine(Directory.GetCurrentDirectory(), "Assets", "SwitchCast.ico");
+            if (System.IO.File.Exists(fallbackPath))
+            {
+                _appWindow.SetIcon(fallbackPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PresentationWindow] ApplyAppIcon failed: {ex.Message}");
+        }
+    }
+
+    private void CenterPresentationWindow()
+    {
+        if (_appWindow is null)
+        {
+            return;
+        }
+
+        uint dpi = GetDpiForWindow(WindowHandle);
+        if (dpi == 0)
+        {
+            dpi = 96;
+        }
+        double scale = dpi / 96.0;
+
+        // Determine target monitor: prefer monitor where MainWindow is currently located
+        IntPtr targetHwnd = WindowHandle;
+        if (App.Current.MainWindow is MainWindow mw && mw.WindowHandle != IntPtr.Zero)
+        {
+            targetHwnd = mw.WindowHandle;
+        }
+
+        var hMonitor = MonitorFromWindow(targetHwnd, MONITOR_DEFAULTTOPRIMARY);
+        var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+
+        if (GetMonitorInfo(hMonitor, ref info))
+        {
+            int workAreaWidth = info.rcWork.Right - info.rcWork.Left;
+            int workAreaHeight = info.rcWork.Bottom - info.rcWork.Top;
+
+            var (x, y, width, height) = WindowPositioningHelper.CalculateDpiScaledCenteredPosition(
+                info.rcWork.Left,
+                info.rcWork.Top,
+                workAreaWidth,
+                workAreaHeight,
+                1280.0,
+                720.0,
+                scale);
+
+            _appWindow.MoveAndResize(new RectInt32(x, y, width, height));
+        }
+        else
+        {
+            int pixelWidth = (int)Math.Round(1280.0 * scale);
+            int pixelHeight = (int)Math.Round(720.0 * scale);
+            _appWindow.Resize(new SizeInt32(pixelWidth, pixelHeight));
         }
     }
 
@@ -119,6 +189,36 @@ public sealed partial class PresentationWindow : Window
         _settingsService.ThemeChanged -= OnThemeChanged;
     }
 
+    #region Win32 P/Invoke
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    private struct MONITORINFO
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public int dwFlags;
+    }
+
+    private const uint MONITOR_DEFAULTTOPRIMARY = 1;
+
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    #endregion
 }
