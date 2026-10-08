@@ -2,6 +2,8 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Text;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using SwitchCast.Models;
@@ -10,7 +12,7 @@ using Windows.Graphics.Imaging;
 namespace SwitchCast.Services;
 
 /// <summary>
-/// High-performance Win32 and Shell icon extraction service with caching and safe native handle lifecycle management.
+/// High-performance Win32 and Shell icon extraction service with caching, UI thread dispatching, and safe native handle lifecycle management.
 /// </summary>
 public sealed class Win32WindowIconService : IWindowIconService
 {
@@ -29,14 +31,23 @@ public sealed class Win32WindowIconService : IWindowIconService
     private const uint SMTO_BLOCK = 0x0001;
 
     private const uint SHGFI_ICON = 0x000000100;
+    private const uint SHGFI_LARGEICON = 0x000000000;
     private const uint SHGFI_SMALLICON = 0x000000001;
 
     private const uint DI_NORMAL = 0x0003;
     private const int DIB_RGB_COLORS = 0;
     private const int BI_RGB = 0;
 
+    private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
     private readonly ConcurrentDictionary<string, ImageSource> _iconCache = new();
+    private readonly DispatcherQueue? _dispatcherQueue;
     private bool _isDisposed;
+
+    public Win32WindowIconService(DispatcherQueue? dispatcherQueue = null)
+    {
+        _dispatcherQueue = dispatcherQueue ?? DispatcherQueue.GetForCurrentThread();
+    }
 
     public async Task<ImageSource?> GetIconForSourceAsync(CaptureSource source, CancellationToken cancellationToken = default)
     {
@@ -51,9 +62,19 @@ public sealed class Win32WindowIconService : IWindowIconService
             return cached;
         }
 
+        string? exeCacheKey = !string.IsNullOrWhiteSpace(windowSource.ProcessPath)
+            ? $"exe_{windowSource.ProcessPath.ToLowerInvariant()}"
+            : null;
+
+        if (exeCacheKey is not null && _iconCache.TryGetValue(exeCacheKey, out var exeCached))
+        {
+            _iconCache[cacheKey] = exeCached;
+            return exeCached;
+        }
+
         try
         {
-            // Extract icon pixels on background thread to avoid blocking UI
+            // 1. Extract icon pixels on background thread to avoid blocking UI
             var pixelData = await Task.Run(() => ExtractIconPixelBytes(windowSource), cancellationToken).ConfigureAwait(false);
 
             if (pixelData is null || pixelData.Length == 0)
@@ -61,20 +82,69 @@ public sealed class Win32WindowIconService : IWindowIconService
                 return null;
             }
 
-            // Create SoftwareBitmap and SoftwareBitmapSource
-            var softwareBitmap = new SoftwareBitmap(
-                BitmapPixelFormat.Bgra8,
-                ICON_WIDTH,
-                ICON_HEIGHT,
-                BitmapAlphaMode.Premultiplied);
+            // 2. Create SoftwareBitmap and SoftwareBitmapSource on the UI thread
+            var dispatcher = _dispatcherQueue ?? DispatcherQueue.GetForCurrentThread();
+            if (dispatcher is not null && !dispatcher.HasThreadAccess)
+            {
+                var tcs = new TaskCompletionSource<ImageSource?>();
+                bool enqueued = dispatcher.TryEnqueue(async () =>
+                {
+                    try
+                    {
+                        var softwareBitmap = new SoftwareBitmap(
+                            BitmapPixelFormat.Bgra8,
+                            ICON_WIDTH,
+                            ICON_HEIGHT,
+                            BitmapAlphaMode.Premultiplied);
 
-            softwareBitmap.CopyFromBuffer(pixelData.AsBuffer());
+                        softwareBitmap.CopyFromBuffer(pixelData.AsBuffer());
 
-            var sourceImage = new SoftwareBitmapSource();
-            await sourceImage.SetBitmapAsync(softwareBitmap);
+                        var sourceImage = new SoftwareBitmapSource();
+                        await sourceImage.SetBitmapAsync(softwareBitmap);
 
-            _iconCache[cacheKey] = sourceImage;
-            return sourceImage;
+                        _iconCache[cacheKey] = sourceImage;
+                        if (exeCacheKey is not null)
+                        {
+                            _iconCache[exeCacheKey] = sourceImage;
+                        }
+
+                        tcs.TrySetResult(sourceImage);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[WindowIconService] Error creating SoftwareBitmapSource on UI thread for {windowSource.Title}: {ex.Message}");
+                        tcs.TrySetResult(null);
+                    }
+                });
+
+                if (!enqueued)
+                {
+                    return null;
+                }
+
+                return await tcs.Task;
+            }
+            else
+            {
+                var softwareBitmap = new SoftwareBitmap(
+                    BitmapPixelFormat.Bgra8,
+                    ICON_WIDTH,
+                    ICON_HEIGHT,
+                    BitmapAlphaMode.Premultiplied);
+
+                softwareBitmap.CopyFromBuffer(pixelData.AsBuffer());
+
+                var sourceImage = new SoftwareBitmapSource();
+                await sourceImage.SetBitmapAsync(softwareBitmap);
+
+                _iconCache[cacheKey] = sourceImage;
+                if (exeCacheKey is not null)
+                {
+                    _iconCache[exeCacheKey] = sourceImage;
+                }
+
+                return sourceImage;
+            }
         }
         catch (Exception ex)
         {
@@ -113,7 +183,7 @@ public sealed class Win32WindowIconService : IWindowIconService
 
         try
         {
-            // 1. Try WM_GETICON (ICON_SMALL2 -> ICON_SMALL -> ICON_BIG) with 200ms timeout
+            // 1. Try WM_GETICON (ICON_SMALL2 -> ICON_SMALL -> ICON_BIG) with 100ms timeout
             hIcon = GetWindowIcon(hWnd);
 
             // 2. Fallback: Window class icon via GetClassLongPtr
@@ -122,13 +192,18 @@ public sealed class Win32WindowIconService : IWindowIconService
                 hIcon = GetClassIcon(hWnd);
             }
 
-            // 3. Fallback: Shell icon from process executable path
-            if (hIcon == IntPtr.Zero && !string.IsNullOrWhiteSpace(windowSource.ProcessPath))
+            // 3. Fallback: Shell/Executable icon from process executable path
+            if (hIcon == IntPtr.Zero)
             {
-                hIcon = GetShellProcessIcon(windowSource.ProcessPath);
-                if (hIcon != IntPtr.Zero)
+                string? exePath = windowSource.ProcessPath;
+                if (string.IsNullOrWhiteSpace(exePath) && windowSource.ProcessId != 0)
                 {
-                    isOwnedHandle = true; // Shell icons must be released with DestroyIcon
+                    exePath = GetProcessPath(windowSource.ProcessId);
+                }
+
+                if (!string.IsNullOrWhiteSpace(exePath))
+                {
+                    hIcon = GetExecutableIcon(exePath, out isOwnedHandle);
                 }
             }
 
@@ -158,19 +233,19 @@ public sealed class Win32WindowIconService : IWindowIconService
         }
 
         // Try ICON_SMALL2
-        if (SendMessageTimeout(hWnd, WM_GETICON, ICON_SMALL2, IntPtr.Zero, SMTO_ABORTIFHUNG | SMTO_BLOCK, 200, out var result) != IntPtr.Zero && result != IntPtr.Zero)
+        if (SendMessageTimeout(hWnd, WM_GETICON, ICON_SMALL2, IntPtr.Zero, SMTO_ABORTIFHUNG | SMTO_BLOCK, 100, out var result) != IntPtr.Zero && result != IntPtr.Zero)
         {
             return result;
         }
 
         // Try ICON_SMALL
-        if (SendMessageTimeout(hWnd, WM_GETICON, ICON_SMALL, IntPtr.Zero, SMTO_ABORTIFHUNG | SMTO_BLOCK, 200, out result) != IntPtr.Zero && result != IntPtr.Zero)
+        if (SendMessageTimeout(hWnd, WM_GETICON, ICON_SMALL, IntPtr.Zero, SMTO_ABORTIFHUNG | SMTO_BLOCK, 100, out result) != IntPtr.Zero && result != IntPtr.Zero)
         {
             return result;
         }
 
         // Try ICON_BIG
-        if (SendMessageTimeout(hWnd, WM_GETICON, ICON_BIG, IntPtr.Zero, SMTO_ABORTIFHUNG | SMTO_BLOCK, 200, out result) != IntPtr.Zero && result != IntPtr.Zero)
+        if (SendMessageTimeout(hWnd, WM_GETICON, ICON_BIG, IntPtr.Zero, SMTO_ABORTIFHUNG | SMTO_BLOCK, 100, out result) != IntPtr.Zero && result != IntPtr.Zero)
         {
             return result;
         }
@@ -193,18 +268,55 @@ public sealed class Win32WindowIconService : IWindowIconService
         return hIcon;
     }
 
-    private static IntPtr GetShellProcessIcon(string processPath)
+    private static IntPtr GetExecutableIcon(string exePath, out bool isOwned)
     {
+        isOwned = false;
+
         try
         {
-            if (!File.Exists(processPath))
+            if (!File.Exists(exePath))
             {
                 return IntPtr.Zero;
             }
 
+            // Primary: ExtractIconEx for large (32x32) or small (16x16) icon
+            int count = ExtractIconExW(exePath, 0, out IntPtr hLarge, out IntPtr hSmall, 1);
+            if (count > 0)
+            {
+                if (hLarge != IntPtr.Zero)
+                {
+                    if (hSmall != IntPtr.Zero)
+                    {
+                        DestroyIcon(hSmall);
+                    }
+                    isOwned = true;
+                    return hLarge;
+                }
+                if (hSmall != IntPtr.Zero)
+                {
+                    isOwned = true;
+                    return hSmall;
+                }
+            }
+
+            // Fallback: SHGetFileInfo with large icon
             var shinfo = new SHFILEINFO();
-            var res = SHGetFileInfo(
-                processPath,
+            var res = SHGetFileInfoW(
+                exePath,
+                0,
+                ref shinfo,
+                (uint)Marshal.SizeOf<SHFILEINFO>(),
+                SHGFI_ICON | SHGFI_LARGEICON);
+
+            if (res != IntPtr.Zero && shinfo.hIcon != IntPtr.Zero)
+            {
+                isOwned = true;
+                return shinfo.hIcon;
+            }
+
+            // Fallback: SHGetFileInfo with small icon
+            res = SHGetFileInfoW(
+                exePath,
                 0,
                 ref shinfo,
                 (uint)Marshal.SizeOf<SHFILEINFO>(),
@@ -212,6 +324,7 @@ public sealed class Win32WindowIconService : IWindowIconService
 
             if (res != IntPtr.Zero && shinfo.hIcon != IntPtr.Zero)
             {
+                isOwned = true;
                 return shinfo.hIcon;
             }
         }
@@ -221,6 +334,42 @@ public sealed class Win32WindowIconService : IWindowIconService
         }
 
         return IntPtr.Zero;
+    }
+
+    private static string? GetProcessPath(uint processId)
+    {
+        if (processId == 0)
+        {
+            return null;
+        }
+
+        var hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
+        if (hProcess != IntPtr.Zero)
+        {
+            try
+            {
+                var sb = new StringBuilder(1024);
+                int size = sb.Capacity;
+                if (QueryFullProcessImageNameW(hProcess, 0, sb, ref size))
+                {
+                    return sb.ToString();
+                }
+            }
+            finally
+            {
+                CloseHandle(hProcess);
+            }
+        }
+
+        try
+        {
+            using var process = Process.GetProcessById((int)processId);
+            return process.MainModule?.FileName;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static byte[]? RenderIconToBgra32(IntPtr hIcon, int width, int height)
@@ -258,6 +407,27 @@ public sealed class Win32WindowIconService : IWindowIconService
 
         try
         {
+            // Check icon info for 32-bit color bitmap vs mask bitmap
+            bool is32Bit = false;
+            if (GetIconInfo(hIcon, out var iconInfo))
+            {
+                if (iconInfo.hbmColor != IntPtr.Zero)
+                {
+                    if (GetObject(iconInfo.hbmColor, Marshal.SizeOf<BITMAP>(), out var bmp) > 0)
+                    {
+                        if (bmp.bmBitsPixel == 32)
+                        {
+                            is32Bit = true;
+                        }
+                    }
+                    DeleteObject(iconInfo.hbmColor);
+                }
+                if (iconInfo.hbmMask != IntPtr.Zero)
+                {
+                    DeleteObject(iconInfo.hbmMask);
+                }
+            }
+
             // Draw icon onto memory DC with alpha channel support
             bool drawn = DrawIconEx(hdcMem, 0, 0, hIcon, width, height, 0, IntPtr.Zero, DI_NORMAL);
             if (!drawn)
@@ -269,7 +439,7 @@ public sealed class Win32WindowIconService : IWindowIconService
             byte[] pixelBytes = new byte[byteLength];
             Marshal.Copy(ppvBits, pixelBytes, 0, byteLength);
 
-            // Verify alpha channel for legacy 1-bit or 24-bit icons
+            // Verify alpha channel
             bool hasAlpha = false;
             for (int i = 3; i < pixelBytes.Length; i += 4)
             {
@@ -280,7 +450,7 @@ public sealed class Win32WindowIconService : IWindowIconService
                 }
             }
 
-            if (!hasAlpha)
+            if (!hasAlpha || !is32Bit)
             {
                 // Fix opaque alpha for legacy icons
                 for (int i = 0; i < pixelBytes.Length; i += 4)
@@ -309,7 +479,7 @@ public sealed class Win32WindowIconService : IWindowIconService
 
     #region Win32 P/Invoke
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct SHFILEINFO
     {
         public IntPtr hIcon;
@@ -319,6 +489,28 @@ public sealed class Win32WindowIconService : IWindowIconService
         public string szDisplayName;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 80)]
         public string szTypeName;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ICONINFO
+    {
+        public bool fIcon;
+        public int xHotspot;
+        public int yHotspot;
+        public IntPtr hbmMask;
+        public IntPtr hbmColor;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BITMAP
+    {
+        public int bmType;
+        public int bmWidth;
+        public int bmHeight;
+        public int bmWidthBytes;
+        public ushort bmPlanes;
+        public ushort bmBitsPixel;
+        public IntPtr bmBits;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -371,8 +563,16 @@ public sealed class Win32WindowIconService : IWindowIconService
         return new IntPtr(GetClassLong32(hWnd, nIndex));
     }
 
-    [DllImport("shell32.dll", CharSet = CharSet.Auto)]
-    private static extern IntPtr SHGetFileInfo(
+    [DllImport("shell32.dll", EntryPoint = "ExtractIconExW", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern int ExtractIconExW(
+        string lpszFile,
+        int nIconIndex,
+        out IntPtr phiconLarge,
+        out IntPtr phiconSmall,
+        int nIcons);
+
+    [DllImport("shell32.dll", EntryPoint = "SHGetFileInfoW", CharSet = CharSet.Unicode)]
+    private static extern IntPtr SHGetFileInfoW(
         string pszPath,
         uint dwFileAttributes,
         ref SHFILEINFO psfi,
@@ -382,6 +582,13 @@ public sealed class Win32WindowIconService : IWindowIconService
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool DestroyIcon(IntPtr hIcon);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetIconInfo(IntPtr hIcon, out ICONINFO piconinfo);
+
+    [DllImport("gdi32.dll", SetLastError = true)]
+    private static extern int GetObject(IntPtr hgdiobj, int cbBuffer, out BITMAP lpvObject);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -422,6 +629,20 @@ public sealed class Win32WindowIconService : IWindowIconService
         out IntPtr ppvBits,
         IntPtr hSection,
         uint dwOffset);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, uint processId);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseHandle(IntPtr hObject);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool QueryFullProcessImageNameW(
+        IntPtr hProcess,
+        int dwFlags,
+        [Out] StringBuilder lpExeName,
+        ref int lpdwSize);
 
     #endregion
 }

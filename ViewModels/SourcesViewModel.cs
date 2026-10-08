@@ -146,13 +146,21 @@ public partial class SourcesViewModel : ObservableObject
             return;
         }
 
-        foreach (var item in items)
+        var windowItems = items.Where(i => i.Source is WindowSource).ToList();
+        if (windowItems.Count == 0)
+        {
+            return;
+        }
+
+        using var semaphore = new SemaphoreSlim(8);
+        var tasks = windowItems.Select(async item =>
         {
             if (item.Source is WindowSource winSource)
             {
+                await semaphore.WaitAsync().ConfigureAwait(false);
                 try
                 {
-                    var icon = await _windowIconService.GetIconForSourceAsync(winSource).ConfigureAwait(true);
+                    var icon = await _windowIconService.GetIconForSourceAsync(winSource).ConfigureAwait(false);
                     if (icon is not null)
                     {
                         item.IconSource = icon;
@@ -163,8 +171,14 @@ public partial class SourcesViewModel : ObservableObject
                 {
                     // Fallback glyph remains visible on any error
                 }
+                finally
+                {
+                    semaphore.Release();
+                }
             }
-        }
+        });
+
+        await Task.WhenAll(tasks).ConfigureAwait(false);
     }
 
     [RelayCommand]

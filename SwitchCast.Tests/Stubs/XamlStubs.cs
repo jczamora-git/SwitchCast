@@ -37,3 +37,22 @@ namespace Microsoft.UI.Xaml.Media.Imaging
         }
     }
 }
+
+namespace Microsoft.UI.Dispatching
+{
+    /// <summary>
+    /// Stubs Microsoft.UI.Dispatching.DispatcherQueue for headless test runner.
+    /// </summary>
+    public class DispatcherQueue
+    {
+        public static DispatcherQueue? GetForCurrentThread() => null;
+        public bool HasThreadAccess => true;
+        public bool TryEnqueue(Action action)
+        {
+            action();
+            return true;
+        }
+    }
+}
+
+

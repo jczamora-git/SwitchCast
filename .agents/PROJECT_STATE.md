@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Presentation Output Custom Title Bar UI Hotfix (Consistent Fluent Design Window Chrome)
+- **Current Phase**: Dynamic Application Icons Runtime Fix (Real Windows App Icons in Sources List)
 - **Overall Status**: **Completed (Ready for Phase 6)**
-- **Last Updated**: 2026-10-09T03:30:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-09T04:00:00+08:00 (UTC+8)
 
 ---
 
@@ -17,6 +17,12 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ### Implemented & Verified
 - [x] **Strict AI Development Harness (Phase 0)**: Standardized rules ([AGENTS.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/AGENTS.md)), 6 domain skills, architecture specifications, coding standards, and [.editorconfig](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.editorconfig).
+- [x] **Dynamic Native Application Icons Engine (Runtime Fix)**:
+  - Fixed WinUI 3 `SoftwareBitmapSource` thread affinity by marshalling `SetBitmapAsync` to the UI thread via `DispatcherQueue`, resolving the root cause where background thread creation threw `RPC_E_WRONG_THREAD` and defaulted all items to fallback glyphs.
+  - Implemented multi-tier icon extraction: `WM_GETICON` -> `GetClassLongPtr` (`GCLP_HICONSM`/`GCLP_HICON`) -> `ExtractIconExW` (32x32) -> `SHGetFileInfoW` (`SHGFI_LARGEICON`/`SHGFI_SMALLICON`).
+  - Added `QueryFullProcessImageNameW` (`PROCESS_QUERY_LIMITED_INFORMATION`) in [Win32WindowDiscoveryService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowDiscoveryService.cs) and [Win32WindowIconService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowIconService.cs) to resolve executable paths for 32/64-bit processes without Access Denied faults.
+  - Accurate 32-bit DIB alpha channel extraction with `GetIconInfo` bit-depth inspection, handling both 32-bit ARGB (Chrome, VS, Explorer, Antigravity) and legacy masked icons.
+  - Dual-key thread-safe in-memory caching (`windowSource.Id` and `ProcessPath.ToLowerInvariant()`) with bounded concurrent loading (`SemaphoreSlim(8)`) in [SourcesViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SourcesViewModel.cs).
 - [x] **Custom Integrated Presentation Output Title Bar (UI Consistency Hotfix)**:
   - Replaced the default bright white Windows native caption bar on [PresentationWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml) with a custom integrated, theme-aware title bar (`ExtendsContentIntoTitleBar = true`, `SetTitleBar(AppTitleBar)`).
   - Native caption buttons configured via `AppWindow.TitleBar` (transparent backgrounds, light glyphs in dark mode, dark glyphs in light mode, double-click maximize/restore, window dragging, Windows 11 Snap Layouts).
@@ -121,10 +127,10 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ## 6. VERIFICATION RECORD
 
-- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 4.06s).
+- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 2.51s).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (154 passed, 0 failed, 0 skipped in 650ms).
-- **Level 4 (Presentation Window Chrome & Theme Integration)**: Custom integrated title bar, DPI-scaled sizing, native caption button styling in Dark and Light themes, drag handling, and presentation canvas layer preservation verified.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (156 passed, 0 failed, 0 skipped in 434ms).
+- **Level 4 (Dynamic Application Icons & Real Windows Extraction)**: UI thread marshalling, multi-tier icon resolution (`WM_GETICON`, `GetClassLongPtr`, `ExtractIconExW`, `SHGetFileInfoW`), process path query, alpha channel extraction, cache reuse, and live explorer.exe icon extraction verified.
 
 ---
 
@@ -132,5 +138,6 @@ This is the authoritative progress, state, and environmental tracking document f
 
 **Task**: **Phase 6 — Stability & Performance Optimization**
 - **Objective**: Direct3D 11 device loss resilience, DPI dynamic scaling across multi-monitor setups, and extended presentation load tests.
+
 
 

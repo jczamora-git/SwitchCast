@@ -7,6 +7,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Dynamic Application Icons Runtime Fix] - 2026-10-09
+
+### Fixed / Added (fix / UI / test / docs)
+- **WinUI 3 UI Thread Marshalling for SoftwareBitmapSource**:
+  - Fixed thread affinity fault (`RPC_E_WRONG_THREAD`) in [Services/Win32WindowIconService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowIconService.cs) where `SoftwareBitmapSource` and `SetBitmapAsync` were called on a ThreadPool worker thread following asynchronous pixel extraction, which threw a COM exception and defaulted all items to fallback glyphs.
+  - Marshalled `SoftwareBitmapSource` creation and bitmap initialization to the UI thread via `_dispatcherQueue.TryEnqueue(...)`.
+- **QueryFullProcessImageNameW for Cross-Architecture Process Paths**:
+  - Upgraded [Services/Win32WindowDiscoveryService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowDiscoveryService.cs) and `Win32WindowIconService` with `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)` and `QueryFullProcessImageNameW`, resolving Access Denied failures on 32-bit and non-elevated user applications.
+- **Multi-Tier Win32 Icon Resolution & Alpha Handling**:
+  - Implemented multi-tier icon resolution (`WM_GETICON` -> `GetClassLongPtr` -> `ExtractIconExW` -> `SHGetFileInfoW`).
+  - Added `GetIconInfo` bit-depth validation to preserve true alpha channel transparency for modern 32-bit ARGB icons (Chrome, Visual Studio, Explorer, Antigravity) while synthesizing opaque alpha for legacy masked icons.
+  - Ensured safe native handle ownership (`DestroyIcon` on owned shell/executable handles, never on borrowed window/class handles).
+- **Dual-Key Caching & Bounded Concurrent Loading**:
+  - Dual-keyed cache (`windowSource.Id` and `exe_{ProcessPath}`) reusing extracted process icons across multiple windows in 0ms.
+  - Upgraded [ViewModels/SourcesViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SourcesViewModel.cs) `LoadIconsAsync` with `SemaphoreSlim(8)` to load window icons concurrently without blocking the UI.
+- **Automated Unit Tests**:
+  - Expanded [SwitchCast.Tests/Services/WindowIconServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/WindowIconServiceTests.cs) with real `explorer.exe` icon extraction, cache reuse, and cancellation handling, expanding the test suite to 156 passing tests (100% pass rate).
+
+---
+
 ## [Presentation Output Custom Title Bar UI Hotfix] - 2026-10-09
 
 ### Fixed / Added (fix / UI / test / docs)

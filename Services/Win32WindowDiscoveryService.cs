@@ -134,24 +134,19 @@ public class Win32WindowDiscoveryService : IWindowDiscoveryService
         }
 
         // 8. Extract Process metadata safely
+        string? processPath = GetProcessPath(processId);
         var processName = "Unknown";
-        string? processPath = null;
         try
         {
             using var process = Process.GetProcessById((int)processId);
             processName = process.ProcessName;
-            try
-            {
-                processPath = process.MainModule?.FileName;
-            }
-            catch
-            {
-                // Process path might be restricted for elevated system processes
-            }
         }
         catch
         {
-            // Process might have terminated or access denied
+            if (!string.IsNullOrWhiteSpace(processPath))
+            {
+                processName = System.IO.Path.GetFileNameWithoutExtension(processPath);
+            }
         }
 
         var isMinimized = IsIconic(hwnd);
@@ -170,7 +165,40 @@ public class Win32WindowDiscoveryService : IWindowDiscoveryService
         return true;
     }
 
+    private static string? GetProcessPath(uint processId)
+    {
+        var hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
+        if (hProcess != IntPtr.Zero)
+        {
+            try
+            {
+                var sb = new StringBuilder(1024);
+                int size = sb.Capacity;
+                if (QueryFullProcessImageNameW(hProcess, 0, sb, ref size))
+                {
+                    return sb.ToString();
+                }
+            }
+            finally
+            {
+                CloseHandle(hProcess);
+            }
+        }
+
+        try
+        {
+            using var process = Process.GetProcessById((int)processId);
+            return process.MainModule?.FileName;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     #region Win32 P/Invoke Declarations
+
+    private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT
@@ -220,6 +248,20 @@ public class Win32WindowDiscoveryService : IWindowDiscoveryService
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmGetWindowAttribute(nint hwnd, int dwAttribute, out int pvAttribute, int cbAttribute);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, uint processId);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseHandle(IntPtr hObject);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool QueryFullProcessImageNameW(
+        IntPtr hProcess,
+        int dwFlags,
+        [Out] StringBuilder lpExeName,
+        ref int lpdwSize);
 
     #endregion
 }

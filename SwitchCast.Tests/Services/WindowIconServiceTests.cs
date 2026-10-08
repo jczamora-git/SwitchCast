@@ -54,4 +54,62 @@ public class WindowIconServiceTests
         service.ClearCache();
         service.Dispose();
     }
+
+    [Fact]
+    public async Task GetIconForSourceAsync_WithValidProcessExecutablePath_ExtractsIconAndReusesCache()
+    {
+        using var service = new Win32WindowIconService();
+        string explorerPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
+
+        var window1 = new WindowSource
+        {
+            Id = "win_exp_1",
+            Title = "File Explorer",
+            WindowHandle = 0x5678,
+            ProcessId = 100,
+            ProcessName = "explorer",
+            ProcessPath = explorerPath
+        };
+
+        var window2 = new WindowSource
+        {
+            Id = "win_exp_2",
+            Title = "Documents",
+            WindowHandle = 0x5679,
+            ProcessId = 100,
+            ProcessName = "explorer",
+            ProcessPath = explorerPath
+        };
+
+        if (System.IO.File.Exists(explorerPath))
+        {
+            var icon1 = await service.GetIconForSourceAsync(window1);
+            Assert.NotNull(icon1);
+
+            // Second window should hit the process icon cache
+            var icon2 = await service.GetIconForSourceAsync(window2);
+            Assert.NotNull(icon2);
+            Assert.Same(icon1, icon2);
+        }
+    }
+
+    [Fact]
+    public async Task GetIconForSourceAsync_CancellationRequested_ReturnsNullSafely()
+    {
+        using var service = new Win32WindowIconService();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var window = new WindowSource
+        {
+            Id = "win_cancel",
+            Title = "Cancel App",
+            WindowHandle = 0x9999,
+            ProcessPath = "C:\\dummy\\app.exe"
+        };
+
+        var icon = await service.GetIconForSourceAsync(window, cts.Token);
+        Assert.Null(icon);
+    }
 }
+
