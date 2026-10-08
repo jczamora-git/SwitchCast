@@ -3,72 +3,63 @@
 ---
 
 ## Task Details
-- **Task**: Main Application UI/UX Refinement (Modern Desktop Shell, Custom Title Bar, & Visual Hierarchy)
-- **Date**: 2026-10-09T01:00:00+08:00 (UTC+8)
+- **Task**: Phase 5.3 Hotfix — Floating Presenter Dock Dropdown Overflow & External Menu Positioning
+- **Date**: 2026-10-09T01:30:00+08:00 (UTC+8)
 - **Status**: Completed
 
 ---
 
 ## 1. Objective
-Perform a comprehensive UI/UX refinement pass on the SwitchCast main application window while preserving all existing capture, discovery, presenter dock, global hotkeys, and presentation output functionality:
-1. Implement a custom integrated application top title bar with theme-aware native caption buttons, eliminating the disconnected white OS title bar in dark mode.
-2. Centralize semantic design tokens in `App.xaml` for near-black dark surfaces (`#101010` to `#141414`), elevated surfaces (`#1A1A1A` to `#222222`), muted borders (`#2C2C2C`), SwitchCast coral accent (`#FF7A59`), and complete light theme compatibility.
-3. Redesign the Dashboard around presenter workflow: compact on-air status overview strip, focal 16:9 preview canvas, prominent presentation action bar, and lightweight queued source cards.
-4. Redesign Sources into a compact desktop source picker (~52px rows) with unified search and category filtering.
-5. Redesign Settings into a clean two-pane categorized interface with compact setting rows and a dedicated searchable shortcuts table.
+Resolve the critical Windows App SDK root bounds popup clipping defect on the Floating Presenter Dock:
+1. When opening dropdown controls ("Queued Sources", "Switching Mode", "More Options"), the menus were visually restricted to the dock window's compact 46–52 DIP bounds because `IsConstrainedToRootBounds` is true by default in Windows App SDK.
+2. Implement a dedicated, lightweight borderless popup window host ([PresenterDockMenuWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml)) that genuinely escapes the dock's HWND boundary and displays above or below the dock.
+3. Provide exact DPI scaling, screen work area bounds clamping, automatic flip-above on bottom-screen docks, and outside-click/deactivation/Escape dismissal.
+4. Maintain full MVVM synchronization, 3-mode switching (A+L, A, L), compact and expanded dock compatibility, zero capture pipeline disruption, and complete light/dark theme fidelity.
 
 ---
 
 ## 2. Architecture & Solutions Applied
-1. **Custom Integrated Title Bar & Modern Shell**:
-   - `MainWindow.xaml.cs`: Called `ExtendsContentIntoTitleBar = true` and `SetTitleBar(AppTitleBar)`.
-   - `MainWindow.xaml`: Created slim 40px integrated draggable title bar (`AppTitleBar`) featuring SwitchCast logo tile, title, and "Screen Sharing Manager" badge.
-   - `UpdateTitleBarColors`: Configured `AppWindow.TitleBar` caption button colors dynamically (transparent background, theme-synchronized foreground and hover colors for light and dark modes).
-   - Styled `NavigationView` left sidebar and `ContentFrame` with centralized theme tokens.
-2. **Centralized Design System (`App.xaml`)**:
-   - Defined `Default` (Dark) and `Light` `ResourceDictionary.ThemeDictionaries` providing semantic brushes: `AppBackgroundBrush`, `AppSidebarBrush`, `AppSurfaceBrush`, `AppSurfaceElevatedBrush`, `AppHoverBrush`, `AppBorderBrush`, `AppAccentBrush`, `AppBadgeBackgroundBrush`, `AppPreviewCanvasBrush`.
-   - Reusable button styles: `SubtleButtonStyle`, `PrimaryAccentButtonStyle`, `DestructiveButtonStyle`, and `KeyBadgeBorderStyle`.
-3. **Presenter-Centric Dashboard Hierarchy (`Views/DashboardPage.xaml`)**:
-   - Compact Top Status Strip: 4 summary sections (Live/Paused/Blackout/Standby status, active source, queued count, output window status).
-   - Primary Presentation Action Bar: Coral "Start Presenting" / Red "Stop Presenting", target source picker, and pause/blackout controls.
-   - Focal 16:9 Preview Workspace: aspect ratio container with live status pill, active preview source switcher, and clear empty/ready states.
-   - Queued sources mini-strip showing queued items with "Queued" badge.
-4. **Desktop Source Picker (`Views/SourcesPage.xaml`)**:
-   - Unified filter toolbar with category selector (Windows vs Displays) and instant search text box.
-   - Compact ~52px list rows with single-line truncated titles, process metadata, and queue checkboxes.
-   - Discovered sources summary footer.
-5. **Two-Pane Categorized Settings (`Views/SettingsPage.xaml` & `ViewModels/SettingsViewModel.cs`)**:
-   - Left Category Sidebar (`General`, `Appearance`, `Window`, `Presenter Controls`, `Keyboard Shortcuts`).
-   - Compact setting rows with right-aligned toggles and subtle horizontal dividers.
-   - Searchable keyboard shortcuts table with key badge pills and "Reset to Defaults" action.
-6. **Preserved All Core Functionality**:
-   - Capture pipeline, Direct3D 11 rendering, single output window HWND, floating presenter dock, global hotkeys, and 3-mode switching preserved with zero regressions.
+1. **Windows App SDK Root Bounds Workaround & Native Window Host**:
+   - In Windows App SDK (WinUI 3 desktop), `Flyout` and `MenuFlyout` reside inside the Window's HWND visual tree and cannot escape the HWND.
+   - Built [PresenterDockMenuWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml) as an independent borderless topmost WinUI 3 Window with `OverlappedPresenter.SetBorderAndTitleBar(false, false)`, `IsAlwaysOnTop = true`, and Win32 `WS_EX_TOOLWINDOW` to prevent taskbar and Alt+Tab presence.
+   - Set owner HWND to `PresenterDockWindow.WindowHandle` via `GWLP_HWNDPARENT`.
+2. **DPI-Aware Multi-Monitor Screen Positioning**:
+   - Implemented [PresenterDockMenuPositioner.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresenterDockMenuPositioner.cs) calculating exact pixel coordinates via `GetDpiForWindow`, `ClientToScreen`, and `GetMonitorInfo`.
+   - Clamps menus within monitor boundaries and automatically flips the menu above the dock when the dock is positioned near the bottom edge of the display.
+3. **Dropdown Menu Views**:
+   - **Queued Sources**: Scrollable `ListView` of `CaptureSource` items with icons, titles, types, and on-air/active checkmark indicators, with an empty state when no sources are queued.
+   - **Switching Mode**: 3-mode selector (`ActiveAndLive`, `ActiveOnly`, `LiveOnly`) with titles, descriptions, and active checkmarks.
+   - **More Options**: Direct actions for "Stop Live Presentation" (critical red), "Control Dashboard", and "Presentation Output Window".
+4. **Lifecycle & Dismissal Safety**:
+   - Closes automatically on `WindowActivationState.Deactivated`.
+   - Closes on `Escape` key (`KeyDown` handler).
+   - Closes on item selection and command execution.
+   - Closes immediately when the dock is dragged, collapsed, expanded, or closed.
+   - Single active menu instance guarantee.
 
 ---
 
 ## 3. Files Modified / Created
 
-### Theme & Window Chrome
-- [App.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml)
-- [MainWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/MainWindow.xaml)
-- [MainWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/MainWindow.xaml.cs)
+### New Components
+- [Services/PresenterDockMenuPositioner.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresenterDockMenuPositioner.cs)
+- [Views/PresenterDockMenuType.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuType.cs)
+- [Views/PresenterDockMenuWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml)
+- [Views/PresenterDockMenuWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml.cs)
+- [SwitchCast.Tests/Services/PresenterDockMenuPositionerTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresenterDockMenuPositionerTests.cs)
 
-### Views & ViewModels
-- [Views/DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml)
-- [Views/SourcesPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SourcesPage.xaml)
-- [Views/SettingsPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SettingsPage.xaml)
-- [ViewModels/SettingsViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SettingsViewModel.cs)
-
-### Automated Tests
-- [SwitchCast.Tests/ViewModels/SettingsViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/SettingsViewModelTests.cs)
+### Modified Components
+- [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml)
+- [Views/PresenterDockWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml.cs)
+- [SwitchCast.Tests/SwitchCast.Tests.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/SwitchCast.Tests.csproj)
 
 ---
 
 ## 4. Validation Performed
-- **Level 1 (Build)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 36.7s).
+- **Level 1 (Build)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 34.4s).
 - **Level 2 (Static Analysis)**: Analyzers and nullable reference checks -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (124 passed, 0 failed, 0 skipped in 469ms).
-- **Level 4 (UI Integration)**: XAML resource keys verified; title bar caption button customization verified; full light/dark theme brushes verified.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (129 passed, 0 failed, 0 skipped in 826ms).
+- **Level 4 (Positioning & Layout Math)**: 5 comprehensive automated tests in `PresenterDockMenuPositionerTests` verifying top dock, bottom dock flip-above, right-edge shift, left-edge clamp, and multi-monitor coordinates.
 
 ---
 

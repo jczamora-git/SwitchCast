@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Main Application UI/UX Refinement (Modern Desktop Shell, Custom Title Bar, & Visual Hierarchy)
+- **Current Phase**: Phase 5.3 Hotfix — Floating Presenter Dock Dropdown Overflow & External Menu Positioning
 - **Overall Status**: **Completed (Ready for Phase 6)**
-- **Last Updated**: 2026-10-09T01:00:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-09T01:30:00+08:00 (UTC+8)
 
 ---
 
@@ -59,11 +59,12 @@ This is the authoritative progress, state, and environmental tracking document f
   - Native WinUI 3 top-level window [PresentationWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml) titled `"SwitchCast Presentation Output"`, 1280x720 default aspect ratio, capturable by Google Meet, Zoom, and Teams.
   - Standby screen, letterbox/pillarbox live video canvas, paused indicator pill, and 100% opaque blackout layer.
   - Single-instance window service [PresentationWindowService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationWindowService.cs).
-- [x] **Global Hotkeys & Minimal Presenter Companion Dock (Phase 5, 5.1 & 5.3)**:
+- [x] **Global Hotkeys & Minimal Presenter Companion Dock (Phase 5, 5.1 & 5.3 + Hotfix)**:
   - System-wide global hotkeys via native Win32 `RegisterHotKey` / `UnregisterHotKey` in [Win32HotkeyService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32HotkeyService.cs).
   - Three source switching modes: `ActiveAndLive` (A+L), `ActiveOnly` (A), `LiveOnly` (L, default).
   - Minimal single-row floating presenter dock in Expanded and Compact modes.
-- [x] **Automated Unit & Regression Test Suite**: 124 comprehensive unit & regression tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) with 100% pass rate.
+  - **Unclipped External Dropdown Host ([PresenterDockMenuWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml))**: Solved the Windows App SDK root bounds popup clipping limitation using a dedicated borderless topmost window host, DPI-aware placement via [PresenterDockMenuPositioner.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresenterDockMenuPositioner.cs), work area bounds clamping, automatic deactivation dismissal, and complete multi-monitor compatibility.
+- [x] **Automated Unit & Regression Test Suite**: 129 comprehensive unit & regression tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) with 100% pass rate.
 
 ### Planned (Upcoming)
 - [ ] **Phase 6**: Stability & Performance Optimization (Device loss recovery, leak audits, DPI dynamic multi-monitor adaptation).
@@ -97,10 +98,10 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ## 6. VERIFICATION RECORD
 
-- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 36.7s).
+- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 34.4s).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (124 passed, 0 failed, 0 skipped in 469ms).
-- **Level 4 (Desktop UI Refinement & Window Chrome)**: Custom integrated title bar, theme-aware caption buttons, focal preview canvas, compact source picker rows, and two-pane settings verified.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (129 passed, 0 failed, 0 skipped in 826ms).
+- **Level 4 (Presenter Dock Menu & Dropdown Overflow)**: External dropdown positioning, flip-above/flip-below, work-area clamping, and single-instance lifecycle verified.
 
 ---
 

@@ -4,9 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using SwitchCast.Models;
 using SwitchCast.ViewModels;
 using Windows.Graphics;
 using WinRT.Interop;
@@ -28,6 +26,8 @@ public sealed partial class PresenterDockWindow : Window
     private const uint MONITOR_DEFAULTTONEAREST = 2;
 
     private AppWindow? _appWindow;
+    private PresenterDockMenuWindow? _activeMenuWindow;
+    private long _lastMenuClosedTicks;
 
     public PresenterDockWindow()
     {
@@ -35,6 +35,7 @@ public sealed partial class PresenterDockWindow : Window
         ViewModel = App.Current.Services.GetRequiredService<PresenterDockViewModel>();
 
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        Closed += OnWindowClosed;
 
         InitializeAppWindow();
     }
@@ -80,6 +81,8 @@ public sealed partial class PresenterDockWindow : Window
 
     private void ApplyWindowSizingAndPosition(bool isCompact, bool initialCenter = false)
     {
+        CloseActiveMenu();
+
         if (_appWindow is null)
         {
             return;
@@ -137,41 +140,76 @@ public sealed partial class PresenterDockWindow : Window
 
     private void OnDragRegionPointerPressed(object sender, PointerRoutedEventArgs e)
     {
+        CloseActiveMenu();
+
         // Hand off dragging directly to the Windows window manager
         ReleaseCapture();
         SendMessage(WindowHandle, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
     }
 
-    private void OnSourceItemClicked(object sender, ItemClickEventArgs e)
+    private void OnSourceSelectorClicked(object sender, RoutedEventArgs e)
     {
-        if (e.ClickedItem is CaptureSource source)
+        ToggleMenu(PresenterDockMenuType.QueuedSources, sender as FrameworkElement);
+    }
+
+    private void OnModeSelectorClicked(object sender, RoutedEventArgs e)
+    {
+        ToggleMenu(PresenterDockMenuType.SwitchMode, sender as FrameworkElement);
+    }
+
+    private void OnMoreOptionsClicked(object sender, RoutedEventArgs e)
+    {
+        ToggleMenu(PresenterDockMenuType.MoreOptions, sender as FrameworkElement);
+    }
+
+    private void ToggleMenu(PresenterDockMenuType type, FrameworkElement? anchor)
+    {
+        if (anchor is null)
         {
-            _ = ViewModel.SwitchSourceCommand.ExecuteAsync(source);
-
-            // Close the source flyout
-            SourceDropDownButton?.Flyout?.Hide();
+            return;
         }
+
+        long now = DateTime.UtcNow.Ticks;
+        if (now - _lastMenuClosedTicks < TimeSpan.FromMilliseconds(200).Ticks &&
+            _activeMenuWindow?.CurrentMenuType == type)
+        {
+            CloseActiveMenu();
+            return;
+        }
+
+        if (_activeMenuWindow is not null)
+        {
+            bool isSameType = _activeMenuWindow.CurrentMenuType == type;
+            CloseActiveMenu();
+            if (isSameType)
+            {
+                return;
+            }
+        }
+
+        var menu = new PresenterDockMenuWindow(ViewModel);
+        _activeMenuWindow = menu;
+        menu.Closed += (s, _) =>
+        {
+            _lastMenuClosedTicks = DateTime.UtcNow.Ticks;
+            if (ReferenceEquals(_activeMenuWindow, s))
+            {
+                _activeMenuWindow = null;
+            }
+        };
+
+        menu.ShowMenu(type, anchor, WindowHandle);
     }
 
-    private void OnModeActiveAndLiveClicked(object sender, RoutedEventArgs e)
+    public void CloseActiveMenu()
     {
-        _ = ViewModel.SetSwitchModeCommand.ExecuteAsync(PresenterSwitchMode.ActiveAndLive);
-        ExpandedModeDropDownButton?.Flyout?.Hide();
-        CompactModeDropDownButton?.Flyout?.Hide();
-    }
-
-    private void OnModeActiveOnlyClicked(object sender, RoutedEventArgs e)
-    {
-        _ = ViewModel.SetSwitchModeCommand.ExecuteAsync(PresenterSwitchMode.ActiveOnly);
-        ExpandedModeDropDownButton?.Flyout?.Hide();
-        CompactModeDropDownButton?.Flyout?.Hide();
-    }
-
-    private void OnModeLiveOnlyClicked(object sender, RoutedEventArgs e)
-    {
-        _ = ViewModel.SetSwitchModeCommand.ExecuteAsync(PresenterSwitchMode.LiveOnly);
-        ExpandedModeDropDownButton?.Flyout?.Hide();
-        CompactModeDropDownButton?.Flyout?.Hide();
+        if (_activeMenuWindow is not null)
+        {
+            var menu = _activeMenuWindow;
+            _activeMenuWindow = null;
+            _lastMenuClosedTicks = DateTime.UtcNow.Ticks;
+            menu.CloseMenu();
+        }
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -180,6 +218,11 @@ public sealed partial class PresenterDockWindow : Window
         {
             DispatcherQueue.TryEnqueue(() => ApplyWindowSizingAndPosition(ViewModel.IsCompactMode, initialCenter: false));
         }
+    }
+
+    private void OnWindowClosed(object sender, WindowEventArgs args)
+    {
+        CloseActiveMenu();
     }
 
     [StructLayout(LayoutKind.Sequential)]

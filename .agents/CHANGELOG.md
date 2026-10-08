@@ -7,6 +7,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Phase 5.3 Hotfix — Floating Dock Dropdown Overflow & External Menu Positioning] - 2026-10-09
+
+### Fixed (fix / UI / test / docs)
+- **Windows App SDK Root Bounds Workaround & Native Window Host**:
+  - Resolved popup clipping defect on Floating Presenter Dock where dropdowns were restricted to the 46–52 DIP window height due to `IsConstrainedToRootBounds` being true in Windows App SDK.
+  - Implemented [Views/PresenterDockMenuWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml) and [Views/PresenterDockMenuWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml.cs) as a lightweight borderless topmost WinUI 3 Window with `WS_EX_TOOLWINDOW` and dock HWND ownership (`GWLP_HWNDPARENT`).
+- **DPI-Aware Positioning & Monitor Bounds Clamping**:
+  - Implemented [Services/PresenterDockMenuPositioner.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresenterDockMenuPositioner.cs) supporting DPI scaling (`GetDpiForWindow`), monitor work area calculation (`GetMonitorInfo`), right-edge shift-in, left-edge clamp, and automatic flip-above when the dock is positioned near the bottom of the screen.
+- **Unconstrained Presenter Dropdown Menus**:
+  - **Queued Sources**: Scrollable `ListView` displaying queued capture sources with title, type, and active checkmarks, with empty state when 0 sources are queued.
+  - **Switching Mode**: 3-mode selector (`ActiveAndLive`, `ActiveOnly`, `LiveOnly`) with titles, descriptions, and active checkmarks.
+  - **More Options**: Direct actions for Stop Live Presentation, Control Dashboard, and Presentation Output Window.
+- **Lifecycle & Dismissal Safety**:
+  - Integrated automatic dismissal on `WindowActivationState.Deactivated`, `Escape` key press, item selection, dock dragging, dock collapse/expand, and dock closure.
+- **Automated Unit Tests**:
+  - Added [SwitchCast.Tests/Services/PresenterDockMenuPositionerTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresenterDockMenuPositionerTests.cs) verifying 5 positioning and boundary clamping scenarios, expanding the test suite to 129 passing tests (100% pass rate).
+
+---
+
 ## [Main Application UI/UX Refinement] - 2026-10-09
 
 ### Added (feat / UI / test / docs)
