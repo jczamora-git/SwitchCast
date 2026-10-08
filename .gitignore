@@ -18,6 +18,7 @@ _pkginfo.txt
 publish/
 releases/
 *.zip
+docs/
 
 ## OS generated files
 .DS_Store
