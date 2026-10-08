@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Dynamic Application Icon Pipeline Repair (Native Icon Extraction to WinUI 3 Rendering)
-- **Overall Status**: **Completed (Ready for Phase 6)**
-- **Last Updated**: 2026-10-09T06:00:00+08:00 (UTC+8)
+- **Current Phase**: Final UI Polish, Creator Attribution & v1.0 Release Preparation
+- **Overall Status**: **Completed (v1.0.0 Release Ready)**
+- **Last Updated**: 2026-10-09T06:30:00+08:00 (UTC+8)
 
 ---
 
@@ -17,93 +17,51 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ### Implemented & Verified
 - [x] **Strict AI Development Harness (Phase 0)**: Standardized rules ([AGENTS.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/AGENTS.md)), 6 domain skills, architecture specifications, coding standards, and [.editorconfig](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.editorconfig).
-- [x] **Dynamic Native Application Icons Pipeline Repair**:
-  - Fixed root-cause WinUI 3 `SoftwareBitmapSource` thread affinity failure (`RPC_E_WRONG_THREAD`) where `Win32WindowIconService` was initialized in the `App` constructor before `DispatcherQueue.GetForCurrentThread()` became available, resulting in null `_dispatcherQueue` and background thread execution of `SoftwareBitmapSource.SetBitmapAsync`.
-  - Added `SetDispatcherQueue` and fallback resolution in [Win32WindowIconService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowIconService.cs), wired `_mainWindow.DispatcherQueue` binding on startup in [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs).
-  - Marshalled `SelectableSourceItem.IconSource` updates strictly to the UI thread in [SourcesViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SourcesViewModel.cs) `LoadIconsAsync`, ensuring WinUI 3 compiled binding (`x:Bind`) property changed events execute on the UI thread without cross-thread exceptions.
-  - Implemented automatic synchronization of `HasIconSource` and `HasNoIconSource` boolean flags via `OnIconSourceChanged` in [SelectableSourceItem.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SelectableSourceItem.cs).
-  - Implemented dual-tier thread-safe caching (`_rawPixelCache` storing immutable `byte[]` BGRA32 pixel data, and `_iconSourceCache` storing WinUI 3 `ImageSource` instances).
+- [x] **Settings Page Visual Polish & Compact Category Navigation**:
+  - Replaced bulky radio-button circles in the Settings sidebar with a compact, modern `ListView` navigation list (38 DIP row height, 14 DIP icons, clean hover/selected states).
+  - Two-pane layout with 190 DIP navigation sidebar and flexible content pane.
+  - Aligned Appearance color mode options (System | Light | Dark) with clean spacing.
+  - Aligned Window and Presenter preference toggles with responsive text wrapping.
+  - Streamlined Keyboard Shortcuts panel with compact ~46 DIP rows, action descriptions, filter search, and monospace key badges.
+- [x] **Creator Attribution & Authoritative v1.0 Metadata**:
+  - Added full creator attribution: **John Christopher King Zamora**.
+  - Added repository link: [https://github.com/jczamora-git/SwitchCast](https://github.com/jczamora-git/SwitchCast).
+  - Single authoritative version metadata configured in [SwitchCast.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.csproj) (`Version 1.0.0`, `AssemblyVersion 1.0.0.0`, `InformationalVersion 1.0.0`) and dynamically read in [SettingsViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SettingsViewModel.cs).
+  - Factual privacy architecture statement (`100% Offline & Local • Zero Telemetry • No Network Access`).
+- [x] **Windows Release Packaging (win-x64)**:
+  - Published self-contained Release package via `dotnet publish SwitchCast.csproj -c Release -r win-x64 --self-contained true`.
+  - Built standalone zip archive `releases/SwitchCast-v1.0.0-win-x64.zip` with verified SHA-256 hash.
+- [x] **Dynamic Native Application Icons Pipeline**:
+  - WinUI 3 `SoftwareBitmapSource` thread affinity marshalled to UI thread via `DispatcherQueue`.
+  - Multi-tier native icon extraction (`WM_GETICON`, `GetClassLongPtr`, `ExtractIconExW`, `SHGetFileInfoW`) with safe `DestroyIcon` lifecycle.
+  - Dual-tier thread-safe caching (`_rawPixelCache` and `_iconSourceCache`).
 - [x] **Centered Presentation Output Window Positioning**:
   - Implemented DPI-aware initial centering for `PresentationWindow` in [PresentationWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml.cs) using pure math helper [WindowPositioningHelper.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/WindowPositioningHelper.cs).
-  - Determines target monitor from `MainWindow` (with fallback to primary monitor), retrieving usable work area (`MONITORINFO.rcWork`) excluding taskbars.
-  - Handles multi-monitor configurations with arbitrary or negative coordinates, DPI scaling factors, and work-area boundary clamping.
-  - Centering runs only on new window initialization; existing instances are activated via `IWindowActivationService` without repositioning or disrupting active screen-sharing streams.
 - [x] **Native Windows Application Icon & Consistent Branding**:
-  - Generated multi-resolution Windows ICO asset at [Assets/SwitchCast.ico](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Assets/SwitchCast.ico) containing 7 frames (16x16, 24x24, 32x32, 48x48, 64x64, 128x128, 256x256) matching the custom title-bar coral badge (`#FF7A59`) and screen-share glyph (`\uE7F4`).
-  - Configured `<ApplicationIcon>Assets\SwitchCast.ico</ApplicationIcon>` and `<Content Include="Assets\SwitchCast.ico"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>` in [SwitchCast.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.csproj) for embedding into `SwitchCast.exe` (Windows Explorer, Taskbar, Task Manager).
-  - Configured native window icons on `MainWindow` and `PresentationWindow` via `_appWindow.SetIcon(iconPath)` for consistent taskbar and Alt+Tab branding.
+  - Multi-resolution Windows ICO asset at [Assets/SwitchCast.ico](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Assets/SwitchCast.ico) (7 frames: 16x16 to 256x256) embedded into `SwitchCast.exe` and configured across `MainWindow` and `PresentationWindow`.
 - [x] **Custom Integrated Presentation Output Title Bar (UI Consistency Hotfix)**:
-  - Replaced the default bright white Windows native caption bar on [PresentationWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml) with a custom integrated, theme-aware title bar (`ExtendsContentIntoTitleBar = true`, `SetTitleBar(AppTitleBar)`).
-  - Native caption buttons configured via `AppWindow.TitleBar` (transparent backgrounds, light glyphs in dark mode, dark glyphs in light mode, double-click maximize/restore, window dragging, Windows 11 Snap Layouts).
-  - Preserved audience-focused presentation canvas geometry in Row 1 (`Stretch="Uniform"`, standby screen, live capture surface, paused pill, blackout overlay) without aspect ratio distortion or `WDA_EXCLUDEFROMCAPTURE`.
-  - Dynamic theme listener wired to `IApplicationSettingsService.ThemeChanged` and DPI-aware scaling (`GetDpiForWindow`).
+  - Custom integrated, theme-aware title bar (`ExtendsContentIntoTitleBar = true`, `SetTitleBar(AppTitleBar)`).
 - [x] **WinUI 3 Desktop Application Shell (Phase 1 & UI Refinement)**:
-  - Custom integrated application top title bar (`ExtendsContentIntoTitleBar = true`, `SetTitleBar(AppTitleBar)`), replacing the disconnected white title bar with a seamless, theme-aware header.
-  - Native caption buttons styled dynamically via `AppWindow.TitleBar` (transparent backgrounds, theme-adaptive foreground and hover states, double-click to maximize, Windows 11 Snap Layouts).
-  - Modern, near-black dark theme design system (`App.xaml`) with centralized semantic brush tokens (`AppBackgroundBrush`, `AppSidebarBrush`, `AppSurfaceBrush`, `AppSurfaceElevatedBrush`, `AppHoverBrush`, `AppBorderBrush`, `AppAccentBrush` coral `#FF7A59`, `AppBadgeBackgroundBrush`, `AppPreviewCanvasBrush`) and complete light theme fidelity.
-  - Compact, responsive left navigation sidebar integrated smoothly with the shell.
-- [x] **Presenter Actions Bring-to-Front & Window Focus Handoff (Hotfix)**:
-  - Fixed Presenter Actions ("Control Dashboard" and "Presentation Output") in `PresenterDockMenuWindow` by detaching owner HWND before closing, preventing Windows from reclaiming focus to the dock window.
-  - `ActivateMainWindow()` in `App.xaml.cs` and `IWindowActivationService` restores minimized windows (`ShowWindowAsync(SW_RESTORE)`) and brings them to the foreground without recreating `MainWindow`.
-  - `PresentationWindowService` integrates `IWindowActivationService` to restore and activate existing `PresentationWindow` instances without tearing down or recreating the output window or capture stream.
-- [x] **Centered MainWindow Startup & DPI-Aware Saved Placement (Hotfix)**:
-  - Calculates target monitor usable work area center coordinates on cold/first launch (`centerX = workArea.Left + (workArea.Width - windowWidth) / 2`, `centerY = workArea.Top + (workArea.Height - windowHeight) / 2`).
-  - Supports multi-monitor setups with negative coordinates, differing DPI scales, and taskbar offsets.
-  - Restores valid saved positions with work-area bounding and recovers safely to screen center if a monitor is disconnected.
+  - Custom integrated application top title bar, centralized semantic design tokens in `App.xaml`, compact left navigation sidebar.
+- [x] **Presenter Actions Bring-to-Front & Window Focus Handoff**:
+  - Window activation and focus restoration across `MainWindow`, `PresentationWindow`, and `PresenterDockMenuWindow`.
+- [x] **Centered MainWindow Startup & DPI-Aware Saved Placement**:
+  - Startup work-area centering with monitor fallback and boundary clamping.
 - [x] **Application Window Hierarchy & Safe Exit Confirmation**:
-  - `MainWindow`: Primary management window. Intercepts `AppWindow.Closing` synchronously (`args.Cancel = true`) and displays a native WinUI 3 `ContentDialog` asking for confirmation before exiting.
-  - Cancel keeps all windows and active presentation intact; Exit SwitchCast authorizes shutdown, stops capture, cleans up secondary windows, unregisters hotkeys, and completes clean process termination.
-  - `PresentationWindow`: Independent audience-facing output. Closing it stops the presentation safely without terminating MainWindow or the application.
-  - `PresenterDockWindow`: Independent presenter companion dock. Closing it closes only the dock without stopping active presentations or closing MainWindow.
-  - Centralized lifecycle coordinator [ApplicationLifecycleService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/ApplicationLifecycleService.cs) governing safe multi-window teardown.
-- [x] **Dependency Injection & Architecture**: Full DI container configured via `Microsoft.Extensions.DependencyInjection` in [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs) registering all core services, discovery engines, capture pipelines, presentation coordinators, window activation service, icon service, dock services, hotkey services, lifecycle service, and ViewModels.
-- [x] **MVVM Pattern**: ViewModels and commands powered by `CommunityToolkit.Mvvm` ([MainViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/MainViewModel.cs), [DashboardViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/DashboardViewModel.cs), [PresentationViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/PresentationViewModel.cs), [PresenterDockViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/PresenterDockViewModel.cs), [SourcesViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SourcesViewModel.cs), [SettingsViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SettingsViewModel.cs), [SelectableSourceItem.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SelectableSourceItem.cs)).
-- [x] **Centralized Application State & Selection Management**: [IPresentationStateService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresentationStateService.cs) & [PresentationStateService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationStateService.cs) managing session status (`Idle`, `Active`, `Paused`, `Blackout`), active capture source (`ActiveSource`), selected navigation cursor (`SelectedSource`), confirmed foreground focus (`ForegroundSource`), three-mode switching preferences (`SwitchMode`), queued sources list, and availability reconciliation.
-- [x] **Real Window Discovery Engine (Phase 2)**: [IWindowDiscoveryService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IWindowDiscoveryService.cs) & [Win32WindowDiscoveryService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowDiscoveryService.cs) enumerating active top-level application windows using `EnumWindows`, `IsWindowVisible`, `GetWindowTextW`, `DwmGetWindowAttribute` (`DWMWA_CLOAKED`), `WS_EX_TOOLWINDOW` filtering, process name resolution, and SwitchCast self-exclusion.
-- [x] **Real Monitor Discovery Engine (Phase 2)**: [IMonitorDiscoveryService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IMonitorDiscoveryService.cs) & [Win32MonitorDiscoveryService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32MonitorDiscoveryService.cs) enumerating connected displays via `EnumDisplayMonitors` and `GetMonitorInfo`, calculating resolutions, virtual coordinates, and primary/secondary flags.
-- [x] **Native Graphics Capture Pipeline (Phase 3 & Stabilization)**:
-  - COM interop bridge `IGraphicsCaptureItemInterop` creating `GraphicsCaptureItem` for window (`HWND`) and monitor (`HMONITOR`) sources with owning PID cross-validation.
-  - Direct3D 11 device provider [Direct3D11DeviceProvider.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11DeviceProvider.cs) managing hardware-accelerated D3D11 device and WinRT `IDirect3DDevice` wrappers with `ResetDevice()` device loss recovery.
-  - Frame pool & session manager [CaptureSessionManager.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/CaptureSessionManager.cs) acquiring `Direct3D11CaptureFramePool` streams, maintaining Direct3D frame lifetime throughout `CreateCopyFromSurfaceAsync`, session generation tracking, and backpressure frame draining.
-  - Diagnostic Win32 capture service [Win32DiagnosticCaptureService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Win32DiagnosticCaptureService.cs) providing fail-safe GDI `PrintWindow` (with `PW_RENDERFULLCONTENT`) and `BitBlt` single-frame screenshot acquisition and conversion.
-  - Live preview renderer [Direct3D11PreviewRenderer.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11PreviewRenderer.cs) presenting converted `SoftwareBitmap` onto WinUI 3 `SoftwareBitmapSource` with decoupled non-blocking UI delivery and ~15 FPS pacing.
-  - Central orchestrator [CaptureCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/CaptureCoordinator.cs) managing serialized state transitions (`Idle` -> `Starting` -> `Capturing` -> `Stopping` -> `Failed`).
-- [x] **Performance Profiling & Deterministic Frame Lifecycle (Phase 4.6)**:
-  - [RefCountedSoftwareBitmap.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/RefCountedSoftwareBitmap.cs) implementing zero-leak multi-consumer frame lifetime management.
-  - Single-conversion frame distribution preventing duplicate GPU-to-CPU copies across preview and presentation renderers.
-  - Non-blocking UI dispatcher integration eliminating `0xC000027B` stowed exception and deadlock vectors.
-- [x] **Rapid Source Switching Hardening & Concurrency Serialization (Phase 4.7)**:
-  - Latest-Request-Wins request coalescing and transition sequence tracking in `CaptureCoordinator` and `PresentationCoordinator`.
-  - Converted frame event handlers to synchronous `void` with top-level try/catch blocks.
-  - Added session generation filtering in preview and presentation renderers.
-- [x] **Redesigned Presenter Dashboard UI**:
-  - Compact on-air status overview strip (Live/Paused/Blackout/Standby status, active source, queued count, output window status).
-  - Focal 16:9 aspect ratio preview container with deep dark surface, clear empty states, and overlay controls.
-  - Prominent primary action bar ("Start Presenting" / "Stop Presenting") with source target dropdown and secondary pause/blackout controls.
-  - Lightweight queued sources list with status badges.
-- [x] **Redesigned Sources Page (Desktop Source Picker)**:
-  - Compact IDE-style list rows (~52px height) with single-line truncated titles, process metadata, and queue checkboxes.
-  - Unified filter toolbar with category selector (Windows vs Displays) and instant search.
-  - Clean discovery empty states and queued summary footer.
-- [x] **Redesigned Two-Pane Settings Page (OpenCode Inspired)**:
-  - Clean category navigation panel (`General`, `Appearance`, `Window`, `Presenter Controls`, `Keyboard Shortcuts`).
-  - Compact setting rows with right-aligned toggles and subtle horizontal dividers.
-  - Dedicated searchable keyboard shortcuts table with key badge pills and reset to default action.
-- [x] **Dedicated Presentation Output Window (Phase 4)**:
-  - Native WinUI 3 top-level window [PresentationWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml) titled `"SwitchCast Presentation Output"`, 1280x720 default aspect ratio, capturable by Google Meet, Zoom, and Teams.
-  - Standby screen, letterbox/pillarbox live video canvas, paused indicator pill, and 100% opaque blackout layer.
-  - Single-instance window service [PresentationWindowService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationWindowService.cs).
-- [x] **Global Hotkeys & Minimal Presenter Companion Dock (Phase 5, 5.1 & 5.3 + Hotfix)**:
-  - System-wide global hotkeys via native Win32 `RegisterHotKey` / `UnregisterHotKey` in [Win32HotkeyService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32HotkeyService.cs).
-  - Three source switching modes: `ActiveAndLive` (A+L), `ActiveOnly` (A), `LiveOnly` (L, default).
-  - Minimal single-row floating presenter dock in Expanded and Compact modes.
-  - Unclipped external dropdown host [PresenterDockMenuWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml) with DPI-aware positioning.
-- [x] **Automated Unit & Regression Test Suite**: 169 comprehensive unit & regression tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) with 100% pass rate.
+  - Intercepts `AppWindow.Closing` on MainWindow with native confirmation dialog. Independent secondary window closure.
+- [x] **Dependency Injection & MVVM Architecture**: Full DI container configured in `App.xaml.cs` with `CommunityToolkit.Mvvm`.
+- [x] **Real Window & Monitor Discovery Engine (Phase 2)**: Windows.Graphics.Capture enumeration and Win32 display detection.
+- [x] **Native Graphics Capture Pipeline (Phase 3 & Stabilization)**: Direct3D 11 swapchain rendering, frame pooling, rate-limiting, and GDI diagnostic fallbacks.
+- [x] **Performance Profiling & Deterministic Frame Lifecycle (Phase 4.6)**: RefCountedSoftwareBitmap zero-leak memory management.
+- [x] **Rapid Source Switching Hardening & Concurrency Serialization (Phase 4.7)**: Latest-Request-Wins request coalescing and generation filtering.
+- [x] **Dedicated Presentation Output Window (Phase 4)**: 16:9 shareable presentation window with standby, live, pause, and blackout layers.
+- [x] **Global Hotkeys & Minimal Presenter Companion Dock (Phase 5, 5.1 & 5.3 + Hotfix)**: Global hotkeys and floating toolbar in 3 switching modes (`A+L`, `A`, `L`).
+- [x] **Automated Unit & Regression Test Suite**: 170 comprehensive unit & regression tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) with 100% pass rate.
 
 ### Planned (Upcoming)
-- [ ] **Phase 6**: Stability & Performance Optimization (Device loss recovery, leak audits, DPI dynamic multi-monitor adaptation).
+- [ ] **Phase 6**: Stability & Performance Optimization (Device loss recovery, extended stress profiling).
 - [ ] **Phase 7**: Advanced Presenter Features (Live thumbnail previews, smooth transitions).
-- [ ] **Phase 8**: Packaging and Release (MSIX packaging, release readiness).
+- [ ] **Phase 8**: Packaging and Distribution (MSIX store packaging option).
 
 ---
 
@@ -132,10 +90,10 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ## 6. VERIFICATION RECORD
 
-- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 4.00s).
+- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (169 passed, 0 failed, 0 skipped in 461ms).
-- **Level 4 (Dynamic Application Icon Pipeline)**: Multi-tier native extraction (`WM_GETICON`, `GetClassLongPtr`, `ExtractIconExW`, `SHGetFileInfoW`), `QueryFullProcessImageNameW` path resolution, UI thread marshalling via `DispatcherQueue`, dual-tier cache (`_rawPixelCache` and `_iconSourceCache`), and `SelectableSourceItem.OnIconSourceChanged` verified.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (170 passed, 0 failed, 0 skipped in 523ms).
+- **Level 4 (Release Build & Package)**: `dotnet publish SwitchCast.csproj -c Release -r win-x64 --self-contained true` -> PASS; `releases/SwitchCast-v1.0.0-win-x64.zip` built and verified with SHA-256 hash.
 
 ---
 

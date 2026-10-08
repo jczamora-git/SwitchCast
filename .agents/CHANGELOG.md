@@ -7,6 +7,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.0.0 — Final UI Polish, Creator Attribution & First GitHub Release] - 2026-10-09
+
+### Added / Improved (feat / UI / test / docs / release)
+- **Settings Page UX & Visual Refinement**:
+  - Replaced bulky radio-button circles in the Settings sidebar with a compact `ListView` navigation list (38 DIP row height, 14 DIP icons, clean hover/selected states).
+  - Aligned Appearance color mode options (System | Light | Dark) with clean horizontal spacing.
+  - Aligned Window and Presenter preference toggles with responsive text wrapping to prevent horizontal clipping.
+  - Streamlined Keyboard Shortcuts list (~46 DIP row height) with action descriptions, filter search, and monospace key badges.
+- **Creator Attribution & Authoritative Metadata**:
+  - Added full creator attribution: **John Christopher King Zamora**.
+  - Added repository link: [https://github.com/jczamora-git/SwitchCast](https://github.com/jczamora-git/SwitchCast).
+  - Added `OpenRepositoryCommand` launching the GitHub repository via `Windows.System.Launcher.LaunchUriAsync`.
+  - Configured single authoritative version metadata in `SwitchCast.csproj` (`Version 1.0.0`, `AssemblyVersion 1.0.0.0`, `InformationalVersion 1.0.0`).
+  - Added factual privacy architecture statement (`100% Offline & Local • Zero Telemetry • No Network Access`).
+- **Release Packaging (win-x64)**:
+  - Published self-contained Release package via `dotnet publish SwitchCast.csproj -c Release -r win-x64 --self-contained true`.
+  - Generated distribution archive `releases/SwitchCast-v1.0.0-win-x64.zip` (SHA-256: `6C416C1A274A931EB9B487CCD9A0B5ADAFB8E423A54559386591A67850E495DE`).
+- **Documentation & Remote Configuration**:
+  - Created comprehensive [README.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/README.md) with overview, features, technology stack, keyboard shortcuts, usage guide, and creator attribution.
+  - Created [docs/RELEASE_NOTES_v1.0.0.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/RELEASE_NOTES_v1.0.0.md).
+  - Configured `origin` remote: `https://github.com/jczamora-git/SwitchCast.git`.
+- **Automated Unit Tests**:
+  - Added [SwitchCast.Tests/ViewModels/SettingsViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/SettingsViewModelTests.cs) verifying About metadata, Creator, RepositoryUrl, Subtitle, and Privacy statement.
+  - Total test suite: 170 automated unit and regression tests passing (100% pass rate).
+
+---
+
 ## [Dynamic Application Icon Pipeline Repair] - 2026-10-09
 
 ### Fixed / Improved (fix / UI / test / docs)

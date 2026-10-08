@@ -9,9 +9,9 @@
     mc:Ignorable="d">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="16" Padding="28,20,28,28" MaxWidth="1040" HorizontalAlignment="Left">
+        <StackPanel Spacing="16" Padding="28,20,28,28" MaxWidth="1080" HorizontalAlignment="Stretch">
             
-            <!-- Header -->
+            <!-- Page Header -->
             <StackPanel Spacing="3">
                 <TextBlock Text="Settings"
                            FontSize="22"
@@ -23,66 +23,106 @@
             </StackPanel>
 
             <!-- Two-Pane Settings Layout -->
-            <Grid ColumnSpacing="16" Margin="0,4,0,0">
+            <Grid ColumnSpacing="20" Margin="0,4,0,0">
                 <Grid.ColumnDefinitions>
-                    <!-- Category Navigation Pane -->
-                    <ColumnDefinition Width="180" />
-                    <!-- Settings Content Pane -->
+                    <!-- Category Navigation Pane (190 DIP) -->
+                    <ColumnDefinition Width="190" />
+                    <!-- Settings Content Pane (Flexible) -->
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Category Sidebar -->
+                <!-- Category Navigation Sidebar -->
                 <Border Grid.Column="0"
                         Background="{ThemeResource AppSurfaceBrush}"
                         BorderBrush="{ThemeResource AppBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="8"
-                        Padding="6,8"
+                        Padding="6,6"
                         VerticalAlignment="Top">
-                    <RadioButtons SelectedIndex="{x:Bind ViewModel.SelectedCategoryIndex, Mode=TwoWay}"
-                                  MaxColumns="1">
-                        <RadioButton Tag="0" Margin="0,0,0,2" Padding="8,6">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon Glyph="&#xE946;" FontSize="13" Foreground="{ThemeResource AppTextSecondaryBrush}" />
-                                <TextBlock Text="General" FontSize="12" />
-                            </StackPanel>
-                        </RadioButton>
+                    <ListView SelectedIndex="{x:Bind ViewModel.SelectedCategoryIndex, Mode=TwoWay}"
+                              SelectionMode="Single"
+                              IsItemClickEnabled="False"
+                              Background="Transparent"
+                              BorderThickness="0"
+                              Padding="0">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="MinHeight" Value="36" />
+                                <Setter Property="Height" Value="38" />
+                                <Setter Property="Padding" Value="10,0" />
+                                <Setter Property="Margin" Value="0,0,0,2" />
+                                <Setter Property="CornerRadius" Value="6" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
 
-                        <RadioButton Tag="1" Margin="0,0,0,2" Padding="8,6">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon Glyph="&#xE790;" FontSize="13" Foreground="{ThemeResource AppTextSecondaryBrush}" />
-                                <TextBlock Text="Appearance" FontSize="12" />
-                            </StackPanel>
-                        </RadioButton>
+                        <!-- 0: General -->
+                        <ListViewItem>
+                            <Grid ColumnSpacing="10" VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Grid.Column="0" Glyph="&#xE946;" FontSize="14" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="General" FontSize="12" FontWeight="Normal" VerticalAlignment="Center" />
+                            </Grid>
+                        </ListViewItem>
 
-                        <RadioButton Tag="2" Margin="0,0,0,2" Padding="8,6">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon Glyph="&#xE78B;" FontSize="13" Foreground="{ThemeResource AppTextSecondaryBrush}" />
-                                <TextBlock Text="Window" FontSize="12" />
-                            </StackPanel>
-                        </RadioButton>
+                        <!-- 1: Appearance -->
+                        <ListViewItem>
+                            <Grid ColumnSpacing="10" VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Grid.Column="0" Glyph="&#xE790;" FontSize="14" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Appearance" FontSize="12" FontWeight="Normal" VerticalAlignment="Center" />
+                            </Grid>
+                        </ListViewItem>
 
-                        <RadioButton Tag="3" Margin="0,0,0,2" Padding="8,6">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon Glyph="&#xE7F4;" FontSize="13" Foreground="{ThemeResource AppTextSecondaryBrush}" />
-                                <TextBlock Text="Presenter" FontSize="12" />
-                            </StackPanel>
-                        </RadioButton>
+                        <!-- 2: Window -->
+                        <ListViewItem>
+                            <Grid ColumnSpacing="10" VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Grid.Column="0" Glyph="&#xE78B;" FontSize="14" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Window" FontSize="12" FontWeight="Normal" VerticalAlignment="Center" />
+                            </Grid>
+                        </ListViewItem>
 
-                        <RadioButton Tag="4" Margin="0,0,0,2" Padding="8,6">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon Glyph="&#xE765;" FontSize="13" Foreground="{ThemeResource AppTextSecondaryBrush}" />
-                                <TextBlock Text="Shortcuts" FontSize="12" />
-                            </StackPanel>
-                        </RadioButton>
-                    </RadioButtons>
+                        <!-- 3: Presenter -->
+                        <ListViewItem>
+                            <Grid ColumnSpacing="10" VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Grid.Column="0" Glyph="&#xE7F4;" FontSize="14" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Presenter" FontSize="12" FontWeight="Normal" VerticalAlignment="Center" />
+                            </Grid>
+                        </ListViewItem>
+
+                        <!-- 4: Shortcuts -->
+                        <ListViewItem>
+                            <Grid ColumnSpacing="10" VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Grid.Column="0" Glyph="&#xE765;" FontSize="14" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Shortcuts" FontSize="12" FontWeight="Normal" VerticalAlignment="Center" />
+                            </Grid>
+                        </ListViewItem>
+                    </ListView>
                 </Border>
 
                 <!-- Settings Content Panel -->
                 <StackPanel Grid.Column="1" Spacing="16">
                     
                     <!-- ========================================================= -->
-                    <!-- CATEGORY 0: GENERAL & SYSTEM INFO                         -->
+                    <!-- CATEGORY 0: GENERAL & ABOUT                               -->
                     <!-- ========================================================= -->
                     <Border Visibility="{x:Bind ViewModel.GeneralCategoryVisibility, Mode=OneWay}"
                             Background="{ThemeResource AppSurfaceBrush}"
@@ -90,45 +130,52 @@
                             BorderThickness="1"
                             CornerRadius="8"
                             Padding="20">
-                        <StackPanel Spacing="14">
-                            <TextBlock Text="General &amp; System Information"
+                        <StackPanel Spacing="16">
+                            <TextBlock Text="General &amp; About"
                                        FontSize="14"
                                        FontWeight="SemiBold"
                                        Foreground="{ThemeResource AppTextPrimaryBrush}" />
 
                             <!-- App Identity Strip -->
-                            <Grid Margin="0,4,0,0">
+                            <Grid Margin="0,2,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
 
                                 <Border Grid.Column="0"
-                                        Width="40"
-                                        Height="40"
+                                        Width="44"
+                                        Height="44"
                                         Background="{ThemeResource AppAccentBrush}"
-                                        CornerRadius="6"
-                                        Margin="0,0,12,0">
-                                    <FontIcon Glyph="&#xE7F4;" FontSize="18" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        CornerRadius="8"
+                                        Margin="0,0,14,0">
+                                    <FontIcon Glyph="&#xE7F4;" FontSize="20" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
 
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
-                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                        <TextBlock Text="{x:Bind ViewModel.AppName, Mode=OneWay}" FontSize="13" FontWeight="Bold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
-                                        <Border Background="{ThemeResource AppBadgeBackgroundBrush}" BorderBrush="{ThemeResource AppBorderBrush}" BorderThickness="1" Padding="4,1" CornerRadius="4">
-                                            <TextBlock Text="{x:Bind ViewModel.AppVersion, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind ViewModel.AppName, Mode=OneWay}" FontSize="15" FontWeight="Bold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                        <Border Background="{ThemeResource AppBadgeBackgroundBrush}" BorderBrush="{ThemeResource AppBorderBrush}" BorderThickness="1" Padding="6,2" CornerRadius="4">
+                                            <TextBlock Text="{x:Bind ViewModel.AppVersion, Mode=OneWay}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppAccentBrush}" />
                                         </Border>
                                     </StackPanel>
-                                    <TextBlock Text="{x:Bind ViewModel.AppDescription, Mode=OneWay}"
-                                               FontSize="11"
+                                    <TextBlock Text="{x:Bind ViewModel.AppSubtitle, Mode=OneWay}"
+                                               FontSize="12"
                                                Foreground="{ThemeResource AppTextSecondaryBrush}" />
                                 </StackPanel>
                             </Grid>
 
-                            <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" Margin="0,4" />
+                            <!-- Description (with text wrapping to prevent clipping) -->
+                            <TextBlock Text="{x:Bind ViewModel.AppDescription, Mode=OneWay}"
+                                       FontSize="11"
+                                       TextWrapping="Wrap"
+                                       LineHeight="16"
+                                       Foreground="{ThemeResource AppTextSecondaryBrush}" />
 
-                            <!-- System Properties Table -->
-                            <Grid RowSpacing="8" ColumnSpacing="16">
+                            <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                            <!-- Application & Creator Metadata Table -->
+                            <Grid RowSpacing="10" ColumnSpacing="16">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="140" />
                                     <ColumnDefinition Width="*" />
@@ -137,16 +184,42 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
 
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Target Runtime" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" />
-                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{x:Bind ViewModel.TargetFramework, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                <!-- Creator Attribution -->
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Creator" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{x:Bind ViewModel.Creator, Mode=OneWay}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
 
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Operating System" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" />
-                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{x:Bind ViewModel.PlatformDescription, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                <!-- Built With -->
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Built With" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{x:Bind ViewModel.BuiltWith, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
 
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Privacy Architecture" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" />
-                                <TextBlock Grid.Row="2" Grid.Column="1" Text="100% Offline &amp; Local • Zero Telemetry • No Network Access" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                                <!-- Platform & Target -->
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Operating System" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{x:Bind ViewModel.PlatformDescription, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" TextWrapping="Wrap" />
+
+                                <!-- Repository Link -->
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Repository" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                <Button Grid.Row="3" Grid.Column="1"
+                                        Command="{x:Bind ViewModel.OpenRepositoryCommand}"
+                                        Style="{ThemeResource SubtleButtonStyle}"
+                                        Padding="0"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xE71B;" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" />
+                                        <TextBlock Text="github.com/jczamora-git/SwitchCast" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" TextDecorations="Underline" />
+                                    </StackPanel>
+                                </Button>
+
+                                <!-- Privacy Architecture -->
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Privacy Architecture" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                                <StackPanel Grid.Row="4" Grid.Column="1" Spacing="2">
+                                    <TextBlock Text="{x:Bind ViewModel.PrivacyStatement, Mode=OneWay}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                                    <TextBlock Text="{x:Bind ViewModel.PrivacyDetails, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" TextWrapping="Wrap" />
+                                </StackPanel>
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -173,19 +246,20 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
                                     <TextBlock Text="App Theme" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
                                     <TextBlock Text="Select color mode. Changes update title bars and surfaces immediately."
                                                FontSize="11"
-                                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                               TextWrapping="Wrap" />
                                 </StackPanel>
 
                                 <RadioButtons Grid.Column="1"
                                               SelectedIndex="{x:Bind ViewModel.SelectedThemeIndex, Mode=TwoWay}"
                                               MaxColumns="3"
                                               VerticalAlignment="Center">
-                                    <RadioButton Content="System" Tag="0" FontSize="12" Margin="0,0,10,0" />
-                                    <RadioButton Content="Light" Tag="1" FontSize="12" Margin="0,0,10,0" />
+                                    <RadioButton Content="System" Tag="0" FontSize="12" Margin="0,0,12,0" />
+                                    <RadioButton Content="Light" Tag="1" FontSize="12" Margin="0,0,12,0" />
                                     <RadioButton Content="Dark" Tag="2" FontSize="12" />
                                 </RadioButtons>
                             </Grid>
@@ -214,11 +288,12 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
                                     <TextBlock Text="Remember Window Dimensions" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
-                                    <TextBlock Text="Automatically save and restore main window dimensions on startup."
+                                    <TextBlock Text="Automatically save and restore main window dimensions and position on startup."
                                                FontSize="11"
-                                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                               TextWrapping="Wrap" />
                                 </StackPanel>
 
                                 <ToggleSwitch Grid.Column="1"
@@ -252,11 +327,12 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
                                     <TextBlock Text="Enable Global Hotkeys" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
                                     <TextBlock Text="Switch sources and control live stream from anywhere in Windows."
                                                FontSize="11"
-                                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                               TextWrapping="Wrap" />
                                 </StackPanel>
 
                                 <ToggleSwitch Grid.Column="1"
@@ -275,11 +351,12 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
                                     <TextBlock Text="Auto-Open Presenter Dock" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
                                     <TextBlock Text="Automatically display the floating dock when starting a live presentation."
                                                FontSize="11"
-                                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                               TextWrapping="Wrap" />
                                 </StackPanel>
 
                                 <ToggleSwitch Grid.Column="1"
@@ -298,11 +375,12 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
                                     <TextBlock Text="Dock Always on Top" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
                                     <TextBlock Text="Keep the presenter dock pinned above full-screen windows and browser tabs."
                                                FontSize="11"
-                                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                               TextWrapping="Wrap" />
                                 </StackPanel>
 
                                 <ToggleSwitch Grid.Column="1"
@@ -321,11 +399,12 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
                                     <TextBlock Text="Start Dock in Compact Mode" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
                                     <TextBlock Text="Open the floating presenter dock in the ultra-slim single-row format."
                                                FontSize="11"
-                                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                               TextWrapping="Wrap" />
                                 </StackPanel>
 
                                 <ToggleSwitch Grid.Column="1"
@@ -389,14 +468,14 @@
 
                             <!-- Shortcut Filter Search -->
                             <TextBox Text="{x:Bind ViewModel.ShortcutSearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     PlaceholderText="Filter shortcuts..."
+                                     PlaceholderText="Filter shortcuts by name or keys..."
                                      FontSize="12" />
 
                             <!-- Shortcuts List -->
                             <ItemsControl ItemsSource="{x:Bind ViewModel.FilteredHotkeyBindings, Mode=OneWay}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="models:HotkeyBinding">
-                                        <Grid Padding="10,8"
+                                        <Grid Padding="12,8"
                                               Margin="0,0,0,4"
                                               Background="{ThemeResource AppSurfaceElevatedBrush}"
                                               BorderBrush="{ThemeResource AppBorderBrush}"
@@ -407,9 +486,9 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
 
-                                            <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
+                                            <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center" Margin="0,0,12,0">
                                                 <TextBlock Text="{x:Bind Name}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
-                                                <TextBlock Text="{x:Bind Description}" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                                <TextBlock Text="{x:Bind Description}" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" TextWrapping="Wrap" />
                                             </StackPanel>
 
                                             <Border Grid.Column="1"
