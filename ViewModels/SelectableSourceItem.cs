@@ -69,6 +69,11 @@ public partial class SelectableSourceItem : ObservableObject
         OnPropertyChanged(nameof(UnavailableBadgeVisibility));
     }
 
+    partial void OnIconSourceChanged(Microsoft.UI.Xaml.Media.ImageSource? value)
+    {
+        HasIconSource = value is not null;
+    }
+
     partial void OnHasIconSourceChanged(bool value)
     {
         OnPropertyChanged(nameof(HasNoIconSource));

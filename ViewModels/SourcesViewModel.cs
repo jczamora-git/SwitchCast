@@ -16,6 +16,7 @@ public partial class SourcesViewModel : ObservableObject
     private readonly IWindowDiscoveryService _windowDiscoveryService;
     private readonly IMonitorDiscoveryService _monitorDiscoveryService;
     private readonly IWindowIconService? _windowIconService;
+    private readonly Microsoft.UI.Dispatching.DispatcherQueue? _dispatcherQueue;
 
     private readonly List<SelectableSourceItem> _allWindows = [];
     private readonly List<SelectableSourceItem> _allDisplays = [];
@@ -51,6 +52,7 @@ public partial class SourcesViewModel : ObservableObject
         _windowDiscoveryService = windowDiscoveryService ?? throw new ArgumentNullException(nameof(windowDiscoveryService));
         _monitorDiscoveryService = monitorDiscoveryService ?? throw new ArgumentNullException(nameof(monitorDiscoveryService));
         _windowIconService = windowIconService;
+        _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 
         DisplayedSources = [];
         _presentationStateService.PropertyChanged += OnPresentationStatePropertyChanged;
@@ -152,6 +154,8 @@ public partial class SourcesViewModel : ObservableObject
             return;
         }
 
+        var dispatcher = _dispatcherQueue ?? Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+
         using var semaphore = new SemaphoreSlim(8);
         var tasks = windowItems.Select(async item =>
         {
@@ -163,13 +167,22 @@ public partial class SourcesViewModel : ObservableObject
                     var icon = await _windowIconService.GetIconForSourceAsync(winSource).ConfigureAwait(false);
                     if (icon is not null)
                     {
-                        item.IconSource = icon;
-                        item.HasIconSource = true;
+                        if (dispatcher is not null && !dispatcher.HasThreadAccess)
+                        {
+                            dispatcher.TryEnqueue(() =>
+                            {
+                                item.IconSource = icon;
+                            });
+                        }
+                        else
+                        {
+                            item.IconSource = icon;
+                        }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Fallback glyph remains visible on any error
+                    System.Diagnostics.Debug.WriteLine($"[SourcesViewModel] Error loading icon for {winSource.Title}: {ex.Message}");
                 }
                 finally
                 {

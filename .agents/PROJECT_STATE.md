@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Window Positioning & Native Application Icon (Centered Presentation Output + Native Branding)
+- **Current Phase**: Dynamic Application Icon Pipeline Repair (Native Icon Extraction to WinUI 3 Rendering)
 - **Overall Status**: **Completed (Ready for Phase 6)**
-- **Last Updated**: 2026-10-09T05:30:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-09T06:00:00+08:00 (UTC+8)
 
 ---
 
@@ -17,6 +17,12 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ### Implemented & Verified
 - [x] **Strict AI Development Harness (Phase 0)**: Standardized rules ([AGENTS.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/AGENTS.md)), 6 domain skills, architecture specifications, coding standards, and [.editorconfig](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.editorconfig).
+- [x] **Dynamic Native Application Icons Pipeline Repair**:
+  - Fixed root-cause WinUI 3 `SoftwareBitmapSource` thread affinity failure (`RPC_E_WRONG_THREAD`) where `Win32WindowIconService` was initialized in the `App` constructor before `DispatcherQueue.GetForCurrentThread()` became available, resulting in null `_dispatcherQueue` and background thread execution of `SoftwareBitmapSource.SetBitmapAsync`.
+  - Added `SetDispatcherQueue` and fallback resolution in [Win32WindowIconService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowIconService.cs), wired `_mainWindow.DispatcherQueue` binding on startup in [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs).
+  - Marshalled `SelectableSourceItem.IconSource` updates strictly to the UI thread in [SourcesViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SourcesViewModel.cs) `LoadIconsAsync`, ensuring WinUI 3 compiled binding (`x:Bind`) property changed events execute on the UI thread without cross-thread exceptions.
+  - Implemented automatic synchronization of `HasIconSource` and `HasNoIconSource` boolean flags via `OnIconSourceChanged` in [SelectableSourceItem.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SelectableSourceItem.cs).
+  - Implemented dual-tier thread-safe caching (`_rawPixelCache` storing immutable `byte[]` BGRA32 pixel data, and `_iconSourceCache` storing WinUI 3 `ImageSource` instances).
 - [x] **Centered Presentation Output Window Positioning**:
   - Implemented DPI-aware initial centering for `PresentationWindow` in [PresentationWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml.cs) using pure math helper [WindowPositioningHelper.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/WindowPositioningHelper.cs).
   - Determines target monitor from `MainWindow` (with fallback to primary monitor), retrieving usable work area (`MONITORINFO.rcWork`) excluding taskbars.
@@ -26,12 +32,6 @@ This is the authoritative progress, state, and environmental tracking document f
   - Generated multi-resolution Windows ICO asset at [Assets/SwitchCast.ico](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Assets/SwitchCast.ico) containing 7 frames (16x16, 24x24, 32x32, 48x48, 64x64, 128x128, 256x256) matching the custom title-bar coral badge (`#FF7A59`) and screen-share glyph (`\uE7F4`).
   - Configured `<ApplicationIcon>Assets\SwitchCast.ico</ApplicationIcon>` and `<Content Include="Assets\SwitchCast.ico"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>` in [SwitchCast.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.csproj) for embedding into `SwitchCast.exe` (Windows Explorer, Taskbar, Task Manager).
   - Configured native window icons on `MainWindow` and `PresentationWindow` via `_appWindow.SetIcon(iconPath)` for consistent taskbar and Alt+Tab branding.
-- [x] **Dynamic Native Application Icons Engine (Runtime Fix)**:
-  - Fixed WinUI 3 `SoftwareBitmapSource` thread affinity by marshalling `SetBitmapAsync` to the UI thread via `DispatcherQueue`, resolving the root cause where background thread creation threw `RPC_E_WRONG_THREAD` and defaulted all items to fallback glyphs.
-  - Implemented multi-tier icon extraction: `WM_GETICON` -> `GetClassLongPtr` (`GCLP_HICONSM`/`GCLP_HICON`) -> `ExtractIconExW` (32x32) -> `SHGetFileInfoW` (`SHGFI_LARGEICON`/`SHGFI_SMALLICON`).
-  - Added `QueryFullProcessImageNameW` (`PROCESS_QUERY_LIMITED_INFORMATION`) in [Win32WindowDiscoveryService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowDiscoveryService.cs) and [Win32WindowIconService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowIconService.cs) to resolve executable paths for 32/64-bit processes without Access Denied faults.
-  - Accurate 32-bit DIB alpha channel extraction with `GetIconInfo` bit-depth inspection, handling both 32-bit ARGB (Chrome, VS, Explorer, Antigravity) and legacy masked icons.
-  - Dual-key thread-safe in-memory caching (`windowSource.Id` and `ProcessPath.ToLowerInvariant()`) with bounded concurrent loading (`SemaphoreSlim(8)`) in [SourcesViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SourcesViewModel.cs).
 - [x] **Custom Integrated Presentation Output Title Bar (UI Consistency Hotfix)**:
   - Replaced the default bright white Windows native caption bar on [PresentationWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml) with a custom integrated, theme-aware title bar (`ExtendsContentIntoTitleBar = true`, `SetTitleBar(AppTitleBar)`).
   - Native caption buttons configured via `AppWindow.TitleBar` (transparent backgrounds, light glyphs in dark mode, dark glyphs in light mode, double-click maximize/restore, window dragging, Windows 11 Snap Layouts).
@@ -50,10 +50,6 @@ This is the authoritative progress, state, and environmental tracking document f
   - Calculates target monitor usable work area center coordinates on cold/first launch (`centerX = workArea.Left + (workArea.Width - windowWidth) / 2`, `centerY = workArea.Top + (workArea.Height - windowHeight) / 2`).
   - Supports multi-monitor setups with negative coordinates, differing DPI scales, and taskbar offsets.
   - Restores valid saved positions with work-area bounding and recovers safely to screen center if a monitor is disconnected.
-- [x] **Dynamic Native Application Icons Engine (Hotfix)**:
-  - [IWindowIconService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IWindowIconService.cs) & [Win32WindowIconService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowIconService.cs) extracting native icons via `SendMessageTimeout` (`WM_GETICON`), `GetClassLongPtr` (`GCLP_HICONSM`/`GCLP_HICON`), and `SHGetFileInfo` with safe native `DestroyIcon` lifecycle management.
-  - In-memory thread-safe icon caching with non-blocking async background resolution on discovery refresh.
-  - Sources page displays crisp true-color 20x20 app icons (Chrome, Visual Studio, Explorer, etc.) with theme-adaptive fallback glyphs for displays or unresolved windows.
 - [x] **Application Window Hierarchy & Safe Exit Confirmation**:
   - `MainWindow`: Primary management window. Intercepts `AppWindow.Closing` synchronously (`args.Cancel = true`) and displays a native WinUI 3 `ContentDialog` asking for confirmation before exiting.
   - Cancel keeps all windows and active presentation intact; Exit SwitchCast authorizes shutdown, stops capture, cleans up secondary windows, unregisters hotkeys, and completes clean process termination.
@@ -102,7 +98,7 @@ This is the authoritative progress, state, and environmental tracking document f
   - Three source switching modes: `ActiveAndLive` (A+L), `ActiveOnly` (A), `LiveOnly` (L, default).
   - Minimal single-row floating presenter dock in Expanded and Compact modes.
   - Unclipped external dropdown host [PresenterDockMenuWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml) with DPI-aware positioning.
-- [x] **Automated Unit & Regression Test Suite**: 167 comprehensive unit & regression tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) with 100% pass rate.
+- [x] **Automated Unit & Regression Test Suite**: 169 comprehensive unit & regression tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) with 100% pass rate.
 
 ### Planned (Upcoming)
 - [ ] **Phase 6**: Stability & Performance Optimization (Device loss recovery, leak audits, DPI dynamic multi-monitor adaptation).
@@ -136,10 +132,10 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ## 6. VERIFICATION RECORD
 
-- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 3.09s).
+- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 4.00s).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (167 passed, 0 failed, 0 skipped in 410ms).
-- **Level 4 (Window Positioning & Native Application Branding)**: Presentation output monitor work-area centering, negative virtual coordinates, DPI scaling, multi-resolution `SwitchCast.ico` asset (7 frames), executable embedded icon (`ExtractAssociatedIcon`), and `_appWindow.SetIcon` configured and verified.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (169 passed, 0 failed, 0 skipped in 461ms).
+- **Level 4 (Dynamic Application Icon Pipeline)**: Multi-tier native extraction (`WM_GETICON`, `GetClassLongPtr`, `ExtractIconExW`, `SHGetFileInfoW`), `QueryFullProcessImageNameW` path resolution, UI thread marshalling via `DispatcherQueue`, dual-tier cache (`_rawPixelCache` and `_iconSourceCache`), and `SelectableSourceItem.OnIconSourceChanged` verified.
 
 ---
 

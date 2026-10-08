@@ -40,13 +40,27 @@ public sealed class Win32WindowIconService : IWindowIconService
 
     private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
 
-    private readonly ConcurrentDictionary<string, ImageSource> _iconCache = new();
-    private readonly DispatcherQueue? _dispatcherQueue;
+    private readonly ConcurrentDictionary<string, byte[]> _rawPixelCache = new();
+    private readonly ConcurrentDictionary<string, ImageSource> _iconSourceCache = new();
+    private DispatcherQueue? _dispatcherQueue;
     private bool _isDisposed;
 
     public Win32WindowIconService(DispatcherQueue? dispatcherQueue = null)
     {
         _dispatcherQueue = dispatcherQueue ?? DispatcherQueue.GetForCurrentThread();
+    }
+
+    /// <summary>
+    /// Explicitly binds or updates the UI thread DispatcherQueue for WinUI 3 image creation.
+    /// </summary>
+    public void SetDispatcherQueue(DispatcherQueue dispatcherQueue)
+    {
+        _dispatcherQueue = dispatcherQueue ?? throw new ArgumentNullException(nameof(dispatcherQueue));
+    }
+
+    private DispatcherQueue? GetDispatcherQueue()
+    {
+        return _dispatcherQueue ?? DispatcherQueue.GetForCurrentThread();
     }
 
     public async Task<ImageSource?> GetIconForSourceAsync(CaptureSource source, CancellationToken cancellationToken = default)
@@ -57,33 +71,49 @@ public sealed class Win32WindowIconService : IWindowIconService
         }
 
         string cacheKey = windowSource.Id;
-        if (_iconCache.TryGetValue(cacheKey, out var cached))
-        {
-            return cached;
-        }
-
         string? exeCacheKey = !string.IsNullOrWhiteSpace(windowSource.ProcessPath)
             ? $"exe_{windowSource.ProcessPath.ToLowerInvariant()}"
             : null;
 
-        if (exeCacheKey is not null && _iconCache.TryGetValue(exeCacheKey, out var exeCached))
+        if (_iconSourceCache.TryGetValue(cacheKey, out var cached))
         {
-            _iconCache[cacheKey] = exeCached;
+            return cached;
+        }
+
+        if (exeCacheKey is not null && _iconSourceCache.TryGetValue(exeCacheKey, out var exeCached))
+        {
+            _iconSourceCache[cacheKey] = exeCached;
             return exeCached;
         }
 
         try
         {
-            // 1. Extract icon pixels on background thread to avoid blocking UI
-            var pixelData = await Task.Run(() => ExtractIconPixelBytes(windowSource), cancellationToken).ConfigureAwait(false);
+            byte[]? pixelData = null;
+            if (!_rawPixelCache.TryGetValue(cacheKey, out pixelData) &&
+                (exeCacheKey is null || !_rawPixelCache.TryGetValue(exeCacheKey, out pixelData)))
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return null;
+                }
 
-            if (pixelData is null || pixelData.Length == 0)
+                pixelData = await Task.Run(() => ExtractIconPixelBytes(windowSource), cancellationToken).ConfigureAwait(false);
+                if (pixelData is not null && pixelData.Length > 0)
+                {
+                    _rawPixelCache[cacheKey] = pixelData;
+                    if (exeCacheKey is not null)
+                    {
+                        _rawPixelCache[exeCacheKey] = pixelData;
+                    }
+                }
+            }
+
+            if (pixelData is null || pixelData.Length == 0 || cancellationToken.IsCancellationRequested)
             {
                 return null;
             }
 
-            // 2. Create SoftwareBitmap and SoftwareBitmapSource on the UI thread
-            var dispatcher = _dispatcherQueue ?? DispatcherQueue.GetForCurrentThread();
+            var dispatcher = GetDispatcherQueue();
             if (dispatcher is not null && !dispatcher.HasThreadAccess)
             {
                 var tcs = new TaskCompletionSource<ImageSource?>();
@@ -91,28 +121,20 @@ public sealed class Win32WindowIconService : IWindowIconService
                 {
                     try
                     {
-                        var softwareBitmap = new SoftwareBitmap(
-                            BitmapPixelFormat.Bgra8,
-                            ICON_WIDTH,
-                            ICON_HEIGHT,
-                            BitmapAlphaMode.Premultiplied);
-
-                        softwareBitmap.CopyFromBuffer(pixelData.AsBuffer());
-
-                        var sourceImage = new SoftwareBitmapSource();
-                        await sourceImage.SetBitmapAsync(softwareBitmap);
-
-                        _iconCache[cacheKey] = sourceImage;
-                        if (exeCacheKey is not null)
+                        var sourceImage = await CreateSoftwareBitmapSourceAsync(pixelData).ConfigureAwait(true);
+                        if (sourceImage is not null)
                         {
-                            _iconCache[exeCacheKey] = sourceImage;
+                            _iconSourceCache[cacheKey] = sourceImage;
+                            if (exeCacheKey is not null)
+                            {
+                                _iconSourceCache[exeCacheKey] = sourceImage;
+                            }
                         }
-
                         tcs.TrySetResult(sourceImage);
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"[WindowIconService] Error creating SoftwareBitmapSource on UI thread for {windowSource.Title}: {ex.Message}");
+                        Debug.WriteLine($"[WindowIconService] Error creating ImageSource on UI thread for {windowSource.Title}: {ex.Message}");
                         tcs.TrySetResult(null);
                     }
                 });
@@ -122,29 +144,26 @@ public sealed class Win32WindowIconService : IWindowIconService
                     return null;
                 }
 
-                return await tcs.Task;
+                return await tcs.Task.ConfigureAwait(false);
             }
             else
             {
-                var softwareBitmap = new SoftwareBitmap(
-                    BitmapPixelFormat.Bgra8,
-                    ICON_WIDTH,
-                    ICON_HEIGHT,
-                    BitmapAlphaMode.Premultiplied);
-
-                softwareBitmap.CopyFromBuffer(pixelData.AsBuffer());
-
-                var sourceImage = new SoftwareBitmapSource();
-                await sourceImage.SetBitmapAsync(softwareBitmap);
-
-                _iconCache[cacheKey] = sourceImage;
-                if (exeCacheKey is not null)
+                var sourceImage = await CreateSoftwareBitmapSourceAsync(pixelData).ConfigureAwait(false);
+                if (sourceImage is not null)
                 {
-                    _iconCache[exeCacheKey] = sourceImage;
+                    _iconSourceCache[cacheKey] = sourceImage;
+                    if (exeCacheKey is not null)
+                    {
+                        _iconSourceCache[exeCacheKey] = sourceImage;
+                    }
                 }
 
                 return sourceImage;
             }
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
         }
         catch (Exception ex)
         {
@@ -153,17 +172,34 @@ public sealed class Win32WindowIconService : IWindowIconService
         }
     }
 
+    private static async Task<SoftwareBitmapSource?> CreateSoftwareBitmapSourceAsync(byte[] pixelData)
+    {
+        var softwareBitmap = new SoftwareBitmap(
+            BitmapPixelFormat.Bgra8,
+            ICON_WIDTH,
+            ICON_HEIGHT,
+            BitmapAlphaMode.Premultiplied);
+
+        softwareBitmap.CopyFromBuffer(pixelData.AsBuffer());
+
+        var sourceImage = new SoftwareBitmapSource();
+        await sourceImage.SetBitmapAsync(softwareBitmap);
+        return sourceImage;
+    }
+
     public void Invalidate(string sourceId)
     {
         if (!string.IsNullOrEmpty(sourceId))
         {
-            _iconCache.TryRemove(sourceId, out _);
+            _iconSourceCache.TryRemove(sourceId, out _);
+            _rawPixelCache.TryRemove(sourceId, out _);
         }
     }
 
     public void ClearCache()
     {
-        _iconCache.Clear();
+        _iconSourceCache.Clear();
+        _rawPixelCache.Clear();
     }
 
     public void Dispose()
@@ -171,7 +207,8 @@ public sealed class Win32WindowIconService : IWindowIconService
         if (!_isDisposed)
         {
             _isDisposed = true;
-            _iconCache.Clear();
+            _iconSourceCache.Clear();
+            _rawPixelCache.Clear();
         }
     }
 

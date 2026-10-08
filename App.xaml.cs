@@ -154,6 +154,13 @@ public partial class App : Application
         hotkeyService.Initialize();
 
         _mainWindow = new MainWindow();
+
+        var windowIconService = Services.GetService<IWindowIconService>() as Win32WindowIconService;
+        if (windowIconService is not null && _mainWindow.DispatcherQueue is not null)
+        {
+            windowIconService.SetDispatcherQueue(_mainWindow.DispatcherQueue);
+        }
+
         _mainWindow.Activate();
     }
 }

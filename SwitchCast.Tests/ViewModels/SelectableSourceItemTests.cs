@@ -70,4 +70,40 @@ public class SelectableSourceItemTests
         Assert.True(callbackInvoked);
         Assert.True(callbackValue);
     }
+
+    [Fact]
+    public void SettingIconSource_AutomaticallyUpdatesHasIconSourceAndHasNoIconSource()
+    {
+        var window = new WindowSource { Id = "win-1", Title = "Window 1" };
+        var item = new SelectableSourceItem(window);
+
+        Assert.Null(item.IconSource);
+        Assert.False(item.HasIconSource);
+        Assert.True(item.HasNoIconSource);
+
+        var propertyChangedEvents = new List<string>();
+        item.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName is not null)
+            {
+                propertyChangedEvents.Add(e.PropertyName);
+            }
+        };
+
+        var dummyImage = new Microsoft.UI.Xaml.Media.ImageSource();
+        item.IconSource = dummyImage;
+
+        Assert.NotNull(item.IconSource);
+        Assert.True(item.HasIconSource);
+        Assert.False(item.HasNoIconSource);
+        Assert.Contains(nameof(SelectableSourceItem.IconSource), propertyChangedEvents);
+        Assert.Contains(nameof(SelectableSourceItem.HasIconSource), propertyChangedEvents);
+        Assert.Contains(nameof(SelectableSourceItem.HasNoIconSource), propertyChangedEvents);
+
+        item.IconSource = null;
+
+        Assert.Null(item.IconSource);
+        Assert.False(item.HasIconSource);
+        Assert.True(item.HasNoIconSource);
+    }
 }

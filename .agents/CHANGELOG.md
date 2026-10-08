@@ -7,6 +7,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Dynamic Application Icon Pipeline Repair] - 2026-10-09
+
+### Fixed / Improved (fix / UI / test / docs)
+- **Resolved DispatcherQueue Resolution & UI Thread Marshalling**:
+  - Fixed root-cause defect where `Win32WindowIconService` was initialized in the `App` constructor before `DispatcherQueue.GetForCurrentThread()` became available, causing `_dispatcherQueue` to remain `null` and falling back to direct background thread `SoftwareBitmapSource.SetBitmapAsync` calls that threw `RPC_E_WRONG_THREAD` and silently returned `null`.
+  - Added `SetDispatcherQueue` and lazy fallback resolution in [Services/Win32WindowIconService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowIconService.cs).
+  - Wired `_mainWindow.DispatcherQueue` binding in [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs) upon window activation.
+  - Implemented explicit UI-thread marshalling in [ViewModels/SourcesViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SourcesViewModel.cs) `LoadIconsAsync` when setting `item.IconSource`, ensuring WinUI 3 XAML compiled binding (`x:Bind`) property changed events execute strictly on the UI thread.
+- **Model Property Synchronization**:
+  - Implemented `OnIconSourceChanged` in [ViewModels/SelectableSourceItem.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SelectableSourceItem.cs) to automatically synchronize `HasIconSource` and `HasNoIconSource` boolean flags and notify XAML bindings whenever `IconSource` is assigned.
+- **Dual-Tier Thread-Safe Caching**:
+  - Added immutable raw `byte[]` pixel cache (`_rawPixelCache`) in `Win32WindowIconService` alongside `_iconSourceCache`, allowing raw BGRA32 icon data to be cached with zero thread affinity across all workers and windows.
+- **Automated Unit & Regression Tests**:
+  - Added [SwitchCast.Tests/Services/WindowIconExtractionTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/WindowIconExtractionTests.cs) and updated [SwitchCast.Tests/ViewModels/SelectableSourceItemTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/SelectableSourceItemTests.cs) to verify automatic `HasIconSource` and `HasNoIconSource` updates.
+  - All 169 unit and regression tests passing (100% pass rate).
+
+---
+
 ## [Window Positioning & Native Application Icon] - 2026-10-09
 
 ### Added / Improved (feat / UI / test / docs)
