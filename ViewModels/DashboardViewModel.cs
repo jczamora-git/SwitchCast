@@ -10,31 +10,40 @@ using SwitchCast.Services.Capture;
 namespace SwitchCast.ViewModels;
 
 /// <summary>
-/// ViewModel managing the presenter dashboard, live preview capture, and workspace controls.
+/// ViewModel managing the presenter dashboard, live preview capture, and dedicated presentation output orchestration.
 /// </summary>
 public partial class DashboardViewModel : ObservableObject
 {
     private readonly IPresentationStateService _presentationStateService;
     private readonly INavigationService _navigationService;
     private readonly ICaptureCoordinator _captureCoordinator;
+    private readonly IPresentationCoordinator _presentationCoordinator;
 
     [ObservableProperty]
     private CaptureSource? _selectedPreviewSource;
 
+    [ObservableProperty]
+    private CaptureSource? _selectedPresentationSource;
+
     public DashboardViewModel(
         IPresentationStateService presentationStateService,
         INavigationService navigationService,
-        ICaptureCoordinator captureCoordinator)
+        ICaptureCoordinator captureCoordinator,
+        IPresentationCoordinator presentationCoordinator)
     {
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
         _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
         _captureCoordinator = captureCoordinator ?? throw new ArgumentNullException(nameof(captureCoordinator));
+        _presentationCoordinator = presentationCoordinator ?? throw new ArgumentNullException(nameof(presentationCoordinator));
 
         _presentationStateService.PropertyChanged += OnPresentationStatePropertyChanged;
         _captureCoordinator.PropertyChanged += OnCaptureCoordinatorPropertyChanged;
+        _presentationCoordinator.PropertyChanged += OnPresentationCoordinatorPropertyChanged;
 
-        // Default selected preview source if sources are already queued
-        _selectedPreviewSource = _presentationStateService.SelectedSources.FirstOrDefault(s => s.IsAvailable);
+        // Default selected sources if sources are already queued
+        var defaultSource = _presentationStateService.SelectedSources.FirstOrDefault(s => s.IsAvailable);
+        _selectedPreviewSource = defaultSource;
+        _selectedPresentationSource = defaultSource;
     }
 
     public PresentationStatus Status => _presentationStateService.Status;
@@ -44,19 +53,24 @@ public partial class DashboardViewModel : ObservableObject
         PresentationStatus.Idle => IsCapturing ? "Live Preview Active" : "Not Started",
         PresentationStatus.Starting => "Initializing...",
         PresentationStatus.Active => "Presenting Live",
-        PresentationStatus.Paused => "Paused",
-        PresentationStatus.Blackout => "Blackout",
+        PresentationStatus.Paused => "Paused (Frozen)",
+        PresentationStatus.Blackout => "Blackout Active",
         PresentationStatus.Error => "Error",
         _ => "Unknown"
     };
 
-    public string ActiveSourceTitle => _captureCoordinator.CurrentPreviewSource?.Title ?? _presentationStateService.ActiveSource?.Title ?? "None";
+    public string ActiveSourceTitle => _presentationCoordinator.CurrentPresentationSource?.Title ??
+                                       _captureCoordinator.CurrentPreviewSource?.Title ??
+                                       _presentationStateService.ActiveSource?.Title ??
+                                       "None";
 
     public int SelectedSourceCount => _presentationStateService.SelectedSourceCount;
 
     public bool HasSelectedSources => SelectedSourceCount > 0;
 
-    public bool HasActiveSource => _captureCoordinator.CurrentPreviewSource is not null || _presentationStateService.ActiveSource is not null;
+    public bool HasActiveSource => _presentationCoordinator.CurrentPresentationSource is not null ||
+                                  _captureCoordinator.CurrentPreviewSource is not null ||
+                                  _presentationStateService.ActiveSource is not null;
 
     public IReadOnlyList<CaptureSource> SelectedSources => _presentationStateService.SelectedSources;
 
@@ -68,11 +82,32 @@ public partial class DashboardViewModel : ObservableObject
 
     public bool IsCaptureIdle => CaptureState == CaptureState.Idle;
 
-    public bool HasCaptureError => !string.IsNullOrWhiteSpace(_captureCoordinator.LastErrorMessage);
+    public bool HasCaptureError => !string.IsNullOrWhiteSpace(_captureCoordinator.LastErrorMessage) ||
+                                  !string.IsNullOrWhiteSpace(_presentationCoordinator.LastErrorMessage);
 
-    public string CaptureErrorMessage => _captureCoordinator.LastErrorMessage ?? string.Empty;
+    public string CaptureErrorMessage => _presentationCoordinator.LastErrorMessage ??
+                                         _captureCoordinator.LastErrorMessage ??
+                                         string.Empty;
 
     public ImageSource? PreviewImageSource => _captureCoordinator.PreviewImageSource;
+
+    public bool IsOutputWindowOpen => _presentationCoordinator.IsOutputWindowOpen;
+
+    public bool IsPresenting => _presentationCoordinator.IsLive;
+
+    public bool IsPresentationPaused => _presentationCoordinator.IsPaused;
+
+    public bool IsPresentationBlackout => _presentationCoordinator.IsBlackout;
+
+    public bool HasActivePresentation => IsPresenting || IsPresentationPaused || IsPresentationBlackout;
+
+    public string PresentationOutputStatusText => IsOutputWindowOpen ? "Window Open" : "Window Closed";
+
+    public string PresentationButtonText => HasActivePresentation ? "Stop Presenting" : "Start Presenting";
+
+    public string PauseButtonText => IsPresentationPaused ? "Resume Stream" : "Pause Stream";
+
+    public string BlackoutButtonText => IsPresentationBlackout ? "End Blackout" : "Blackout";
 
     public Visibility LivePreviewVisibility => IsCapturing ? Visibility.Visible : Visibility.Collapsed;
 
@@ -108,7 +143,7 @@ public partial class DashboardViewModel : ObservableObject
         }
         catch
         {
-            // Error state is captured and bound via ICaptureCoordinator.LastErrorMessage
+            // Error state bound via CaptureErrorMessage
         }
     }
 
@@ -146,7 +181,152 @@ public partial class DashboardViewModel : ObservableObject
             }
             catch
             {
-                // Error state is captured and bound via ICaptureCoordinator.LastErrorMessage
+                // Error state bound via CaptureErrorMessage
+            }
+        }
+    }
+
+    /// <summary>
+    /// Opens or focuses the dedicated presentation output window.
+    /// </summary>
+    [RelayCommand]
+    public async Task OpenPresentationWindowAsync()
+    {
+        await _presentationCoordinator.OpenOutputWindowAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Closes the dedicated presentation output window.
+    /// </summary>
+    [RelayCommand]
+    public async Task ClosePresentationWindowAsync()
+    {
+        await _presentationCoordinator.CloseOutputWindowAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Starts presenting to the dedicated Presentation Output Window.
+    /// </summary>
+    [RelayCommand]
+    public async Task StartPresentationAsync()
+    {
+        var targetSource = SelectedPresentationSource ?? SelectedPreviewSource ?? SelectedSources.FirstOrDefault(s => s.IsAvailable);
+        if (targetSource is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _presentationCoordinator.StartPresentationAsync(targetSource).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Error state bound via CaptureErrorMessage
+        }
+    }
+
+    /// <summary>
+    /// Stops presenting to the dedicated Presentation Output Window.
+    /// </summary>
+    [RelayCommand]
+    public async Task StopPresentationAsync()
+    {
+        try
+        {
+            await _presentationCoordinator.StopPresentationAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            // Error state bound via CaptureErrorMessage
+        }
+    }
+
+    /// <summary>
+    /// Toggles presenting on/off.
+    /// </summary>
+    [RelayCommand]
+    public async Task TogglePresentationAsync()
+    {
+        if (HasActivePresentation)
+        {
+            await StopPresentationAsync().ConfigureAwait(false);
+        }
+        else
+        {
+            await StartPresentationAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Pauses presentation output, freezing the current frame.
+    /// </summary>
+    [RelayCommand]
+    public async Task PausePresentationAsync()
+    {
+        await _presentationCoordinator.PausePresentationAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Resumes live presentation output.
+    /// </summary>
+    [RelayCommand]
+    public async Task ResumePresentationAsync()
+    {
+        await _presentationCoordinator.ResumePresentationAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Toggles between Paused and Live presentation states.
+    /// </summary>
+    [RelayCommand]
+    public async Task TogglePauseAsync()
+    {
+        if (IsPresentationPaused)
+        {
+            await ResumePresentationAsync().ConfigureAwait(false);
+        }
+        else if (IsPresenting)
+        {
+            await PausePresentationAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Toggles presentation blackout mode.
+    /// </summary>
+    [RelayCommand]
+    public async Task ToggleBlackoutAsync()
+    {
+        await _presentationCoordinator.ToggleBlackoutAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Switches live presentation source on the fly without closing the output window.
+    /// </summary>
+    [RelayCommand]
+    public async Task SwitchPresentationSourceAsync(CaptureSource? newSource)
+    {
+        if (newSource is null || !newSource.IsAvailable)
+        {
+            return;
+        }
+
+        if (SelectedPresentationSource?.Id != newSource.Id)
+        {
+            SelectedPresentationSource = newSource;
+            return;
+        }
+
+        if (HasActivePresentation)
+        {
+            try
+            {
+                await _presentationCoordinator.SwitchPresentationSourceAsync(newSource).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Error state bound via CaptureErrorMessage
             }
         }
     }
@@ -160,44 +340,19 @@ public partial class DashboardViewModel : ObservableObject
         _navigationService.NavigateTo(typeof(Views.SourcesPage));
     }
 
-    /// <summary>
-    /// Placeholder command for Phase 4 start presentation (disabled in Phase 3).
-    /// </summary>
-    [RelayCommand(CanExecute = nameof(CanStartPresentation))]
-    private void StartPresentation()
-    {
-        // Unreachable in Phase 3
-    }
-
-    private bool CanStartPresentation() => false;
-
-    /// <summary>
-    /// Placeholder command for Phase 5 pause presentation (disabled in Phase 3).
-    /// </summary>
-    [RelayCommand(CanExecute = nameof(CanPausePresentation))]
-    private void PausePresentation()
-    {
-        // Unreachable in Phase 3
-    }
-
-    private bool CanPausePresentation() => false;
-
-    /// <summary>
-    /// Placeholder command for Phase 5 blackout presentation (disabled in Phase 3).
-    /// </summary>
-    [RelayCommand(CanExecute = nameof(CanBlackout))]
-    private void Blackout()
-    {
-        // Unreachable in Phase 3
-    }
-
-    private bool CanBlackout() => false;
-
     partial void OnSelectedPreviewSourceChanged(CaptureSource? value)
     {
         if (IsCapturing && value is not null && value.IsAvailable && value.Id != _captureCoordinator.CurrentPreviewSource?.Id)
         {
             _ = SwitchPreviewSourceAsync(value);
+        }
+    }
+
+    partial void OnSelectedPresentationSourceChanged(CaptureSource? value)
+    {
+        if (HasActivePresentation && value is not null && value.IsAvailable && value.Id != _presentationCoordinator.CurrentPresentationSource?.Id)
+        {
+            _ = SwitchPresentationSourceAsync(value);
         }
     }
 
@@ -207,6 +362,13 @@ public partial class DashboardViewModel : ObservableObject
         {
             OnPropertyChanged(nameof(Status));
             OnPropertyChanged(nameof(StatusDisplayText));
+            OnPropertyChanged(nameof(IsPresenting));
+            OnPropertyChanged(nameof(IsPresentationPaused));
+            OnPropertyChanged(nameof(IsPresentationBlackout));
+            OnPropertyChanged(nameof(HasActivePresentation));
+            OnPropertyChanged(nameof(PresentationButtonText));
+            OnPropertyChanged(nameof(PauseButtonText));
+            OnPropertyChanged(nameof(BlackoutButtonText));
         }
         else if (e.PropertyName == nameof(IPresentationStateService.ActiveSource))
         {
@@ -228,6 +390,11 @@ public partial class DashboardViewModel : ObservableObject
             {
                 SelectedPreviewSource = SelectedSources.FirstOrDefault(s => s.IsAvailable);
             }
+
+            if (SelectedPresentationSource is null || !SelectedSources.Any(s => s.Id == SelectedPresentationSource.Id))
+            {
+                SelectedPresentationSource = SelectedSources.FirstOrDefault(s => s.IsAvailable);
+            }
         }
     }
 
@@ -247,5 +414,22 @@ public partial class DashboardViewModel : ObservableObject
         OnPropertyChanged(nameof(StartingCaptureVisibility));
         OnPropertyChanged(nameof(EmptyWorkspaceVisibility));
         OnPropertyChanged(nameof(ReadyToPreviewVisibility));
+    }
+
+    private void OnPresentationCoordinatorPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        OnPropertyChanged(nameof(IsOutputWindowOpen));
+        OnPropertyChanged(nameof(PresentationOutputStatusText));
+        OnPropertyChanged(nameof(IsPresenting));
+        OnPropertyChanged(nameof(IsPresentationPaused));
+        OnPropertyChanged(nameof(IsPresentationBlackout));
+        OnPropertyChanged(nameof(HasActivePresentation));
+        OnPropertyChanged(nameof(PresentationButtonText));
+        OnPropertyChanged(nameof(PauseButtonText));
+        OnPropertyChanged(nameof(BlackoutButtonText));
+        OnPropertyChanged(nameof(HasCaptureError));
+        OnPropertyChanged(nameof(CaptureErrorMessage));
+        OnPropertyChanged(nameof(ActiveSourceTitle));
+        OnPropertyChanged(nameof(StatusDisplayText));
     }
 }

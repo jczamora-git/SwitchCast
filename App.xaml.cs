@@ -41,9 +41,15 @@ public partial class App : Application
         services.AddSingleton<ICapturePreviewRenderer, Direct3D11PreviewRenderer>();
         services.AddSingleton<ICaptureCoordinator, CaptureCoordinator>();
 
+        // Presentation Output & Orchestration Services
+        services.AddSingleton<IPresentationWindowService, PresentationWindowService>();
+        services.AddSingleton<IPresentationOutputRenderer, Direct3D11PresentationRenderer>();
+        services.AddSingleton<IPresentationCoordinator, PresentationCoordinator>();
+
         // ViewModels
         services.AddSingleton<MainViewModel>();
         services.AddTransient<DashboardViewModel>();
+        services.AddTransient<PresentationViewModel>();
         services.AddTransient<SourcesViewModel>();
         services.AddTransient<SettingsViewModel>();
 

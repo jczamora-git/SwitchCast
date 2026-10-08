@@ -45,6 +45,8 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
 
     public ImageSource? PreviewImageSource => _previewRenderer.PreviewImageSource;
 
+    public event EventHandler<FrameArrivedEventArgs>? FrameArrived;
+
     public async Task StartPreviewAsync(CaptureSource source)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -151,6 +153,7 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
         if (State == CaptureState.Capturing)
         {
             await _previewRenderer.RenderFrameAsync(e.Frame).ConfigureAwait(false);
+            FrameArrived?.Invoke(this, e);
         }
     }
 

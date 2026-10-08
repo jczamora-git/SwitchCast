@@ -28,15 +28,20 @@
     <Compile Include="..\Services\INavigationService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IWindowDiscoveryService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IMonitorDiscoveryService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\IPresentationWindowService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\IPresentationCoordinator.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\PresentationCoordinator.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\CaptureState.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\ICaptureCoordinator.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\CaptureCoordinator.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\ICaptureSessionManager.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\ICapturePreviewRenderer.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Capture\IPresentationOutputRenderer.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\IGraphicsCaptureItemFactory.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\IDirect3D11DeviceProvider.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\FrameArrivedEventArgs.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\ViewModels\DashboardViewModel.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />
+    <Compile Include="..\ViewModels\PresentationViewModel.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />
     <Compile Include="..\ViewModels\SourcesViewModel.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />
     <Compile Include="..\ViewModels\SelectableSourceItem.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />
     <Compile Include="..\ViewModels\SettingsViewModel.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />

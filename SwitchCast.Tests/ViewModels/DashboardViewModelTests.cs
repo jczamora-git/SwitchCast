@@ -12,12 +12,14 @@ public class DashboardViewModelTests
     private readonly Mock<IPresentationStateService> _mockStateService;
     private readonly Mock<INavigationService> _mockNavigationService;
     private readonly Mock<ICaptureCoordinator> _mockCaptureCoordinator;
+    private readonly Mock<IPresentationCoordinator> _mockPresentationCoordinator;
 
     public DashboardViewModelTests()
     {
         _mockStateService = new Mock<IPresentationStateService>();
         _mockNavigationService = new Mock<INavigationService>();
         _mockCaptureCoordinator = new Mock<ICaptureCoordinator>();
+        _mockPresentationCoordinator = new Mock<IPresentationCoordinator>();
 
         _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Idle);
         _mockStateService.SetupGet(s => s.ActiveSource).Returns((CaptureSource?)null);
@@ -26,12 +28,23 @@ public class DashboardViewModelTests
 
         _mockCaptureCoordinator.SetupGet(c => c.State).Returns(CaptureState.Idle);
         _mockCaptureCoordinator.SetupGet(c => c.CurrentPreviewSource).Returns((CaptureSource?)null);
+
+        _mockPresentationCoordinator.SetupGet(p => p.Status).Returns(PresentationStatus.Idle);
+        _mockPresentationCoordinator.SetupGet(p => p.IsOutputWindowOpen).Returns(false);
+        _mockPresentationCoordinator.SetupGet(p => p.IsLive).Returns(false);
+        _mockPresentationCoordinator.SetupGet(p => p.IsPaused).Returns(false);
+        _mockPresentationCoordinator.SetupGet(p => p.IsBlackout).Returns(false);
+        _mockPresentationCoordinator.SetupGet(p => p.CurrentPresentationSource).Returns((CaptureSource?)null);
     }
 
     [Fact]
     public void InitialProperties_ReflectPresentationAndCaptureState()
     {
-        var vm = new DashboardViewModel(_mockStateService.Object, _mockNavigationService.Object, _mockCaptureCoordinator.Object);
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object);
 
         Assert.Equal(PresentationStatus.Idle, vm.Status);
         Assert.Equal("Not Started", vm.StatusDisplayText);
@@ -43,6 +56,9 @@ public class DashboardViewModelTests
         Assert.True(vm.IsCaptureIdle);
         Assert.False(vm.IsCapturing);
         Assert.False(vm.IsStartingCapture);
+        Assert.False(vm.IsOutputWindowOpen);
+        Assert.Equal("Window Closed", vm.PresentationOutputStatusText);
+        Assert.Equal("Start Presenting", vm.PresentationButtonText);
     }
 
     [Fact]
@@ -52,7 +68,11 @@ public class DashboardViewModelTests
         _mockStateService.SetupGet(s => s.SelectedSources).Returns(new List<CaptureSource> { source });
         _mockStateService.SetupGet(s => s.SelectedSourceCount).Returns(1);
 
-        var vm = new DashboardViewModel(_mockStateService.Object, _mockNavigationService.Object, _mockCaptureCoordinator.Object)
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object)
         {
             SelectedPreviewSource = source
         };
@@ -65,7 +85,11 @@ public class DashboardViewModelTests
     [Fact]
     public async Task StopPreviewCommand_CallsCaptureCoordinatorStopPreview()
     {
-        var vm = new DashboardViewModel(_mockStateService.Object, _mockNavigationService.Object, _mockCaptureCoordinator.Object);
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object);
 
         await vm.StopPreviewCommand.ExecuteAsync(null);
 
@@ -80,7 +104,11 @@ public class DashboardViewModelTests
 
         _mockCaptureCoordinator.SetupGet(c => c.State).Returns(CaptureState.Capturing);
 
-        var vm = new DashboardViewModel(_mockStateService.Object, _mockNavigationService.Object, _mockCaptureCoordinator.Object);
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object);
 
         await vm.SwitchPreviewSourceCommand.ExecuteAsync(source2);
 
@@ -89,9 +117,95 @@ public class DashboardViewModelTests
     }
 
     [Fact]
+    public async Task OpenPresentationWindowCommand_CallsPresentationCoordinator()
+    {
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object);
+
+        await vm.OpenPresentationWindowCommand.ExecuteAsync(null);
+
+        _mockPresentationCoordinator.Verify(p => p.OpenOutputWindowAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task StartPresentationCommand_CallsPresentationCoordinator()
+    {
+        var source = new WindowSource { Id = "win-1", Title = "Chrome", IsAvailable = true };
+        _mockStateService.SetupGet(s => s.SelectedSources).Returns(new List<CaptureSource> { source });
+        _mockStateService.SetupGet(s => s.SelectedSourceCount).Returns(1);
+
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object)
+        {
+            SelectedPresentationSource = source
+        };
+
+        await vm.StartPresentationCommand.ExecuteAsync(null);
+
+        _mockPresentationCoordinator.Verify(p => p.StartPresentationAsync(source), Times.Once);
+    }
+
+    [Fact]
+    public async Task TogglePauseCommand_WhenLive_PausesPresentation()
+    {
+        _mockPresentationCoordinator.SetupGet(p => p.IsLive).Returns(true);
+        _mockPresentationCoordinator.SetupGet(p => p.IsPaused).Returns(false);
+
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object);
+
+        await vm.TogglePauseCommand.ExecuteAsync(null);
+
+        _mockPresentationCoordinator.Verify(p => p.PausePresentationAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task TogglePauseCommand_WhenPaused_ResumesPresentation()
+    {
+        _mockPresentationCoordinator.SetupGet(p => p.IsPaused).Returns(true);
+
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object);
+
+        await vm.TogglePauseCommand.ExecuteAsync(null);
+
+        _mockPresentationCoordinator.Verify(p => p.ResumePresentationAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task ToggleBlackoutCommand_CallsPresentationCoordinator()
+    {
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object);
+
+        await vm.ToggleBlackoutCommand.ExecuteAsync(null);
+
+        _mockPresentationCoordinator.Verify(p => p.ToggleBlackoutAsync(), Times.Once);
+    }
+
+    [Fact]
     public void VisibilityProperties_CalculateCorrectly()
     {
-        var vm = new DashboardViewModel(_mockStateService.Object, _mockNavigationService.Object, _mockCaptureCoordinator.Object);
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object);
 
         // When Idle with 0 selected sources
         Assert.Equal(Microsoft.UI.Xaml.Visibility.Visible, vm.EmptyWorkspaceVisibility);
@@ -110,7 +224,11 @@ public class DashboardViewModelTests
     [Fact]
     public void NavigateToSourcesCommand_CallsNavigationService()
     {
-        var vm = new DashboardViewModel(_mockStateService.Object, _mockNavigationService.Object, _mockCaptureCoordinator.Object);
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object);
 
         vm.NavigateToSourcesCommand.Execute(null);
 

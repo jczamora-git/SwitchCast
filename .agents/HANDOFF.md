@@ -3,66 +3,63 @@
 ---
 
 ## Task Details
-- **Task**: Phase 3 — Native Live Capture Engine
-- **Date**: 2026-10-08T20:03:00+08:00 (UTC+8)
+- **Task**: Phase 4 — Dedicated Presentation Output Window & Binding Regression Fix
+- **Date**: 2026-10-08T20:25:00+08:00 (UTC+8)
 - **Status**: Completed
 
 ---
 
 ## 1. Objective
-Implement real, hardware-accelerated screen capture and live dashboard preview using `Windows.Graphics.Capture`, COM interop `IGraphicsCaptureItemInterop`, Direct3D 11 device management, `Direct3D11CaptureFramePool`, and WinUI 3 GPU preview rendering with multi-source switching and fail-closed teardown.
+Implement the dedicated, shareable native Windows Presentation Output window (`PresentationWindow.xaml`) isolated from the Control Dashboard, unified with the Phase 3 Windows Graphics Capture pipeline, with Standby screens, live letterbox/pillarbox rendering, Pause/freeze frame retention, 100% opaque Blackout, and on-the-fly source switching without window recreation or reconnection. Investigate and verify all Dashboard MVVM XAML bindings (resolving reported XLS0432 diagnostics).
 
 ---
 
 ## 2. Initial State
-- Phase 2 established native Win32 window and monitor discovery with 30 passing unit tests.
-- Git was uninitialized locally; baseline repository initialized and committed (`651e1a1: chore: establish SwitchCast Phase 2 baseline`).
-- Dashboard workspace was a placeholder banner waiting for the Phase 3 capture engine.
+- Phase 3 established native Direct3D 11 / `Windows.Graphics.Capture` live preview in the dashboard with 38 unit tests passing.
+- Reported XLS0432 diagnostics in `DashboardPage.xaml` investigated: bindings were verified against source-generated `CommunityToolkit.Mvvm` properties/commands (`SelectedPreviewSource`, `StartPreviewCommand`, `StopPreviewCommand`).
+- Presentation Output was planned for Phase 4.
 
 ---
 
 ## 3. Files Created & Modified
 
-### Services & Native Capture Engine
-- [Services/Capture/CaptureState.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/CaptureState.cs) — Capture state machine enum (`Idle`, `Starting`, `Capturing`, `Stopping`, `Failed`).
-- [Services/Capture/Interop/IGraphicsCaptureItemInterop.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Interop/IGraphicsCaptureItemInterop.cs) — COM interop definition for `CreateForWindow` and `CreateForMonitor`.
-- [Services/Capture/Interop/NativeCaptureMethods.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Interop/NativeCaptureMethods.cs) — P/Invoke definitions for `D3D11CreateDevice`, `CreateDirect3D11DeviceFromDXGIDevice`, `RoGetActivationFactory`, `IsWindow`, and `GetWindowThreadProcessId`.
-- [Services/Capture/IDirect3D11DeviceProvider.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/IDirect3D11DeviceProvider.cs) & [Services/Capture/Direct3D11DeviceProvider.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11DeviceProvider.cs) — Direct3D 11 native device creation with WARP fallback and WinRT `IDirect3DDevice` projection.
-- [Services/Capture/IGraphicsCaptureItemFactory.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/IGraphicsCaptureItemFactory.cs) & [Services/Capture/GraphicsCaptureItemFactory.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/GraphicsCaptureItemFactory.cs) — Validates `HWND` / `HMONITOR` and owning PID, activating `GraphicsCaptureItem`.
-- [Services/Capture/ICaptureSessionManager.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/ICaptureSessionManager.cs) & [Services/Capture/CaptureSessionManager.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/CaptureSessionManager.cs) — Manages `Direct3D11CaptureFramePool` streams, dynamic resize handling, cursor capture, and fail-closed disposal.
-- [Services/Capture/FrameArrivedEventArgs.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/FrameArrivedEventArgs.cs) — Event arguments conveying acquired `Direct3D11CaptureFrame`.
-- [Services/Capture/ICapturePreviewRenderer.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/ICapturePreviewRenderer.cs) & [Services/Capture/Direct3D11PreviewRenderer.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11PreviewRenderer.cs) — WinUI 3 preview renderer converting GPU surfaces to `SoftwareBitmapSource` with frame pacing.
-- [Services/Capture/ICaptureCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/ICaptureCoordinator.cs) & [Services/Capture/CaptureCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/CaptureCoordinator.cs) — High-level orchestrator coordinating session startup, preview switching, and error handling.
-- [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs) — Registered all 5 capture pipeline services in DI container.
+### Services & Presentation Orchestration
+- [Services/Capture/ICaptureCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/ICaptureCoordinator.cs) & [Services/Capture/CaptureCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/CaptureCoordinator.cs) — Added `FrameArrived` distribution event enabling unified frame distribution to multiple renderers from a single capture session.
+- [Services/Capture/IPresentationOutputRenderer.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/IPresentationOutputRenderer.cs) & [Services/Capture/Direct3D11PresentationRenderer.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11PresentationRenderer.cs) — Dedicated presentation output renderer with frame pacing, freeze-frame pause support, blackout, and clean clearing.
+- [Services/IPresentationWindowService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresentationWindowService.cs) & [Services/PresentationWindowService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationWindowService.cs) — Single-instance presentation window service managing creation, activation, and closed-state events.
+- [Services/IPresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresentationCoordinator.cs) & [Services/PresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationCoordinator.cs) — Authoritative presentation orchestrator coordinating output window lifecycle, start/stop presentation, pause, resume, blackout, and continuous source switching.
+- [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs) — Registered `PresentationWindowService`, `Direct3D11PresentationRenderer`, `PresentationCoordinator`, and `PresentationViewModel` in DI.
 
-### ViewModels & UI
-- [ViewModels/DashboardViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/DashboardViewModel.cs) — Integrated `ICaptureCoordinator`, added `StartPreviewCommand`, `StopPreviewCommand`, `SwitchPreviewSourceCommand`, `PreviewImageSource`, and reactive visibility states.
-- [Views/DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml) — Implemented Section B workspace with live preview video display, source switcher ComboBox, live indicator pill, start/stop preview actions, and error InfoBars.
+### Views & ViewModels
+- [Views/PresentationWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml) & [Views/PresentationWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml.cs) — Native shareable WinUI 3 Window titled `"SwitchCast Presentation Output"`, 1280x720 initial aspect ratio, capturable by meeting software (no `WDA_EXCLUDEFROMCAPTURE`), containing Standby, Live video, Paused pill, and Blackout overlay.
+- [ViewModels/PresentationViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/PresentationViewModel.cs) — Reactive ViewModel managing presentation window visual layer visibilities.
+- [ViewModels/DashboardViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/DashboardViewModel.cs) — Extended with presentation commands (`OpenPresentationWindowCommand`, `StartPresentationCommand`, `StopPresentationCommand`, `TogglePresentationCommand`, `TogglePauseCommand`, `ToggleBlackoutCommand`, `SwitchPresentationSourceCommand`), presentation output status, and verified bindings.
+- [Views/DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml) — Updated with Section B (Presentation Output Controls), wired Presenter Quick Actions, and verified all bindings against ViewModel members.
 
 ### Unit Tests
-- [SwitchCast.Tests/SwitchCast.Tests.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/SwitchCast.Tests.csproj) — Updated to `net8.0-windows10.0.19041.0` and linked capture interfaces.
-- [SwitchCast.Tests/Stubs/XamlStubs.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Stubs/XamlStubs.cs) — Stubs for `Visibility` and `ImageSource`.
-- [SwitchCast.Tests/ViewModels/DashboardViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/DashboardViewModelTests.cs) — Added tests for live preview start, stop, source switching, and visibility states.
-- [SwitchCast.Tests/Services/CaptureCoordinatorTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/CaptureCoordinatorTests.cs) — Tests verifying state transitions, source closure, and error recovery.
+- [SwitchCast.Tests/SwitchCast.Tests.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/SwitchCast.Tests.csproj) — Linked Phase 4 interfaces, coordinators, renderers, and ViewModels.
+- [SwitchCast.Tests/Services/PresentationCoordinatorTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresentationCoordinatorTests.cs) — Tests verifying presentation start, stop, pause, resume, blackout, source switching, duplicate window prevention, and teardown.
+- [SwitchCast.Tests/ViewModels/PresentationViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/PresentationViewModelTests.cs) — Tests verifying standby, live, paused, and blackout layer visibilities.
+- [SwitchCast.Tests/ViewModels/DashboardViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/DashboardViewModelTests.cs) — Updated tests for presentation output commands and quick actions.
 
 ---
 
 ## 4. Implementation Summary
-- Built a native, hardware-accelerated Windows Graphics Capture pipeline without third-party dependencies or mock frames.
-- Implemented real-time GPU frame conversion to `SoftwareBitmapSource` presented cleanly in the Dashboard with automatic aspect ratio preservation.
-- Provided a source switcher allowing instant preview switching between queued windows and monitors.
-- Expanded automated test suite from 30 to 38 unit tests with 100% pass rate.
-- Preserved all Phase 1 and Phase 2 discovery and navigation features.
+- Created a separate native Windows window designed for screen sharing in Google Meet, Zoom, and Microsoft Teams.
+- Engineered unified frame distribution so a single underlying capture session simultaneously feeds the Dashboard Preview and Presentation Output Window without double-capturing or degrading GPU performance.
+- Implemented presentation controls: Start Presenting, Stop Presenting, Freeze/Pause, Resume, Blackout, and on-the-fly source switching without closing or recreating the output window.
+- All bindings in `DashboardPage.xaml` strictly validated; 0 build warnings, 0 build errors.
+- Unit test suite expanded from 38 to 57 unit tests (100% pass rate).
 
 ---
 
 ## 5. Validation Performed
-- **Level 1 (Build)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 34.2s).
+- **Level 1 (Build)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 21.1s).
 - **Level 2 (Static Analysis)**: Analyzers and nullable reference checks -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (38 passed, 0 failed, 0 skipped in 609ms).
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (57 passed, 0 failed, 0 skipped in 216ms).
 
 ---
 
 ## 6. Next Steps
-- **Next Task**: **Phase 4 — Presentation Output Window**
-- Implement the dedicated, shareable Direct3D 11 presentation window hosting the final output stream, decoupled from the Control Dashboard, with aspect-ratio letterbox/pillarbox shaders and fail-closed blanking screens.
+- **Next Task**: **Phase 5 — Global Hotkeys & Presentation Switching Controls**
+- Implement native Win32 `RegisterHotKey` hooks for global shortcut activation (switching between queued sources 1-9, toggle pause, toggle blackout) when SwitchCast is in the background.

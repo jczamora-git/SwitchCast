@@ -30,6 +30,11 @@ public interface ICaptureCoordinator : INotifyPropertyChanged, IDisposable
     ImageSource? PreviewImageSource { get; }
 
     /// <summary>
+    /// Event raised when a new frame is acquired by the capture engine.
+    /// </summary>
+    event EventHandler<FrameArrivedEventArgs>? FrameArrived;
+
+    /// <summary>
     /// Starts live capture preview for the specified presentation source.
     /// </summary>
     Task StartPreviewAsync(CaptureSource source);

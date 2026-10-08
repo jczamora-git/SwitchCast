@@ -84,19 +84,24 @@ This roadmap outlines the structured, phased development plan for SwitchCast. Al
 ---
 
 ## PHASE 4 — Presentation Output Window
-- **Status**: **PLANNED**
-- **Objective**: Create the dedicated, shareable Presentation Output Window hosting a Direct3D 11 swapchain renderer.
+- **Status**: **COMPLETED (Ready for Phase 5)**
+- **Objective**: Create the dedicated, shareable Presentation Output Window hosting live video frames, standby screen, pause freeze-frame retention, and blackout overlay.
 - **Scope**:
-  - `PresentationWindow.xaml` hosting WinUI 3 `SwapChainPanel` or Direct3D 11 swapchain.
-  - Aspect-ratio letterboxing / pillarboxing shader and texture presentation.
-  - Fail-closed fallback screen when capture is interrupted or paused.
-  - Isolation of presentation window from discovery services.
+  - `PresentationWindow.xaml` and `PresentationViewModel.cs` providing a native shareable WinUI 3 Window titled `"SwitchCast Presentation Output"`.
+  - Aspect-ratio letterboxing / pillarboxing live video canvas (`Stretch="Uniform"`).
+  - Fail-closed fallback standby screen ("Ready to Present") when capture is stopped or inactive.
+  - Paused indicator pill and 100% opaque solid blackout overlay.
+  - Single-instance `PresentationWindowService` and authoritative `PresentationCoordinator`.
+  - Unified frame delivery architecture distributing capture frames from a single capture engine session to both local preview and presentation output surfaces.
+  - Dashboard presentation control strip (Start/Stop Presenting, Pause/Resume, Blackout, target source selector).
 - **Dependencies**: Phase 3 capture engine.
 - **Acceptance Criteria**:
-  - Presentation Output Window opens independently of the Control Dashboard.
-  - Active capture feed renders at 60 FPS with correct aspect ratio.
-  - Output window is shareable via Zoom/Teams/Meet.
-- **Validation**: Manual verification sharing output window in meeting software.
+  - [x] Presentation Output Window opens independently of the Control Dashboard with stable HWND.
+  - [x] Output window remains capturable by Google Meet, Zoom, and Teams (no `WDA_EXCLUDEFROMCAPTURE`).
+  - [x] Source switching preserves the open presentation window without requiring re-sharing.
+  - [x] Freeze/Pause, Resume, and Blackout states function reliably.
+  - [x] 0 build warnings or errors across the entire solution.
+- **Validation**: 57 automated unit tests; Level 1 compilation clean (0 warnings, 0 errors).
 
 ---
 

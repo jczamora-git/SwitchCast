@@ -7,11 +7,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [Unreleased] - Phase 4 Planned
-- Dedicated, shareable Presentation Output Window (`PresentationWindow.xaml`).
-- Direct3D 11 swapchain renderer with letterbox/pillarbox aspect-ratio scaling.
-- Fail-closed fallback screen when presentation is stopped or paused.
-- Window display affinity isolation to prevent control dashboard capture loops.
+## [Phase 4] - 2026-10-08
+
+### Added (feat / test / docs)
+- **Dedicated Presentation Output Window**:
+  - Implemented [Views/PresentationWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml) and [Views/PresentationWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml.cs) as a separate, shareable native WinUI 3 Window titled `"SwitchCast Presentation Output"`.
+  - Configured 1280x720 initial client dimensions (16:9), resizable, moveable across monitors, without `WDA_EXCLUDEFROMCAPTURE` to ensure direct discovery in Google Meet, Zoom, and Microsoft Teams.
+  - Implemented visual states: Standby Screen ("Ready to Present"), Live Video Canvas (`Stretch="Uniform"` letterbox/pillarbox), Paused indicator pill, and 100% opaque Blackout overlay.
+- **Single-Instance Presentation Window Service**:
+  - Implemented [IPresentationWindowService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresentationWindowService.cs) and [PresentationWindowService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationWindowService.cs) to ensure idempotent window opening, activation/focus, and clean teardown on closure.
+- **Unified Frame Delivery Architecture & Presentation Renderer**:
+  - Enhanced [ICaptureCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/ICaptureCoordinator.cs) with `FrameArrived` event distribution, enabling a single underlying capture session to supply both local preview and shareable output renderers simultaneously without redundant captures.
+  - Implemented [IPresentationOutputRenderer.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/IPresentationOutputRenderer.cs) and [Direct3D11PresentationRenderer.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11PresentationRenderer.cs) providing real-time GPU frame conversion, frame pacing, freeze-frame pause retention, and blackout clearing.
+- **Presentation Coordinator & Presenter Controls**:
+  - Implemented [IPresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresentationCoordinator.cs) and [PresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationCoordinator.cs) managing presentation lifecycle (`Idle`, `Starting`, `Active`, `Paused`, `Blackout`, `Error`), continuous source switching, and synchronized state transitions.
+- **Dashboard Presentation UI & XAML MVVM Binding Fix**:
+  - Updated [DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml) with Section B (Presentation Output Controls), output window status indicator, Start/Stop presentation actions, Pause/Resume toggle, and Blackout button.
+  - Resolved reported XLS0432 diagnostics and verified all XAML bindings against `DashboardViewModel.cs`.
+- **Automated Unit Tests**:
+  - Expanded test suite from 38 to 57 unit tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) verifying presentation coordinator, presentation window states, and dashboard commands (100% pass rate).
 
 ---
 

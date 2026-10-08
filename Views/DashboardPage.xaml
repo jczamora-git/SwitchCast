@@ -14,7 +14,7 @@
             <!-- Header -->
             <StackPanel Spacing="6">
                 <TextBlock Text="Presentation Dashboard" Style="{ThemeResource TitleTextBlockStyle}" FontWeight="SemiBold" />
-                <TextBlock Text="Manage your presentation sources and screen-sharing workspace."
+                <TextBlock Text="Manage your presentation sources, live preview, and dedicated screen-sharing output window."
                            Style="{ThemeResource BodyTextBlockStyle}"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             </StackPanel>
@@ -26,6 +26,7 @@
                   BorderThickness="1"
                   CornerRadius="8">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
@@ -59,7 +60,7 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Selected Count Metric -->
+                <!-- Queued Sources Metric -->
                 <StackPanel Grid.Column="2" Spacing="4">
                     <TextBlock Text="QUEUED SOURCES"
                                Style="{ThemeResource CaptionTextBlockStyle}"
@@ -68,6 +69,20 @@
                     <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <FontIcon Glyph="&#xE8B7;" FontSize="16" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         <TextBlock Text="{x:Bind ViewModel.SelectedSourceCount, Mode=OneWay}"
+                                   Style="{ThemeResource SubtitleTextBlockStyle}"
+                                   FontWeight="SemiBold" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Output Window Metric -->
+                <StackPanel Grid.Column="3" Spacing="4">
+                    <TextBlock Text="OUTPUT WINDOW"
+                               Style="{ThemeResource CaptionTextBlockStyle}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               FontWeight="SemiBold" />
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE78B;" FontSize="16" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="{x:Bind ViewModel.PresentationOutputStatusText, Mode=OneWay}"
                                    Style="{ThemeResource SubtitleTextBlockStyle}"
                                    FontWeight="SemiBold" />
                     </StackPanel>
@@ -81,10 +96,97 @@
                      Message="{x:Bind ViewModel.CaptureErrorMessage, Mode=OneWay}"
                      IsClosable="True" />
 
-            <!-- SECTION B: PRESENTATION WORKSPACE & LIVE PREVIEW -->
+            <!-- SECTION B: PRESENTATION OUTPUT CONTROLS (PHASE 4) -->
             <StackPanel Spacing="12">
                 <Grid>
-                    <TextBlock Text="Live Presentation Workspace" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Text="Dedicated Presentation Output (Share in Zoom / Teams / Meet)"
+                               Style="{ThemeResource SubtitleTextBlockStyle}"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center" />
+                </Grid>
+
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="20">
+                    <Grid RowSpacing="16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Row 0: Window Management & Presentation Start/Stop -->
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                                <Button Command="{x:Bind ViewModel.OpenPresentationWindowCommand}"
+                                        Padding="14,8"
+                                        VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE78B;" FontSize="14" />
+                                        <TextBlock Text="Open Output Window" />
+                                    </StackPanel>
+                                </Button>
+
+                                <ComboBox ItemsSource="{x:Bind ViewModel.SelectedSources, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedPresentationSource, Mode=TwoWay}"
+                                          DisplayMemberPath="Title"
+                                          PlaceholderText="Select presentation target..."
+                                          MinWidth="240"
+                                          VerticalAlignment="Center" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <Button Command="{x:Bind ViewModel.TogglePresentationCommand}"
+                                        Style="{ThemeResource AccentButtonStyle}"
+                                        Padding="16,8">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE768;" FontSize="14" />
+                                        <TextBlock Text="{x:Bind ViewModel.PresentationButtonText, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Row 1: Active Presentation Control Strip (Pause / Blackout) -->
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12">
+                            <Button Command="{x:Bind ViewModel.TogglePauseCommand}"
+                                    IsEnabled="{x:Bind ViewModel.HasActivePresentation, Mode=OneWay}"
+                                    Padding="14,6">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE769;" FontSize="14" Foreground="#FFA500" />
+                                    <TextBlock Text="{x:Bind ViewModel.PauseButtonText, Mode=OneWay}" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button Command="{x:Bind ViewModel.ToggleBlackoutCommand}"
+                                    IsEnabled="{x:Bind ViewModel.HasActivePresentation, Mode=OneWay}"
+                                    Padding="14,6">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE790;" FontSize="14" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                                    <TextBlock Text="{x:Bind ViewModel.BlackoutButtonText, Mode=OneWay}" />
+                                </StackPanel>
+                            </Button>
+
+                            <TextBlock Text="Select the 'SwitchCast Presentation Output' window in your video conferencing application."
+                                       Style="{ThemeResource CaptionTextBlockStyle}"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="12,0,0,0" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <!-- SECTION C: LOCAL LIVE PREVIEW WORKSPACE -->
+            <StackPanel Spacing="12">
+                <Grid>
+                    <TextBlock Text="Local Preview Workspace" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" VerticalAlignment="Center" />
                     
                     <!-- Live Indicator Pill (when capturing) -->
                     <Border Visibility="{x:Bind ViewModel.LivePreviewVisibility, Mode=OneWay}"
@@ -244,7 +346,7 @@
                 </Border>
             </StackPanel>
 
-            <!-- SECTION C: QUICK ACTIONS -->
+            <!-- SECTION D: QUICK ACTIONS -->
             <StackPanel Spacing="12">
                 <TextBlock Text="Presenter Quick Actions" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" />
 
@@ -263,49 +365,48 @@
                         <StackPanel Spacing="6" HorizontalAlignment="Center">
                             <FontIcon Glyph="&#xE710;" FontSize="20" HorizontalAlignment="Center" />
                             <TextBlock Text="Manage Sources" Style="{ThemeResource BodyStrongTextBlockStyle}" HorizontalAlignment="Center" />
-                            <TextBlock Text="Configure list" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="Configure queue" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
 
                     <Button Grid.Column="1"
                             HorizontalAlignment="Stretch"
                             Padding="12,16"
-                            IsEnabled="False"
-                            ToolTipService.ToolTip="Starts the Direct3D 11 presentation output window (Implemented in Phase 4).">
+                            Command="{x:Bind ViewModel.TogglePresentationCommand}">
                         <StackPanel Spacing="6" HorizontalAlignment="Center">
                             <FontIcon Glyph="&#xE768;" FontSize="20" HorizontalAlignment="Center" />
-                            <TextBlock Text="Start Presenting" Style="{ThemeResource BodyStrongTextBlockStyle}" HorizontalAlignment="Center" />
-                            <TextBlock Text="Phase 4" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="{x:Bind ViewModel.PresentationButtonText, Mode=OneWay}" Style="{ThemeResource BodyStrongTextBlockStyle}" HorizontalAlignment="Center" />
+                            <TextBlock Text="Dedicated output" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
 
                     <Button Grid.Column="2"
                             HorizontalAlignment="Stretch"
                             Padding="12,16"
-                            IsEnabled="False"
-                            ToolTipService.ToolTip="Freezes output frame during transitions (Implemented in Phase 5).">
+                            Command="{x:Bind ViewModel.TogglePauseCommand}"
+                            IsEnabled="{x:Bind ViewModel.HasActivePresentation, Mode=OneWay}">
                         <StackPanel Spacing="6" HorizontalAlignment="Center">
                             <FontIcon Glyph="&#xE769;" FontSize="20" HorizontalAlignment="Center" />
-                            <TextBlock Text="Pause Stream" Style="{ThemeResource BodyStrongTextBlockStyle}" HorizontalAlignment="Center" />
-                            <TextBlock Text="Phase 5" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="{x:Bind ViewModel.PauseButtonText, Mode=OneWay}" Style="{ThemeResource BodyStrongTextBlockStyle}" HorizontalAlignment="Center" />
+                            <TextBlock Text="Freeze output frame" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
 
                     <Button Grid.Column="3"
                             HorizontalAlignment="Stretch"
                             Padding="12,16"
-                            IsEnabled="False"
-                            ToolTipService.ToolTip="Instantly outputs a black screen (Implemented in Phase 5).">
+                            Command="{x:Bind ViewModel.ToggleBlackoutCommand}"
+                            IsEnabled="{x:Bind ViewModel.HasActivePresentation, Mode=OneWay}">
                         <StackPanel Spacing="6" HorizontalAlignment="Center">
                             <FontIcon Glyph="&#xE790;" FontSize="20" HorizontalAlignment="Center" />
-                            <TextBlock Text="Blackout" Style="{ThemeResource BodyStrongTextBlockStyle}" HorizontalAlignment="Center" />
-                            <TextBlock Text="Phase 5" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="{x:Bind ViewModel.BlackoutButtonText, Mode=OneWay}" Style="{ThemeResource BodyStrongTextBlockStyle}" HorizontalAlignment="Center" />
+                            <TextBlock Text="Solid black screen" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
                         </StackPanel>
                     </Button>
                 </Grid>
             </StackPanel>
 
-            <!-- SECTION D: SELECTED SOURCES OVERVIEW -->
+            <!-- SECTION E: SELECTED SOURCES OVERVIEW -->
             <StackPanel Spacing="12">
                 <Grid>
                     <TextBlock Text="Queued Presentation Sources" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" VerticalAlignment="Center" />
