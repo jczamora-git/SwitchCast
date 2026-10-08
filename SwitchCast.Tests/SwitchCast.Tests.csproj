@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
@@ -28,6 +28,14 @@
     <Compile Include="..\Services\INavigationService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IWindowDiscoveryService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IMonitorDiscoveryService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Capture\CaptureState.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Capture\ICaptureCoordinator.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Capture\CaptureCoordinator.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Capture\ICaptureSessionManager.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Capture\ICapturePreviewRenderer.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Capture\IGraphicsCaptureItemFactory.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Capture\IDirect3D11DeviceProvider.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Capture\FrameArrivedEventArgs.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\ViewModels\DashboardViewModel.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />
     <Compile Include="..\ViewModels\SourcesViewModel.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />
     <Compile Include="..\ViewModels\SelectableSourceItem.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />

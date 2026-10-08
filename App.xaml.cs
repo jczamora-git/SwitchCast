@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using SwitchCast.Services;
+using SwitchCast.Services.Capture;
 using SwitchCast.ViewModels;
 
 namespace SwitchCast;
@@ -32,6 +33,13 @@ public partial class App : Application
         services.AddSingleton<INavigationService, NavigationService>();
         services.AddSingleton<IWindowDiscoveryService, Win32WindowDiscoveryService>();
         services.AddSingleton<IMonitorDiscoveryService, Win32MonitorDiscoveryService>();
+
+        // Native Capture Pipeline Services
+        services.AddSingleton<IDirect3D11DeviceProvider, Direct3D11DeviceProvider>();
+        services.AddSingleton<IGraphicsCaptureItemFactory, GraphicsCaptureItemFactory>();
+        services.AddSingleton<ICaptureSessionManager, CaptureSessionManager>();
+        services.AddSingleton<ICapturePreviewRenderer, Direct3D11PreviewRenderer>();
+        services.AddSingleton<ICaptureCoordinator, CaptureCoordinator>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();

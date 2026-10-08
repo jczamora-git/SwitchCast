@@ -7,10 +7,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [Unreleased] - Phase 3 Planned
-- Hardware-accelerated screen capture pipeline using `Windows.Graphics.Capture` and `IGraphicsCaptureItemInterop`.
-- Direct3D 11 device and frame pool lifecycle management (`Direct3D11CaptureFramePool`).
-- Frame acquisition and synchronization services.
+## [Unreleased] - Phase 4 Planned
+- Dedicated, shareable Presentation Output Window (`PresentationWindow.xaml`).
+- Direct3D 11 swapchain renderer with letterbox/pillarbox aspect-ratio scaling.
+- Fail-closed fallback screen when presentation is stopped or paused.
+- Window display affinity isolation to prevent control dashboard capture loops.
+
+---
+
+## [Phase 3] - 2026-10-08
+
+### Added (feat / test / docs)
+- **Native Windows Graphics Capture Engine**:
+  - Implemented COM interop [IGraphicsCaptureItemInterop.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Interop/IGraphicsCaptureItemInterop.cs) for `GraphicsCaptureItem` creation from `HWND` and `HMONITOR`.
+  - Implemented [GraphicsCaptureItemFactory.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/GraphicsCaptureItemFactory.cs) validating window validity and owning PID cross-checks to prevent HWND reuse security hazards.
+  - Implemented [Direct3D11DeviceProvider.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11DeviceProvider.cs) providing hardware-accelerated Direct3D 11 devices with WARP fallback and WinRT `IDirect3DDevice` projections.
+  - Implemented [CaptureSessionManager.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/CaptureSessionManager.cs) managing `Direct3D11CaptureFramePool`, cursor capture toggles, dynamic surface resizing, and fail-closed disposal on source close.
+  - Implemented [Direct3D11PreviewRenderer.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11PreviewRenderer.cs) converting GPU surfaces into `SoftwareBitmapSource` with real-time frame pacing.
+  - Implemented [CaptureCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/CaptureCoordinator.cs) governing serialized state machine transitions (`Idle`, `Starting`, `Capturing`, `Stopping`, `Failed`).
+- **Dashboard Live Preview UI**:
+  - Implemented live video surface in [Views/DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml).
+  - Added source switcher ComboBox allowing instant preview switching between queued sources.
+  - Added "Start Live Preview", "Stop Preview" buttons, live indicator pill, and error InfoBars.
+  - Integrated [ViewModels/DashboardViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/DashboardViewModel.cs) with reactive visibility and error notifications.
+- **Automated Unit Tests**:
+  - Expanded test suite from 30 to 38 unit tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) covering preview commands, source switching, and coordinator failure transitions (100% pass rate).
+- **Git Baseline Repository**:
+  - Created `.gitignore` and established baseline commit (`651e1a1: chore: establish SwitchCast Phase 2 baseline`).
 
 ---
 

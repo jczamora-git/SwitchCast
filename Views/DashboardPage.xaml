@@ -74,38 +74,173 @@
                 </StackPanel>
             </Grid>
 
-            <!-- SECTION B: PRESENTATION WORKSPACE -->
-            <StackPanel Spacing="12">
-                <TextBlock Text="Presentation Workspace" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" />
+            <!-- Error Notification -->
+            <InfoBar IsOpen="{x:Bind ViewModel.HasCaptureError, Mode=OneWay}"
+                     Severity="Error"
+                     Title="Capture Alert"
+                     Message="{x:Bind ViewModel.CaptureErrorMessage, Mode=OneWay}"
+                     IsClosable="True" />
 
-                <Border Padding="40,48"
-                        Background="{ThemeResource LayerFillColorDefaultBrush}"
+            <!-- SECTION B: PRESENTATION WORKSPACE & LIVE PREVIEW -->
+            <StackPanel Spacing="12">
+                <Grid>
+                    <TextBlock Text="Live Presentation Workspace" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    
+                    <!-- Live Indicator Pill (when capturing) -->
+                    <Border Visibility="{x:Bind ViewModel.LivePreviewVisibility, Mode=OneWay}"
+                            HorizontalAlignment="Right"
+                            Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}"
+                            BorderBrush="{ThemeResource SystemFillColorCriticalBrush}"
+                            BorderThickness="1"
+                            Padding="10,4"
+                            CornerRadius="12">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <Ellipse Width="8" Height="8" Fill="{ThemeResource SystemFillColorCriticalBrush}" />
+                            <TextBlock Text="LIVE PREVIEW" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" FontWeight="Bold" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Workspace Container -->
+                <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1"
                         CornerRadius="8"
-                        MinHeight="220">
-                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-                        <FontIcon Glyph="&#xE790;" FontSize="44" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
-                        <TextBlock Text="No presentation source selected"
-                                   Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                   FontSize="16"
-                                   HorizontalAlignment="Center" />
-                        <TextBlock Text="Add application windows or displays to prepare your presentation workspace."
-                                   Style="{ThemeResource CaptionTextBlockStyle}"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                   HorizontalAlignment="Center"
-                                   TextAlignment="Center"
-                                   MaxWidth="400" />
-                        <Button Content="Manage Presentation Sources"
-                                Command="{x:Bind ViewModel.NavigateToSourcesCommand}"
-                                Style="{ThemeResource AccentButtonStyle}"
-                                HorizontalAlignment="Center"
-                                Margin="0,8,0,0">
-                            <Button.KeyboardAccelerators>
-                                <KeyboardAccelerator Key="S" Modifiers="Control" />
-                            </Button.KeyboardAccelerators>
-                        </Button>
-                    </StackPanel>
+                        Padding="24">
+                    <Grid>
+                        <!-- STATE A: No sources selected -->
+                        <StackPanel Visibility="{x:Bind ViewModel.EmptyWorkspaceVisibility, Mode=OneWay}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Spacing="12"
+                                    Padding="16,32">
+                            <FontIcon Glyph="&#xE790;" FontSize="44" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="No presentation sources queued"
+                                       Style="{ThemeResource BodyStrongTextBlockStyle}"
+                                       FontSize="16"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="Select application windows or display monitors from the Sources page to initialize live preview."
+                                       Style="{ThemeResource CaptionTextBlockStyle}"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       MaxWidth="420" />
+                            <Button Content="Manage Presentation Sources"
+                                    Command="{x:Bind ViewModel.NavigateToSourcesCommand}"
+                                    Style="{ThemeResource AccentButtonStyle}"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,8,0,0">
+                                <Button.KeyboardAccelerators>
+                                    <KeyboardAccelerator Key="S" Modifiers="Control" />
+                                </Button.KeyboardAccelerators>
+                            </Button>
+                        </StackPanel>
+
+                        <!-- STATE B: Sources queued, Ready to Start Preview -->
+                        <StackPanel Visibility="{x:Bind ViewModel.ReadyToPreviewVisibility, Mode=OneWay}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Spacing="16"
+                                    Padding="16,32">
+                            <FontIcon Glyph="&#xE714;" FontSize="40" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" />
+                            <TextBlock Text="Ready for Live Preview"
+                                       Style="{ThemeResource BodyStrongTextBlockStyle}"
+                                       FontSize="16"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="Choose a queued presentation source and start hardware-accelerated preview."
+                                       Style="{ThemeResource CaptionTextBlockStyle}"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       MaxWidth="420" />
+                            
+                            <!-- Source Selector & Action -->
+                            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center" Margin="0,4,0,0">
+                                <ComboBox ItemsSource="{x:Bind ViewModel.SelectedSources, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedPreviewSource, Mode=TwoWay}"
+                                          DisplayMemberPath="Title"
+                                          PlaceholderText="Select presentation source..."
+                                          MinWidth="240"
+                                          VerticalAlignment="Center" />
+                                <Button Command="{x:Bind ViewModel.StartPreviewCommand}"
+                                        Style="{ThemeResource AccentButtonStyle}"
+                                        Padding="16,8"
+                                        VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE768;" FontSize="14" />
+                                        <TextBlock Text="Start Live Preview" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- STATE C: Initializing / Starting -->
+                        <StackPanel Visibility="{x:Bind ViewModel.StartingCaptureVisibility, Mode=OneWay}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Spacing="14"
+                                    Padding="16,40">
+                            <ProgressRing IsActive="True" Width="40" Height="40" />
+                            <TextBlock Text="Initializing capture session &amp; Direct3D frame pool..."
+                                       Style="{ThemeResource BodyStrongTextBlockStyle}"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="Acquiring graphics item and establishing GPU surface pipeline."
+                                       Style="{ThemeResource CaptionTextBlockStyle}"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       HorizontalAlignment="Center" />
+                        </StackPanel>
+
+                        <!-- STATE D: Active Live Preview Stream -->
+                        <Grid Visibility="{x:Bind ViewModel.LivePreviewVisibility, Mode=OneWay}" RowSpacing="14">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <!-- Preview Toolbar -->
+                            <Grid Grid.Row="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Source Switcher -->
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                    <TextBlock Text="Previewing:" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                    <ComboBox ItemsSource="{x:Bind ViewModel.SelectedSources, Mode=OneWay}"
+                                              SelectedItem="{x:Bind ViewModel.SelectedPreviewSource, Mode=TwoWay}"
+                                              DisplayMemberPath="Title"
+                                              MinWidth="220"
+                                              VerticalAlignment="Center" />
+                                </StackPanel>
+
+                                <!-- Stop Button -->
+                                <Button Grid.Column="1"
+                                        Command="{x:Bind ViewModel.StopPreviewCommand}"
+                                        VerticalAlignment="Center"
+                                        Padding="14,6">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE71A;" FontSize="14" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                                        <TextBlock Text="Stop Preview" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+
+                            <!-- Live Video Surface -->
+                            <Border Grid.Row="1"
+                                    Background="#0A0A0A"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    MinHeight="360"
+                                    MaxHeight="500">
+                                <Image Source="{x:Bind ViewModel.PreviewImageSource, Mode=OneWay}"
+                                       Stretch="Uniform"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                            </Border>
+                        </Grid>
+                    </Grid>
                 </Border>
             </StackPanel>
 
