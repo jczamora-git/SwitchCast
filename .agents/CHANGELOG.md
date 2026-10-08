@@ -27,6 +27,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Automated Unit Tests**:
   - Expanded test suite from 38 to 57 unit tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) verifying presentation coordinator, presentation window states, and dashboard commands (100% pass rate).
 
+### Fixed (fix)
+- **RoGetActivationFactory HSTRING Marshaling**: Replaced invalid `[MarshalAs(UnmanagedType.HString)] string` P/Invoke parameter with native `IntPtr` handle and safe allocation/deletion lifecycle (`WindowsCreateString` and `WindowsDeleteString`), resolving runtime `MarshalDirectiveException` (0x80131535).
+
 ---
 
 ## [Phase 3] - 2026-10-08

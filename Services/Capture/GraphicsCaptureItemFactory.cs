@@ -54,19 +54,13 @@ public sealed class GraphicsCaptureItemFactory : IGraphicsCaptureItemFactory
             }
         }
 
-        var interopGuid = NativeCaptureMethods.IID_IGraphicsCaptureItemInterop;
-        var hr = NativeCaptureMethods.RoGetActivationFactory(CaptureItemClassId, ref interopGuid, out var factoryPtr);
-        if (hr != 0)
-        {
-            Marshal.ThrowExceptionForHR(hr);
-        }
-
+        var factoryPtr = GetActivationFactory(CaptureItemClassId, NativeCaptureMethods.IID_IGraphicsCaptureItemInterop);
         try
         {
             var interop = (IGraphicsCaptureItemInterop)Marshal.GetObjectForIUnknown(factoryPtr);
             var inspectableGuid = NativeCaptureMethods.IID_IInspectable;
 
-            hr = interop.CreateForWindow(hwnd, ref inspectableGuid, out var rawItemPtr);
+            var hr = interop.CreateForWindow(hwnd, ref inspectableGuid, out var rawItemPtr);
             if (hr != 0)
             {
                 Marshal.ThrowExceptionForHR(hr);
@@ -96,19 +90,13 @@ public sealed class GraphicsCaptureItemFactory : IGraphicsCaptureItemFactory
             throw new InvalidOperationException($"Monitor handle for display '{monitorSource.DeviceName}' is invalid or disconnected.");
         }
 
-        var interopGuid = NativeCaptureMethods.IID_IGraphicsCaptureItemInterop;
-        var hr = NativeCaptureMethods.RoGetActivationFactory(CaptureItemClassId, ref interopGuid, out var factoryPtr);
-        if (hr != 0)
-        {
-            Marshal.ThrowExceptionForHR(hr);
-        }
-
+        var factoryPtr = GetActivationFactory(CaptureItemClassId, NativeCaptureMethods.IID_IGraphicsCaptureItemInterop);
         try
         {
             var interop = (IGraphicsCaptureItemInterop)Marshal.GetObjectForIUnknown(factoryPtr);
             var inspectableGuid = NativeCaptureMethods.IID_IInspectable;
 
-            hr = interop.CreateForMonitor(hmon, ref inspectableGuid, out var rawItemPtr);
+            var hr = interop.CreateForMonitor(hmon, ref inspectableGuid, out var rawItemPtr);
             if (hr != 0)
             {
                 Marshal.ThrowExceptionForHR(hr);
@@ -126,6 +114,30 @@ public sealed class GraphicsCaptureItemFactory : IGraphicsCaptureItemFactory
         finally
         {
             Marshal.Release(factoryPtr);
+        }
+    }
+
+    private static IntPtr GetActivationFactory(string classId, Guid iid)
+    {
+        var hr = NativeCaptureMethods.WindowsCreateString(classId, (uint)classId.Length, out var hstring);
+        if (hr != 0)
+        {
+            Marshal.ThrowExceptionForHR(hr);
+        }
+
+        try
+        {
+            hr = NativeCaptureMethods.RoGetActivationFactory(hstring, ref iid, out var factoryPtr);
+            if (hr != 0)
+            {
+                Marshal.ThrowExceptionForHR(hr);
+            }
+
+            return factoryPtr;
+        }
+        finally
+        {
+            _ = NativeCaptureMethods.WindowsDeleteString(hstring);
         }
     }
 }

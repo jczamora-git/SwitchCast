@@ -35,8 +35,17 @@ public static class NativeCaptureMethods
         out IntPtr graphicsDevice);
 
     [DllImport("combase.dll", ExactSpelling = true)]
+    public static extern int WindowsCreateString(
+        [MarshalAs(UnmanagedType.LPWStr)] string sourceString,
+        uint length,
+        out IntPtr hstring);
+
+    [DllImport("combase.dll", ExactSpelling = true)]
+    public static extern int WindowsDeleteString(IntPtr hstring);
+
+    [DllImport("combase.dll", ExactSpelling = true)]
     public static extern int RoGetActivationFactory(
-        [MarshalAs(UnmanagedType.HString)] string activatableClassId,
+        IntPtr activatableClassId,
         [In] ref Guid iid,
         [Out] out IntPtr factory);
 

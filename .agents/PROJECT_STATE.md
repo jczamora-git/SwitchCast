@@ -75,9 +75,10 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ## 6. VERIFICATION RECORD
 
-- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 21.1s).
+- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 30.3s).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (57 passed, 0 failed, 0 skipped in 216ms).
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (57 passed, 0 failed, 0 skipped in 1s).
+- **Level 4 (Native COM/WinRT Interop)**: Fixed `RoGetActivationFactory` P/Invoke declaration to use native `HSTRING` handles (`WindowsCreateString` / `WindowsDeleteString`) eliminating `MarshalDirectiveException` (0x80131535).
 
 ---
 
