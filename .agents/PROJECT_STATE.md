@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Phase 5 — Global Hotkeys & Floating Presenter Dock
+- **Current Phase**: Phase 5.1 — Floating Presenter Dock UI & Window Chrome Fix
 - **Overall Status**: **Completed (Ready for Phase 6)**
-- **Last Updated**: 2026-10-08T22:45:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-08T23:20:00+08:00 (UTC+8)
 
 ---
 
@@ -50,14 +50,15 @@ This is the authoritative progress, state, and environmental tracking document f
   - Unified frame distribution pipeline and output renderer [Direct3D11PresentationRenderer.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11PresentationRenderer.cs).
   - Presentation coordinator [PresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationCoordinator.cs) supporting Start Presenting, Stop Presenting, Freeze/Pause, Resume, Blackout, and on-the-fly source switching without closing or recreating the output window.
   - Dashboard presentation controls in [DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml) and [DashboardViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/DashboardViewModel.cs).
-- [x] **Global Hotkeys & Floating Presenter Companion Dock (Phase 5)**:
+- [x] **Global Hotkeys & Floating Presenter Companion Dock (Phase 5 & 5.1)**:
   - System-wide global hotkeys via native Win32 `RegisterHotKey` / `UnregisterHotKey` in [Win32HotkeyService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32HotkeyService.cs) hosted on a dedicated message-only window (`HWND_MESSAGE`).
   - Hotkey actions for Next Source (`Ctrl+Shift+Right`), Previous Source (`Ctrl+Shift+Left`), Pause/Resume (`Ctrl+Shift+P`), Blackout (`Ctrl+Shift+B`), Stop Presenting (`Ctrl+Shift+S`), Toggle Presenter Dock (`Ctrl+Shift+D`), Focus Dashboard (`Ctrl+Shift+M`), and Direct Source Switching (`Ctrl+Shift+1..5`).
-  - Native WinUI 3 compact floating presenter dock [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml) with always-on-top mode (`OverlappedPresenter.IsAlwaysOnTop`), custom title bar drag handle, live status badge, quick switcher flyout, next/previous buttons, pause, blackout, stop, and show output actions.
+  - Native WinUI 3 compact floating presenter dock [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml) with custom borderless styling (`SetBorderAndTitleBar(false, false)`), always-on-top mode (`OverlappedPresenter.IsAlwaysOnTop`), custom title bar drag handle (`WM_NCLBUTTONDOWN` / `ReleaseCapture`), monitor work-area centering, DPI scaling calculations, live status badge, quick switcher flyout with queued source list, next/previous buttons, pause, blackout, stop, show output, and show dashboard actions.
+  - Two distinct presenter modes: Expanded 2-row layout (620×110 DIP) and Compact 1-row layout (480×54 DIP) with dynamic animated window resizing and setting persistence.
   - Single-instance dock window service [PresenterDockService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresenterDockService.cs) for opening, closing, and toggling dock visibility.
   - Configurable presenter controls in Settings ([SettingsPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SettingsPage.xaml)) for global hotkey toggles, auto-open dock on start presenting, always-on-top preference, and active keybinding display table.
   - Sequential source switching API on [IPresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresentationCoordinator.cs) (`SwitchToNextSourceAsync`, `SwitchToPreviousSourceAsync`, `SwitchToSourceIndexAsync`) routing directly through the serialized Latest-Request-Wins pipeline.
-- [x] **Automated Unit & Concurrency Test Suite**: 109 comprehensive unit & regression tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) verifying hotkey lifecycle, dock service lifecycle, dock ViewModel commands, rapid source switching (Latest-Request-Wins), concurrent transitions, ref-counted bitmap lifecycles, presentation coordinator, presentation window states, capture transitions, win32 diagnostic capture, discovery orchestration, search filtering, selection sync, and reconciliation (100% pass rate).
+- [x] **Automated Unit & Concurrency Test Suite**: 110 comprehensive unit & regression tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) verifying hotkey lifecycle, dock service lifecycle, dock ViewModel commands, rapid source switching (Latest-Request-Wins), concurrent transitions, ref-counted bitmap lifecycles, presentation coordinator, presentation window states, capture transitions, win32 diagnostic capture, discovery orchestration, search filtering, selection sync, and reconciliation (100% pass rate).
 
 ### Planned (Upcoming)
 - [x] **Phase 5**: Switching System (Global hotkeys, instant source switching, shortcut customization).
@@ -79,7 +80,7 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ## 4. ARCHITECTURE DECISION RECORDS
 
-- [ADR-0001: Technology Stack & Clean Architecture Core](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/decisions/ADR-0001-architecture.md) — Implemented in Phase 1, 2, 3, 4, 4.6, 4.7, and 5.
+- [ADR-0001: Technology Stack & Clean Architecture Core](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/decisions/ADR-0001-architecture.md) — Implemented in Phase 1, 2, 3, 4, 4.6, 4.7, 5, and 5.1.
 
 ---
 
@@ -95,10 +96,10 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ## 6. VERIFICATION RECORD
 
-- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 4.0s).
+- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 28.6s).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (109 passed, 0 failed, 0 skipped in 380ms).
-- **Level 4 (Deterministic Lifecycle & Concurrency Hardening)**: Hotkey message-only window unregistration, Presenter Dock single-instance lifecycle, Latest-Request-Wins transition serialization, RefCountedSoftwareBitmap zero-leak memory lifecycle, and session generation validation verified.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (110 passed, 0 failed, 0 skipped in 329ms).
+- **Level 4 (Deterministic Lifecycle & Concurrency Hardening)**: Dock custom chrome, DPI scaling conversions, work-area centering, Latest-Request-Wins transition serialization, RefCountedSoftwareBitmap zero-leak memory lifecycle, and session generation validation verified.
 
 ---
 

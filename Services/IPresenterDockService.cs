@@ -39,4 +39,14 @@ public interface IPresenterDockService
     /// Toggles the visibility of the presenter dock window.
     /// </summary>
     void ToggleDock();
+
+    /// <summary>
+    /// Requests bringing the main application dashboard to the foreground.
+    /// </summary>
+    void ShowDashboard();
+
+    /// <summary>
+    /// Event raised when the main dashboard is requested to be shown.
+    /// </summary>
+    event EventHandler? RequestShowDashboard;
 }

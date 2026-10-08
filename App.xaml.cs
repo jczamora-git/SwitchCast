@@ -23,6 +23,14 @@ public partial class App : Application
 
     public IServiceProvider Services { get; }
 
+    /// <summary>
+    /// Activates and brings the primary application window to the foreground.
+    /// </summary>
+    public void ActivateMainWindow()
+    {
+        _mainWindow?.Activate();
+    }
+
     private static IServiceProvider ConfigureServices()
     {
         var services = new ServiceCollection();
@@ -122,6 +130,8 @@ public partial class App : Application
                     break;
             }
         };
+
+        presenterDockService.RequestShowDashboard += (s, e) => _mainWindow?.Activate();
 
         hotkeyService.Initialize();
 

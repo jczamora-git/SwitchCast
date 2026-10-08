@@ -7,6 +7,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Phase 5.1 — Floating Presenter Dock UI & Window Chrome Fix] - 2026-10-08
+
+### Fixed (fix / UI / test)
+- **Window Chrome & Native Title Bar Removal**:
+  - Configured `presenter.SetBorderAndTitleBar(hasBorder: false, hasTitleBar: false)`, removing the duplicate OS caption title bar that was previously consuming ~32px and vertically compressing the dock content.
+  - Implemented custom drag region on the top header bar delegating directly to the Windows window manager via `ReleaseCapture()` and `SendMessage(WindowHandle, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero)`.
+- **DPI-Aware Window Scaling & Work-Area Centering**:
+  - Implemented `GetDpiForWindow` scaling (`scale = dpi / 96.0`) ensuring physical pixel allocations (`AppWindow.Resize`) accurately reflect DIP targets across 100%, 125%, 150%, and 200% displays.
+  - Centered default opening position at top of current monitor work area via `MonitorFromWindow` and `GetMonitorInfo`.
+- **2-Row Expanded & 1-Row Compact Presenter Modes**:
+  - **Expanded Mode** (620×110 DIP): 2-row layout with top drag header (SwitchCast branding, live status pill, mode toggle, close button) and bottom action row (source quick switcher flyout, next/previous buttons, pause, blackout, stop, show output, show dashboard).
+  - **Compact Mode** (480×54 DIP): Sleek 1-row mini toolbar with essential switching, playback controls, and expand toggle.
+  - Added setting persistence for compact mode preference via `UserSettings.StartDockInCompactMode`.
+- **Decoupled Dashboard Focus Navigation**:
+  - Added `ShowDashboard()` / `RequestShowDashboard` on `IPresenterDockService` and `PresenterDockService`, cleanly routing dashboard activation to `_mainWindow?.Activate()` without direct UI dependencies.
+- **Automated Unit Tests**:
+  - Added `ShowDashboardCommand_CallsDockServiceShowDashboard` to [SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs), bringing total passing tests to 110 (100% pass rate).
+
+---
+
 ## [Phase 5 — Global Hotkeys & Floating Presenter Dock] - 2026-10-08
 
 ### Added (feat / test / docs)

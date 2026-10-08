@@ -3,75 +3,67 @@
 ---
 
 ## Task Details
-- **Task**: Phase 5 — Global Hotkeys & Floating Presenter Dock
-- **Date**: 2026-10-08T22:45:00+08:00 (UTC+8)
+- **Task**: Phase 5.1 — Floating Presenter Dock UI & Window Chrome Fix
+- **Date**: 2026-10-08T23:20:00+08:00 (UTC+8)
 - **Status**: Completed
 
 ---
 
 ## 1. Objective
-Add a presenter-friendly floating control dock and global hotkeys so the user can switch presentation sources instantly while presenting, without needing to return to the main dashboard window, while preserving the existing single capture pipeline, stable presentation output window, and Phase 4.7 rapid switching safety protections.
+Fix the visual compression, title bar duplication, and sizing defects on the Floating Presenter Companion Dock. Establish correct DPI-aware physical pixel conversions, borderless window chrome with native drag handling, work-area positioning, and a polished 2-row Expanded layout (620×110 DIP) and 1-row Compact layout (480×54 DIP).
 
 ---
 
-## 2. Architecture & Design Decisions
-1. **Win32 Message-Only Window for Global Hotkeys**:
-   - `Win32HotkeyService` creates an invisible Win32 message-only window (`HWND_MESSAGE` = `-3`) with a dedicated `WndProc` delegate pinned in memory to intercept `WM_HOTKEY` (0x0312).
-   - This ensures background shortcut handling without polling, without low-level keyboard hooks (`WH_KEYBOARD_LL`), and without dependency on whether the main window is focused, minimized, or in background.
-   - Cleanly registers on startup/reconfiguration and unregisters all hotkeys upon shutdown or disable.
-2. **Compact Always-On-Top Presenter Dock**:
-   - `PresenterDockWindow.xaml` is a native WinUI 3 top-level window configured with `OverlappedPresenter.IsAlwaysOnTop = true`, fixed compact dimensions (440x88), custom title bar drag handle (`AppTitleBar`), and borderless styling.
-   - Provides quick switching buttons (Previous, Next, Quick Switcher flyout with direct source list), status pill (Live/Paused/Blackout/Idle), Pause/Resume toggle, Blackout toggle, Stop Presenting, and Show Presentation Output.
-3. **Presenter Dock Window Service**:
-   - `PresenterDockService` provides single-instance lifecycle management (`OpenDock()`, `CloseDock()`, `ToggleDock()`, `BringToFront()`), preventing duplicate dock windows and handling window closure gracefully.
-4. **Authoritative Source Switching Integration**:
-   - Added `SwitchToNextSourceAsync()`, `SwitchToPreviousSourceAsync()`, and `SwitchToSourceIndexAsync(int index)` directly to `IPresentationCoordinator`.
-   - All dock actions and global hotkeys route through `PresentationCoordinator` and `CaptureCoordinator`, strictly preserving the Latest-Request-Wins request coalescing, transition serialization, and generation filtering established in Phase 4.7.
-5. **Presenter Settings & Persistence**:
-   - Added Section C in `SettingsPage.xaml` / `SettingsViewModel.cs` for toggling global hotkeys, auto-opening dock on presentation start, keeping dock always-on-top, and displaying the active hotkey binding map.
-   - Persisted in `%LOCALAPPDATA%\SwitchCast\settings.json` via `ApplicationSettingsService`.
+## 2. Root Cause Analysis
+1. **Window Sizing & Unit Confusion (DIP vs Physical Pixels)**:
+   - `_appWindow.Resize(new SizeInt32(660, 68))` passed raw unscaled device pixels. On high-DPI displays (e.g. 125% or 150% scaling), 68 physical pixels represented only ~45–54 DIPs.
+2. **Native Title Bar Caption Not Removed**:
+   - `presenter.SetBorderAndTitleBar(false, false)` was not configured. Windows drew the default system title bar (~32px caption), consuming half of the available physical window height and squeezing the XAML client area down to ~20–30px.
+3. **Overcrowded 1-Row Grid**:
+   - All controls, labels, and dropdowns were forced into a single compressed row with excessive column constraints, causing truncation and clipping.
 
 ---
 
-## 3. Files Modified / Created
+## 3. Architecture & Solutions Applied
+1. **Borderless Window Chrome & Native Drag Handling**:
+   - Configured `presenter.SetBorderAndTitleBar(hasBorder: false, hasTitleBar: false)`, `presenter.IsAlwaysOnTop = true`, `presenter.IsResizable = false`.
+   - Implemented lag-free native dragging via `ReleaseCapture()` and `SendMessage(WindowHandle, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero)` on pointer press.
+2. **DPI-Aware Window Scaling**:
+   - Implemented `GetDpiForWindow(WindowHandle)` scaling (`scale = dpi / 96.0`):
+     - **Expanded Mode**: 620 × 110 DIP
+     - **Compact Mode**: 480 × 54 DIP
+   - Centered window on top of monitor work area via `MonitorFromWindow` and `GetMonitorInfo(rcWork)`.
+3. **2-Row Expanded & 1-Row Compact Presenter Modes**:
+   - Expanded mode provides clean top row (drag grip, branding, status pill, mode toggle, close button) and bottom row (source quick switcher flyout, next/previous buttons, pause, blackout, stop, show output, show dashboard).
+   - Compact mode provides a minimal single-row toolbar.
+4. **Decoupled Dashboard Activation**:
+   - Added `ShowDashboard()` / `RequestShowDashboard` to `IPresenterDockService` and `PresenterDockService`, wired up cleanly to `_mainWindow?.Activate()` in `App.xaml.cs`.
 
-### Models & Services
-- [Models/HotkeyModels.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/HotkeyModels.cs) *(New)*
-- [Models/UserSettings.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/UserSettings.cs)
-- [Services/IHotkeyService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IHotkeyService.cs) *(New)*
-- [Services/Win32HotkeyService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32HotkeyService.cs) *(New)*
-- [Services/IPresenterDockService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresenterDockService.cs) *(New)*
-- [Services/PresenterDockService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresenterDockService.cs) *(New)*
-- [Services/IPresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresentationCoordinator.cs)
-- [Services/PresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationCoordinator.cs)
+---
 
-### UI & ViewModels
-- [ViewModels/PresenterDockViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/PresenterDockViewModel.cs) *(New)*
-- [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml) *(New)*
-- [Views/PresenterDockWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml.cs) *(New)*
-- [ViewModels/DashboardViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/DashboardViewModel.cs)
-- [Views/DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml)
-- [ViewModels/SettingsViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SettingsViewModel.cs)
-- [Views/SettingsPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SettingsPage.xaml)
+## 4. Files Modified / Created
+
+### Core UI & ViewModels
+- [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml)
+- [Views/PresenterDockWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml.cs)
+- [ViewModels/PresenterDockViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/PresenterDockViewModel.cs)
+- [Services/IPresenterDockService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresenterDockService.cs)
+- [Services/PresenterDockService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresenterDockService.cs)
 - [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs)
 
 ### Automated Test Suite
-- [SwitchCast.Tests/Services/HotkeyServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/HotkeyServiceTests.cs) *(New)*
-- [SwitchCast.Tests/Services/PresenterDockServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresenterDockServiceTests.cs) *(New)*
-- [SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs) *(New)*
-- [SwitchCast.Tests/Services/PresentationCoordinatorTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresentationCoordinatorTests.cs)
-- [SwitchCast.Tests/SwitchCast.Tests.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/SwitchCast.Tests.csproj)
+- [SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs)
 
 ---
 
-## 4. Validation Performed
-- **Level 1 (Build)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 4.0s).
+## 5. Validation Performed
+- **Level 1 (Build)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 28.6s).
 - **Level 2 (Static Analysis)**: Analyzers and nullable reference checks -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (109 passed, 0 failed, 0 skipped in 380ms).
-- **Level 4 (Deterministic Lifecycle & Concurrency Hardening)**: Verified hotkey registration/unregistration, message-only window lifecycle, dock single-instance management, presenter dock commands, and sequential source transitions through the coordinator.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (110 passed, 0 failed, 0 skipped in 329ms).
+- **Level 4 (Deterministic Lifecycle & Concurrency Hardening)**: Verified borderless window sizing, DPI calculations, custom drag handling, ShowDashboard routing, and PresenterDockViewModel command execution.
 
 ---
 
-## 5. Next Steps
+## 6. Next Steps
 - **Next Task**: **Phase 6 — Stability & Performance Optimization**
 - Implement Direct3D 11 device loss resilience and recovery hooks, dynamic DPI multi-monitor scaling, and extended load verification.

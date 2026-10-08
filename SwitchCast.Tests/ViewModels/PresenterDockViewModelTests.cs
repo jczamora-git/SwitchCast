@@ -208,4 +208,19 @@ public class PresenterDockViewModelTests
 
         _mockDockService.Verify(d => d.CloseDock(), Times.Once);
     }
+
+    [Fact]
+    public void ShowDashboardCommand_CallsDockServiceShowDashboard()
+    {
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object);
+
+        vm.ShowDashboardCommand.Execute(null);
+
+        _mockDockService.Verify(d => d.ShowDashboard(), Times.Once);
+    }
 }

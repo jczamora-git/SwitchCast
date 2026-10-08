@@ -16,6 +16,12 @@ public sealed class PresenterDockService : IPresenterDockService
 
     public event EventHandler? DockOpened;
     public event EventHandler? DockClosed;
+    public event EventHandler? RequestShowDashboard;
+
+    public void ShowDashboard()
+    {
+        RequestShowDashboard?.Invoke(this, EventArgs.Empty);
+    }
 
     public void ShowDock()
     {

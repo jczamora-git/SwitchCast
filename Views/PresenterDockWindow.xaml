@@ -5,155 +5,360 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:SwitchCast.Models"
+    xmlns:views="using:SwitchCast.Views"
     xmlns:vm="using:SwitchCast.ViewModels"
     mc:Ignorable="d"
     Title="SwitchCast Presenter Dock">
 
-    <Grid Background="{ThemeResource LayerFillColorDefaultBrush}" Padding="8,6">
-        <!-- Main Floating Dock Container -->
-        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+    <!-- Floating Dock Surface with rounded border -->
+    <Grid Background="Transparent">
+        <Border x:Name="DockCardBorder"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
                 CornerRadius="10"
-                Padding="8,6">
+                Padding="10,6"
+                Margin="0">
             
-            <Grid ColumnSpacing="8" VerticalAlignment="Center">
-                <Grid.ColumnDefinitions>
-                    <!-- Drag Grip -->
-                    <ColumnDefinition Width="Auto" />
-                    <!-- Status Badge -->
-                    <ColumnDefinition Width="Auto" />
-                    <!-- Source Navigation / Title -->
-                    <ColumnDefinition Width="*" />
-                    <!-- Presenter Actions -->
-                    <ColumnDefinition Width="Auto" />
-                    <!-- Window Controls -->
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+            <Grid>
+                <!-- ========================================================= -->
+                <!-- EXPANDED MODE (2 Rows)                                    -->
+                <!-- ========================================================= -->
+                <Grid x:Name="ExpandedRootGrid"
+                      RowSpacing="6"
+                      VerticalAlignment="Center"
+                      Visibility="{x:Bind views:PresenterDockWindow.InvertBoolToVis(ViewModel.IsCompactMode), Mode=OneWay}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                <!-- 1. Drag Grip -->
-                <Border Grid.Column="0"
-                        Width="16" Height="32"
-                        Background="Transparent"
-                        VerticalAlignment="Center"
-                        ToolTipService.ToolTip="Drag to move presenter dock">
-                    <FontIcon Glyph="&#xE76F;" FontSize="14" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
+                    <!-- Row 0: Top Header / Drag Bar & Status & Window Controls -->
+                    <Grid Grid.Row="0" ColumnSpacing="8" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <!-- Drag Region & Branding -->
+                            <ColumnDefinition Width="*" />
+                            <!-- Status Pill -->
+                            <ColumnDefinition Width="Auto" />
+                            <!-- Window Controls (Compact toggle, Close) -->
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-                <!-- 2. Status Badge -->
-                <Border Grid.Column="1"
-                        Padding="8,4"
-                        CornerRadius="6"
-                        VerticalAlignment="Center"
-                        Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                        <Ellipse Width="8" Height="8"
-                                 Fill="{ThemeResource AccentFillColorDefaultBrush}" />
-                        <TextBlock Text="{x:Bind ViewModel.StatusDisplayText, Mode=OneWay}"
-                                   Style="{ThemeResource CaptionTextBlockStyle}"
-                                   FontWeight="Bold"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
-                </Border>
+                        <!-- Drag Region & Branding -->
+                        <Border Grid.Column="0"
+                                Background="Transparent"
+                                PointerPressed="OnDragRegionPointerPressed"
+                                ToolTipService.ToolTip="Drag to reposition presenter dock">
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <!-- Drag Grip Icon -->
+                                <FontIcon Glyph="&#xE76F;" FontSize="13" Foreground="{ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
+                                
+                                <!-- App Brand Icon & Title -->
+                                <FontIcon Glyph="&#xE7F4;" FontSize="13" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                <TextBlock Text="SwitchCast Dock" Style="{ThemeResource CaptionTextBlockStyle}" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
 
-                <!-- 3. Active Source & Navigation -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                    <!-- Previous Source -->
-                    <Button Command="{x:Bind ViewModel.PreviousSourceCommand}"
-                            IsEnabled="{x:Bind ViewModel.CanSwitchSources, Mode=OneWay}"
-                            Padding="6,4"
-                            ToolTipService.ToolTip="Previous Source (Ctrl+Shift+Left)">
-                        <FontIcon Glyph="&#xE76B;" FontSize="12" />
-                    </Button>
-
-                    <!-- Active Source Display with Quick Switch Flyout -->
-                    <DropDownButton Padding="10,4"
-                                    VerticalAlignment="Center"
-                                    MaxWidth="220"
-                                    ToolTipService.ToolTip="{x:Bind ViewModel.ActiveSourceTitle, Mode=OneWay}">
-                        <DropDownButton.Content>
+                        <!-- Status Badge Pill -->
+                        <Border Grid.Column="1"
+                                Padding="8,3"
+                                CornerRadius="8"
+                                VerticalAlignment="Center"
+                                Background="{ThemeResource SubtleFillColorSecondaryBrush}">
                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                <FontIcon Glyph="&#xE7F4;" FontSize="13" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                                <TextBlock Text="{x:Bind ViewModel.ActiveSourceTitle, Mode=OneWay}"
-                                           Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                           TextTrimming="CharacterEllipsis"
-                                           MaxLines="1"
+                                <Ellipse Width="7" Height="7" Fill="{ThemeResource AccentFillColorDefaultBrush}" />
+                                <TextBlock Text="{x:Bind ViewModel.StatusDisplayText, Mode=OneWay}"
+                                           FontSize="11"
+                                           FontWeight="Bold"
+                                           Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                                            VerticalAlignment="Center" />
                             </StackPanel>
-                        </DropDownButton.Content>
+                        </Border>
 
-                        <DropDownButton.Flyout>
-                            <MenuFlyout>
-                                <MenuFlyoutItem Text="Quick Switch Sources" IsEnabled="False" FontWeight="SemiBold" />
-                                <MenuFlyoutSeparator />
-                                <MenuFlyoutSubItem Text="Available Sources">
-                                    <MenuFlyoutItem Text="Next Source (Ctrl+Shift+Right)" Command="{x:Bind ViewModel.NextSourceCommand}" />
-                                    <MenuFlyoutItem Text="Previous Source (Ctrl+Shift+Left)" Command="{x:Bind ViewModel.PreviousSourceCommand}" />
-                                </MenuFlyoutSubItem>
-                            </MenuFlyout>
-                        </DropDownButton.Flyout>
-                    </DropDownButton>
+                        <!-- Window Controls -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <!-- Toggle Compact Mode -->
+                            <Button Command="{x:Bind ViewModel.ToggleCompactModeCommand}"
+                                    Style="{ThemeResource SubtleButtonStyle}"
+                                    Padding="6,4"
+                                    ToolTipService.ToolTip="{x:Bind ViewModel.CompactModeTooltip, Mode=OneWay}">
+                                <FontIcon Glyph="&#xE73F;" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </Button>
 
-                    <!-- Next Source -->
-                    <Button Command="{x:Bind ViewModel.NextSourceCommand}"
-                            IsEnabled="{x:Bind ViewModel.CanSwitchSources, Mode=OneWay}"
-                            Padding="6,4"
-                            ToolTipService.ToolTip="Next Source (Ctrl+Shift+Right)">
-                        <FontIcon Glyph="&#xE76C;" FontSize="12" />
-                    </Button>
-                </StackPanel>
-
-                <!-- 4. Presenter Action Controls -->
-                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                    <!-- Pause / Resume -->
-                    <Button Command="{x:Bind ViewModel.TogglePauseCommand}"
-                            Padding="8,5"
-                            ToolTipService.ToolTip="Pause / Resume Live Presentation (Ctrl+Shift+P)">
-                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                            <FontIcon Glyph="{x:Bind ViewModel.PauseButtonGlyph, Mode=OneWay}" FontSize="12" />
-                            <TextBlock Text="{x:Bind ViewModel.PauseButtonText, Mode=OneWay}" Style="{ThemeResource CaptionTextBlockStyle}" />
+                            <!-- Close Dock -->
+                            <Button Command="{x:Bind ViewModel.CloseDockCommand}"
+                                    Style="{ThemeResource SubtleButtonStyle}"
+                                    Padding="6,4"
+                                    ToolTipService.ToolTip="Close Presenter Dock (Ctrl+Shift+D)">
+                                <FontIcon Glyph="&#xE8BB;" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </Button>
                         </StackPanel>
-                    </Button>
+                    </Grid>
 
-                    <!-- Blackout -->
-                    <Button Command="{x:Bind ViewModel.ToggleBlackoutCommand}"
-                            Padding="8,5"
-                            ToolTipService.ToolTip="Toggle Blackout Privacy Screen (Ctrl+Shift+B)">
-                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                            <FontIcon Glyph="{x:Bind ViewModel.BlackoutButtonGlyph, Mode=OneWay}" FontSize="12" />
-                            <TextBlock Text="{x:Bind ViewModel.BlackoutButtonText, Mode=OneWay}" Style="{ThemeResource CaptionTextBlockStyle}" />
+                    <!-- Row 1: Action Controls & Source Switcher -->
+                    <Grid Grid.Row="1" ColumnSpacing="6" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <!-- Source Quick-Switch Section -->
+                            <ColumnDefinition Width="*" />
+                            <!-- Presentation Action Buttons (Pause, Blackout, Stop) -->
+                            <ColumnDefinition Width="Auto" />
+                            <!-- Secondary Options (Output, Dashboard) -->
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Source Navigation & Active Source Dropdown -->
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <!-- Previous Source -->
+                            <Button Command="{x:Bind ViewModel.PreviousSourceCommand}"
+                                    IsEnabled="{x:Bind ViewModel.CanSwitchSources, Mode=OneWay}"
+                                    Padding="7,5"
+                                    ToolTipService.ToolTip="Previous Source (Ctrl+Shift+Left)">
+                                <FontIcon Glyph="&#xE76B;" FontSize="12" />
+                            </Button>
+
+                            <!-- Active Source Dropdown with Flyout -->
+                            <DropDownButton x:Name="SourceDropDownButton"
+                                            Padding="8,5"
+                                            VerticalAlignment="Center"
+                                            MaxWidth="210"
+                                            ToolTipService.ToolTip="{x:Bind ViewModel.ActiveSourceTitle, Mode=OneWay}">
+                                <DropDownButton.Content>
+                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <FontIcon Glyph="&#xE7C5;" FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock Text="{x:Bind ViewModel.ActiveSourceTitle, Mode=OneWay}"
+                                                   Style="{ThemeResource BodyTextBlockStyle}"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   MaxLines="1"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </DropDownButton.Content>
+
+                                <DropDownButton.Flyout>
+                                    <Flyout Placement="Bottom">
+                                        <StackPanel Spacing="6" MinWidth="240" MaxWidth="320">
+                                            <TextBlock Text="Queued Sources"
+                                                       Style="{ThemeResource CaptionTextBlockStyle}"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                       FontWeight="SemiBold"
+                                                       Margin="4,2,4,4"/>
+                                            
+                                            <ListView ItemsSource="{x:Bind ViewModel.SelectedSources, Mode=OneWay}"
+                                                      SelectionMode="None"
+                                                      IsItemClickEnabled="True"
+                                                      ItemClick="OnSourceItemClicked">
+                                                <ListView.ItemTemplate>
+                                                    <DataTemplate x:DataType="models:CaptureSource">
+                                                        <Grid ColumnSpacing="8" Padding="4,4">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <FontIcon Grid.Column="0" Glyph="&#xE7F4;" FontSize="13" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center"/>
+                                                            <TextBlock Grid.Column="1" Text="{x:Bind Title}" Style="{ThemeResource BodyTextBlockStyle}" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                            <TextBlock Grid.Column="2" Text="{x:Bind Type}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ListView.ItemTemplate>
+                                            </ListView>
+
+                                            <TextBlock Text="No queued sources available."
+                                                       Style="{ThemeResource CaptionTextBlockStyle}"
+                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                       HorizontalAlignment="Center"
+                                                       Margin="8,4"
+                                                       Visibility="{x:Bind views:PresenterDockWindow.InvertBoolToVis(ViewModel.HasSelectedSources), Mode=OneWay}" />
+                                        </StackPanel>
+                                    </Flyout>
+                                </DropDownButton.Flyout>
+                            </DropDownButton>
+
+                            <!-- Next Source -->
+                            <Button Command="{x:Bind ViewModel.NextSourceCommand}"
+                                    IsEnabled="{x:Bind ViewModel.CanSwitchSources, Mode=OneWay}"
+                                    Padding="7,5"
+                                    ToolTipService.ToolTip="Next Source (Ctrl+Shift+Right)">
+                                <FontIcon Glyph="&#xE76C;" FontSize="12" />
+                            </Button>
                         </StackPanel>
-                    </Button>
 
-                    <!-- Stop Presenting -->
-                    <Button Command="{x:Bind ViewModel.StopPresentationCommand}"
-                            Padding="8,5"
-                            IsEnabled="{x:Bind ViewModel.IsPresenting, Mode=OneWay}"
-                            ToolTipService.ToolTip="Stop Live Presentation (Ctrl+Shift+S)">
-                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                            <FontIcon Glyph="&#xE71A;" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
-                            <TextBlock Text="Stop" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                        <!-- Presenter Action Controls -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <!-- Pause / Resume -->
+                            <Button Command="{x:Bind ViewModel.TogglePauseCommand}"
+                                    IsEnabled="{x:Bind ViewModel.IsPresenting, Mode=OneWay}"
+                                    Padding="8,5"
+                                    ToolTipService.ToolTip="Pause / Resume Live Presentation (Ctrl+Shift+P)">
+                                <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                                    <FontIcon Glyph="{x:Bind ViewModel.PauseButtonGlyph, Mode=OneWay}" FontSize="12" />
+                                    <TextBlock Text="{x:Bind ViewModel.PauseButtonText, Mode=OneWay}" Style="{ThemeResource CaptionTextBlockStyle}" FontSize="11" />
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Blackout -->
+                            <Button Command="{x:Bind ViewModel.ToggleBlackoutCommand}"
+                                    IsEnabled="{x:Bind ViewModel.IsPresenting, Mode=OneWay}"
+                                    Padding="8,5"
+                                    ToolTipService.ToolTip="Toggle Blackout Privacy Screen (Ctrl+Shift+B)">
+                                <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                                    <FontIcon Glyph="{x:Bind ViewModel.BlackoutButtonGlyph, Mode=OneWay}" FontSize="12" />
+                                    <TextBlock Text="{x:Bind ViewModel.BlackoutButtonText, Mode=OneWay}" Style="{ThemeResource CaptionTextBlockStyle}" FontSize="11" />
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Stop Presenting -->
+                            <Button Command="{x:Bind ViewModel.StopPresentationCommand}"
+                                    IsEnabled="{x:Bind ViewModel.IsPresenting, Mode=OneWay}"
+                                    Padding="8,5"
+                                    ToolTipService.ToolTip="Stop Live Presentation (Ctrl+Shift+S)">
+                                <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE71A;" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                                    <TextBlock Text="Stop" Style="{ThemeResource CaptionTextBlockStyle}" FontSize="11" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
-                    </Button>
 
-                    <!-- Show Presentation Output Window -->
-                    <Button Command="{x:Bind ViewModel.ShowOutputWindowCommand}"
-                            Padding="6,4"
-                            ToolTipService.ToolTip="Show / Bring Output Window to Front">
-                        <FontIcon Glyph="&#xE7F4;" FontSize="12" />
-                    </Button>
-                </StackPanel>
+                        <!-- Secondary Row Shortcuts -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                            <!-- Show Presentation Output Window -->
+                            <Button Command="{x:Bind ViewModel.ShowOutputWindowCommand}"
+                                    Style="{ThemeResource SubtleButtonStyle}"
+                                    Padding="6,5"
+                                    ToolTipService.ToolTip="Bring Presentation Output Window to Front">
+                                <FontIcon Glyph="&#xE7F4;" FontSize="12" />
+                            </Button>
 
-                <!-- 5. Dock Controls -->
-                <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                    <!-- Close Dock -->
-                    <Button Command="{x:Bind ViewModel.CloseDockCommand}"
-                            Padding="6,4"
-                            ToolTipService.ToolTip="Close Presenter Dock (Ctrl+Shift+D)">
-                        <FontIcon Glyph="&#xE8BB;" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    </Button>
-                </StackPanel>
+                            <!-- Show Dashboard -->
+                            <Button Command="{x:Bind ViewModel.ShowDashboardCommand}"
+                                    Style="{ThemeResource SubtleButtonStyle}"
+                                    Padding="6,5"
+                                    ToolTipService.ToolTip="Bring Main Dashboard to Front (Ctrl+Shift+M)">
+                                <FontIcon Glyph="&#xE80F;" FontSize="12" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
 
+                <!-- ========================================================= -->
+                <!-- COMPACT MODE (1 Row)                                      -->
+                <!-- ========================================================= -->
+                <Grid x:Name="CompactRootGrid"
+                      ColumnSpacing="6"
+                      VerticalAlignment="Center"
+                      Visibility="{x:Bind views:PresenterDockWindow.BoolToVis(ViewModel.IsCompactMode), Mode=OneWay}">
+                    <Grid.ColumnDefinitions>
+                        <!-- Drag Handle -->
+                        <ColumnDefinition Width="Auto" />
+                        <!-- Status Pill -->
+                        <ColumnDefinition Width="Auto" />
+                        <!-- Source Controls (Prev, Source Name, Next) -->
+                        <ColumnDefinition Width="*" />
+                        <!-- Actions (Pause, Blackout, Stop) -->
+                        <ColumnDefinition Width="Auto" />
+                        <!-- Controls (Expand, Close) -->
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Drag Handle -->
+                    <Border Grid.Column="0"
+                            Padding="2,4"
+                            Background="Transparent"
+                            PointerPressed="OnDragRegionPointerPressed"
+                            ToolTipService.ToolTip="Drag to reposition presenter dock">
+                        <FontIcon Glyph="&#xE76F;" FontSize="13" Foreground="{ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
+                    </Border>
+
+                    <!-- Status Pill -->
+                    <Border Grid.Column="1"
+                            Padding="6,2"
+                            CornerRadius="8"
+                            VerticalAlignment="Center"
+                            Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <Ellipse Width="6" Height="6" Fill="{ThemeResource AccentFillColorDefaultBrush}" />
+                            <TextBlock Text="{x:Bind ViewModel.StatusDisplayText, Mode=OneWay}"
+                                       FontSize="10"
+                                       FontWeight="Bold"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Source Navigation in Compact Mode -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                        <Button Command="{x:Bind ViewModel.PreviousSourceCommand}"
+                                IsEnabled="{x:Bind ViewModel.CanSwitchSources, Mode=OneWay}"
+                                Padding="5,4"
+                                ToolTipService.ToolTip="Previous Source (Ctrl+Shift+Left)">
+                            <FontIcon Glyph="&#xE76B;" FontSize="11" />
+                        </Button>
+
+                        <TextBlock Text="{x:Bind ViewModel.ActiveSourceTitle, Mode=OneWay}"
+                                   Style="{ThemeResource BodyTextBlockStyle}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxWidth="120"
+                                   VerticalAlignment="Center"
+                                   Margin="2,0"
+                                   ToolTipService.ToolTip="{x:Bind ViewModel.ActiveSourceTitle, Mode=OneWay}" />
+
+                        <Button Command="{x:Bind ViewModel.NextSourceCommand}"
+                                IsEnabled="{x:Bind ViewModel.CanSwitchSources, Mode=OneWay}"
+                                Padding="5,4"
+                                ToolTipService.ToolTip="Next Source (Ctrl+Shift+Right)">
+                            <FontIcon Glyph="&#xE76C;" FontSize="11" />
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Compact Actions -->
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                        <!-- Pause -->
+                        <Button Command="{x:Bind ViewModel.TogglePauseCommand}"
+                                IsEnabled="{x:Bind ViewModel.IsPresenting, Mode=OneWay}"
+                                Padding="5,4"
+                                ToolTipService.ToolTip="Pause / Resume Live Presentation (Ctrl+Shift+P)">
+                            <FontIcon Glyph="{x:Bind ViewModel.PauseButtonGlyph, Mode=OneWay}" FontSize="11" />
+                        </Button>
+
+                        <!-- Blackout -->
+                        <Button Command="{x:Bind ViewModel.ToggleBlackoutCommand}"
+                                IsEnabled="{x:Bind ViewModel.IsPresenting, Mode=OneWay}"
+                                Padding="5,4"
+                                ToolTipService.ToolTip="Toggle Blackout (Ctrl+Shift+B)">
+                            <FontIcon Glyph="{x:Bind ViewModel.BlackoutButtonGlyph, Mode=OneWay}" FontSize="11" />
+                        </Button>
+
+                        <!-- Stop -->
+                        <Button Command="{x:Bind ViewModel.StopPresentationCommand}"
+                                IsEnabled="{x:Bind ViewModel.IsPresenting, Mode=OneWay}"
+                                Padding="5,4"
+                                ToolTipService.ToolTip="Stop Presentation (Ctrl+Shift+S)">
+                            <FontIcon Glyph="&#xE71A;" FontSize="11" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Compact Controls (Expand, Close) -->
+                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                        <!-- Expand Button -->
+                        <Button Command="{x:Bind ViewModel.ToggleCompactModeCommand}"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Padding="5,4"
+                                ToolTipService.ToolTip="{x:Bind ViewModel.CompactModeTooltip, Mode=OneWay}">
+                            <FontIcon Glyph="&#xE740;" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </Button>
+
+                        <!-- Close Button -->
+                        <Button Command="{x:Bind ViewModel.CloseDockCommand}"
+                                Style="{ThemeResource SubtleButtonStyle}"
+                                Padding="5,4"
+                                ToolTipService.ToolTip="Close Presenter Dock (Ctrl+Shift+D)">
+                            <FontIcon Glyph="&#xE8BB;" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
             </Grid>
         </Border>
     </Grid>

@@ -82,6 +82,18 @@ public partial class PresenterDockViewModel : ObservableObject
 
     public string BlackoutButtonGlyph => IsBlackout ? "\uE7B3" : "\uED1A"; // Eye / Closed Eye
 
+    public string CompactModeGlyph => IsCompactMode ? "\uE740" : "\uE73F"; // Expand / Contract
+
+    public string CompactModeTooltip => IsCompactMode ? "Expand Presenter Dock" : "Collapse to Compact Mode";
+
+    partial void OnIsCompactModeChanged(bool value)
+    {
+        _settingsService.CurrentSettings.StartDockInCompactMode = value;
+        _ = _settingsService.SaveSettingsAsync();
+        OnPropertyChanged(nameof(CompactModeGlyph));
+        OnPropertyChanged(nameof(CompactModeTooltip));
+    }
+
     [RelayCommand]
     private async Task NextSourceAsync()
     {
@@ -142,6 +154,12 @@ public partial class PresenterDockViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void ShowDashboard()
+    {
+        _dockService.ShowDashboard();
+    }
+
+    [RelayCommand]
     private void ToggleCompactMode()
     {
         IsCompactMode = !IsCompactMode;
@@ -185,5 +203,7 @@ public partial class PresenterDockViewModel : ObservableObject
         OnPropertyChanged(nameof(PauseButtonGlyph));
         OnPropertyChanged(nameof(BlackoutButtonText));
         OnPropertyChanged(nameof(BlackoutButtonGlyph));
+        OnPropertyChanged(nameof(CompactModeGlyph));
+        OnPropertyChanged(nameof(CompactModeTooltip));
     }
 }
