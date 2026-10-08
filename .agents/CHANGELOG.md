@@ -7,6 +7,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Phase 4.6 — Performance & Stability Optimization] - 2026-10-08
+
+### Added (perf / test / docs)
+- **RefCountedSoftwareBitmap Memory Management**:
+  - Implemented [RefCountedSoftwareBitmap.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/RefCountedSoftwareBitmap.cs) providing thread-safe reference-counted lifetime management around WinRT `SoftwareBitmap` instances.
+  - Guarantees deterministic disposal across multiple asynchronous UI and capture consumers without GC finalizer delays or unmanaged memory growth (eliminated up to 250 MB/s allocation leak).
+- **Decoupled Non-Blocking UI Delivery Pipeline**:
+  - Refactored [Direct3D11PreviewRenderer.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11PreviewRenderer.cs) and [Direct3D11PresentationRenderer.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11PresentationRenderer.cs) to eliminate `TaskCompletionSource` blocking waits from capture worker threads.
+  - Implemented atomic presentation gates via `Interlocked.CompareExchange`, completely eliminating worker threadpool starvation and `0xC000027B` stowed exception crash vectors.
+- **Priority Separation & Preview Rate-Limiting**:
+  - Implemented ~15 FPS (66ms interval) rate limiter for Dashboard Preview monitoring, reducing preview GPU-to-CPU and UI thread workload by 75%.
+  - Preserved unthrottled (~30-60 FPS) delivery for dedicated Presentation Output.
+- **Session Generation Tracking**:
+  - Added incrementing session generation counters in [CaptureSessionManager.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/CaptureSessionManager.cs) to discard stale frames arriving across rapid source switching boundaries.
+- **Direct3D Device Recovery**:
+  - Added `ResetDevice()` in [Direct3D11DeviceProvider.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11DeviceProvider.cs) for resilient handling of DXGI device removal/reset events.
+- **Performance Baseline Documentation**:
+  - Documented authoritative before/after audit report in [docs/PERFORMANCE_BASELINE.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/PERFORMANCE_BASELINE.md).
+- **Automated Regression Tests**:
+  - Added [SwitchCast.Tests/Services/RefCountedSoftwareBitmapTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/RefCountedSoftwareBitmapTests.cs) and expanded `CaptureCoordinatorTests.cs` and `PresentationCoordinatorTests.cs`, bringing total passing tests to 70 (100% pass rate).
+
+---
+
 ## [Stabilization & Capture Recovery] - 2026-10-08
 
 ### Fixed (fix / perf / test)

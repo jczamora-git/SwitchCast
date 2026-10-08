@@ -127,4 +127,36 @@ public class CaptureCoordinatorTests
         Assert.Equal(source2.Id, coordinator.CurrentPreviewSource?.Id);
         _mockPresentationStateService.Verify(s => s.SetActiveSource(source2), Times.Once);
     }
+
+    [Fact]
+    public async Task FrameArrived_WithSharedBitmap_RendersAndPropagatesEvent()
+    {
+        var source = new WindowSource { Id = "win-1", Title = "Window 1", IsAvailable = true };
+
+        using var coordinator = new CaptureCoordinator(
+            _mockItemFactory.Object,
+            _mockDeviceProvider.Object,
+            _mockSessionManager.Object,
+            _mockPreviewRenderer.Object,
+            _mockPresentationStateService.Object);
+
+        await coordinator.StartPreviewAsync(source);
+
+        using var rawBitmap = new Windows.Graphics.Imaging.SoftwareBitmap(
+            Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, 10, 10, Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
+        using var sharedBitmap = new RefCountedSoftwareBitmap(rawBitmap, initialRefCount: 1);
+
+        bool eventFired = false;
+        coordinator.FrameArrived += (s, e) =>
+        {
+            eventFired = true;
+            Assert.Same(sharedBitmap, e.SharedBitmap);
+        };
+
+        // Raise FrameArrived on session manager
+        _mockSessionManager.Raise(s => s.FrameArrived += null, _mockSessionManager.Object, new FrameArrivedEventArgs(sharedBitmap, 1));
+
+        Assert.True(eventFired);
+        _mockPreviewRenderer.Verify(r => r.RenderSharedBitmapAsync(sharedBitmap), Times.Once);
+    }
 }

@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Phase 4 — Dedicated Presentation Output Window
+- **Current Phase**: Phase 4.6 — Performance Profiling & Stability Optimization
 - **Overall Status**: **Completed (Ready for Phase 5)**
-- **Last Updated**: 2026-10-08T20:25:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-08T21:30:00+08:00 (UTC+8)
 
 ---
 
@@ -25,11 +25,16 @@ This is the authoritative progress, state, and environmental tracking document f
 - [x] **Real Monitor Discovery Engine (Phase 2)**: [IMonitorDiscoveryService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IMonitorDiscoveryService.cs) & [Win32MonitorDiscoveryService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32MonitorDiscoveryService.cs) enumerating connected displays via `EnumDisplayMonitors` and `GetMonitorInfo`, calculating resolutions, virtual coordinates, and primary/secondary flags.
 - [x] **Native Graphics Capture Pipeline (Phase 3 & Stabilization)**:
   - COM interop bridge `IGraphicsCaptureItemInterop` creating `GraphicsCaptureItem` for window (`HWND`) and monitor (`HMONITOR`) sources with owning PID cross-validation.
-  - Direct3D 11 device provider [Direct3D11DeviceProvider.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11DeviceProvider.cs) managing hardware-accelerated D3D11 device and WinRT `IDirect3DDevice` wrappers.
-  - Frame pool & session manager [CaptureSessionManager.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/CaptureSessionManager.cs) acquiring `Direct3D11CaptureFramePool` streams, maintaining Direct3D frame lifetime throughout `CreateCopyFromSurfaceAsync`, frame pacing / backpressure draining, and delivering owned `SoftwareBitmap` instances without premature WinRT disposal or exception storms.
+  - Direct3D 11 device provider [Direct3D11DeviceProvider.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11DeviceProvider.cs) managing hardware-accelerated D3D11 device and WinRT `IDirect3DDevice` wrappers with `ResetDevice()` device loss recovery.
+  - Frame pool & session manager [CaptureSessionManager.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/CaptureSessionManager.cs) acquiring `Direct3D11CaptureFramePool` streams, maintaining Direct3D frame lifetime throughout `CreateCopyFromSurfaceAsync`, session generation tracking, and backpressure frame draining.
   - Diagnostic Win32 capture service [Win32DiagnosticCaptureService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Win32DiagnosticCaptureService.cs) providing fail-safe GDI `PrintWindow` (with `PW_RENDERFULLCONTENT`) and `BitBlt` single-frame screenshot acquisition and conversion.
-  - Live preview renderer [Direct3D11PreviewRenderer.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11PreviewRenderer.cs) presenting converted `SoftwareBitmap` onto WinUI 3 `SoftwareBitmapSource`.
+  - Live preview renderer [Direct3D11PreviewRenderer.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11PreviewRenderer.cs) presenting converted `SoftwareBitmap` onto WinUI 3 `SoftwareBitmapSource` with decoupled non-blocking UI delivery and ~15 FPS pacing.
   - Central orchestrator [CaptureCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/CaptureCoordinator.cs) managing serialized state transitions (`Idle` -> `Starting` -> `Capturing` -> `Stopping` -> `Failed`).
+- [x] **Performance Profiling & Deterministic Frame Lifecycle (Phase 4.6)**:
+  - [RefCountedSoftwareBitmap.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/RefCountedSoftwareBitmap.cs) implementing zero-leak multi-consumer frame lifetime management.
+  - Single-conversion frame distribution preventing duplicate GPU-to-CPU copies across preview and presentation renderers.
+  - Non-blocking UI dispatcher integration eliminating `0xC000027B` stowed exception and deadlock vectors.
+  - Authoritative report documented in [docs/PERFORMANCE_BASELINE.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/PERFORMANCE_BASELINE.md).
 - [x] **Dashboard Live Preview UI (Phase 3)**: [DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml) featuring live preview video surface, source switcher dropdown, "Start Live Preview" and "Stop Preview" buttons, live status pill, progress indicators, and error InfoBars.
 - [x] **Dedicated Presentation Output Window (Phase 4)**:
   - Native WinUI 3 top-level window [PresentationWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml) titled `"SwitchCast Presentation Output"`, 1280x720 default aspect ratio, capturable by Google Meet, Zoom, and Teams (no `WDA_EXCLUDEFROMCAPTURE` on output window).
@@ -38,7 +43,7 @@ This is the authoritative progress, state, and environmental tracking document f
   - Unified frame distribution pipeline and output renderer [Direct3D11PresentationRenderer.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11PresentationRenderer.cs).
   - Presentation coordinator [PresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationCoordinator.cs) supporting Start Presenting, Stop Presenting, Freeze/Pause, Resume, Blackout, and on-the-fly source switching without closing or recreating the output window.
   - Dashboard presentation controls in [DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml) and [DashboardViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/DashboardViewModel.cs).
-- [x] **Automated Unit Test Suite**: 61 comprehensive unit tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) verifying presentation coordinator, presentation window states, capture transitions, win32 diagnostic capture, discovery orchestration, search filtering, selection sync, and reconciliation (100% pass rate).
+- [x] **Automated Unit Test Suite**: 70 comprehensive unit tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) verifying ref-counted bitmap lifecycles, presentation coordinator, presentation window states, capture transitions, win32 diagnostic capture, discovery orchestration, search filtering, selection sync, and reconciliation (100% pass rate).
 
 ### Planned (Upcoming)
 - [ ] **Phase 5**: Switching System (Global hotkeys, instant source switching, shortcut customization).
@@ -60,7 +65,7 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ## 4. ARCHITECTURE DECISION RECORDS
 
-- [ADR-0001: Technology Stack & Clean Architecture Core](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/decisions/ADR-0001-architecture.md) — Implemented in Phase 1, 2, 3, and 4.
+- [ADR-0001: Technology Stack & Clean Architecture Core](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/decisions/ADR-0001-architecture.md) — Implemented in Phase 1, 2, 3, 4, and 4.6.
 
 ---
 
@@ -78,8 +83,8 @@ This is the authoritative progress, state, and environmental tracking document f
 
 - **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 2.8s).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (61 passed, 0 failed, 0 skipped in 246ms).
-- **Level 4 (Native COM/WinRT Interop & Frame Ownership)**: Fixed `Direct3D11CaptureFrame` premature disposal defect, implemented fail-safe Win32 diagnostic capture engine, and verified WinUI 3 image delivery pipeline.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (70 passed, 0 failed, 0 skipped in 669ms).
+- **Level 4 (Deterministic Lifecycle & Non-Blocking Delivery)**: RefCountedSoftwareBitmap zero-leak memory lifecycle, non-blocking UI dispatcher queues, and 15 FPS preview rate limiting verified.
 
 ---
 

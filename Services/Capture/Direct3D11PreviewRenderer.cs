@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -8,12 +9,17 @@ namespace SwitchCast.Services.Capture;
 
 /// <summary>
 /// GPU-backed preview renderer presenting capture frames onto WinUI 3 SoftwareBitmapSource.
+/// Implements decoupled non-blocking UI delivery and ~15 FPS rate-limiting for secondary dashboard preview.
 /// </summary>
 public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
 {
+    private const int MinPreviewIntervalMs = 66; // ~15 FPS target for dashboard preview monitoring
+
     private readonly DispatcherQueue _dispatcherQueue;
     private readonly SoftwareBitmapSource _softwareBitmapSource;
+    private long _lastRenderTimestamp;
     private int _isProcessingFrame;
+    private bool _isEnabled = true;
     private bool _isDisposed;
 
     public Direct3D11PreviewRenderer()
@@ -25,57 +31,128 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
 
     public ImageSource PreviewImageSource => _softwareBitmapSource;
 
-    public async Task RenderBitmapAsync(SoftwareBitmap bitmap)
+    public bool IsEnabled
+    {
+        get => _isEnabled;
+        set => _isEnabled = value;
+    }
+
+    /// <summary>
+    /// Renders a thread-safe ref-counted bitmap with preview rate-limiting (~15 FPS) and non-blocking UI dispatch.
+    /// </summary>
+    public Task RenderSharedBitmapAsync(RefCountedSoftwareBitmap sharedBitmap)
+    {
+        ArgumentNullException.ThrowIfNull(sharedBitmap);
+
+        if (_isDisposed || !_isEnabled)
+        {
+            return Task.CompletedTask;
+        }
+
+        // Preview Pacing: Limit dashboard preview to ~15 FPS to reduce GPU-to-CPU and UI thread workload
+        long now = Stopwatch.GetTimestamp();
+        long elapsedMs = (now - _lastRenderTimestamp) * 1000 / Stopwatch.Frequency;
+        if (elapsedMs < MinPreviewIntervalMs)
+        {
+            return Task.CompletedTask;
+        }
+
+        // Frame Dropping Gate: If previous preview frame is still being presented on UI thread, skip
+        if (Interlocked.CompareExchange(ref _isProcessingFrame, 1, 0) != 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (!sharedBitmap.TryAddRef())
+        {
+            Interlocked.Exchange(ref _isProcessingFrame, 0);
+            return Task.CompletedTask;
+        }
+
+        _lastRenderTimestamp = now;
+
+        // Decoupled non-blocking UI dispatch (worker thread never blocks on UI thread)
+        var enqueued = _dispatcherQueue.TryEnqueue(async () =>
+        {
+            try
+            {
+                if (!_isDisposed && _isEnabled)
+                {
+                    await _softwareBitmapSource.SetBitmapAsync(sharedBitmap.Bitmap);
+                }
+            }
+            catch
+            {
+                // Ignore transient render errors during window resize or navigation
+            }
+            finally
+            {
+                sharedBitmap.Release();
+                Interlocked.Exchange(ref _isProcessingFrame, 0);
+            }
+        });
+
+        if (!enqueued)
+        {
+            sharedBitmap.Release();
+            Interlocked.Exchange(ref _isProcessingFrame, 0);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Standalone fallback bitmap renderer.
+    /// </summary>
+    public Task RenderBitmapAsync(SoftwareBitmap bitmap)
     {
         ArgumentNullException.ThrowIfNull(bitmap);
 
-        if (_isDisposed)
+        if (_isDisposed || !_isEnabled)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        // Frame dropping / pacing: If previous frame is still being presented, skip to keep real-time performance
         if (Interlocked.CompareExchange(ref _isProcessingFrame, 1, 0) != 0)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        try
+        var enqueued = _dispatcherQueue.TryEnqueue(async () =>
         {
-            var tcs = new TaskCompletionSource();
-            _dispatcherQueue.TryEnqueue(async () =>
+            try
             {
-                try
+                if (!_isDisposed && _isEnabled)
                 {
-                    if (!_isDisposed)
-                    {
-                        await _softwareBitmapSource.SetBitmapAsync(bitmap);
-                    }
-                    tcs.TrySetResult();
+                    await _softwareBitmapSource.SetBitmapAsync(bitmap);
                 }
-                catch (Exception ex)
-                {
-                    tcs.TrySetException(ex);
-                }
-            });
+            }
+            catch
+            {
+                // Ignore transient render errors
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _isProcessingFrame, 0);
+            }
+        });
 
-            await tcs.Task.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Ignore transient render errors during window resize or shutdown
-        }
-        finally
+        if (!enqueued)
         {
             Interlocked.Exchange(ref _isProcessingFrame, 0);
         }
+
+        return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Direct frame rendering fallback.
+    /// </summary>
     public async Task RenderFrameAsync(Direct3D11CaptureFrame frame)
     {
         ArgumentNullException.ThrowIfNull(frame);
 
-        if (_isDisposed)
+        if (_isDisposed || !_isEnabled)
         {
             return;
         }
@@ -90,12 +167,14 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
             var surface = frame.Surface;
             if (surface is null)
             {
+                Interlocked.Exchange(ref _isProcessingFrame, 0);
                 return;
             }
 
             using var softwareBitmap = await SoftwareBitmap.CreateCopyFromSurfaceAsync(surface);
-            if (_isDisposed || softwareBitmap is null)
+            if (_isDisposed || !_isEnabled || softwareBitmap is null)
             {
+                Interlocked.Exchange(ref _isProcessingFrame, 0);
                 return;
             }
 
@@ -113,34 +192,27 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
                 displayBitmap = SoftwareBitmap.Copy(softwareBitmap);
             }
 
-            var tcs = new TaskCompletionSource();
             _dispatcherQueue.TryEnqueue(async () =>
             {
                 try
                 {
-                    if (!_isDisposed)
+                    if (!_isDisposed && _isEnabled)
                     {
                         await _softwareBitmapSource.SetBitmapAsync(displayBitmap);
                     }
-                    tcs.TrySetResult();
                 }
-                catch (Exception ex)
+                catch
                 {
-                    tcs.TrySetException(ex);
+                    // Ignore transient render errors
                 }
                 finally
                 {
                     displayBitmap.Dispose();
+                    Interlocked.Exchange(ref _isProcessingFrame, 0);
                 }
             });
-
-            await tcs.Task.ConfigureAwait(false);
         }
         catch
-        {
-            // Ignore transient render errors during window resize or shutdown
-        }
-        finally
         {
             Interlocked.Exchange(ref _isProcessingFrame, 0);
         }
@@ -170,6 +242,7 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
         }
 
         _isDisposed = true;
+        _isEnabled = false;
         Clear();
         _softwareBitmapSource.Dispose();
     }

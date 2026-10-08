@@ -21,4 +21,9 @@ public interface IDirect3D11DeviceProvider : IDisposable
     /// Ensures the graphics device is active and recreates it if lost.
     /// </summary>
     void EnsureDevice();
+
+    /// <summary>
+    /// Forces the release and recreation of the Direct3D 11 device (e.g. after DXGI device removal or reset).
+    /// </summary>
+    void ResetDevice();
 }

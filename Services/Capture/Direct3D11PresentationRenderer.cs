@@ -8,6 +8,7 @@ namespace SwitchCast.Services.Capture;
 
 /// <summary>
 /// GPU-backed presentation renderer presenting capture frames onto WinUI 3 SoftwareBitmapSource for the Presentation Output Window.
+/// Implements high-priority non-blocking UI delivery and frame-pacing to ensure smooth presentation output.
 /// </summary>
 public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
 {
@@ -28,52 +29,107 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
 
     public bool IsFrozen => _isFrozen;
 
-    public async Task RenderBitmapAsync(SoftwareBitmap bitmap)
+    /// <summary>
+    /// Renders a thread-safe ref-counted bitmap to the presentation output surface with non-blocking UI dispatch.
+    /// </summary>
+    public Task RenderSharedBitmapAsync(RefCountedSoftwareBitmap sharedBitmap)
+    {
+        ArgumentNullException.ThrowIfNull(sharedBitmap);
+
+        if (_isDisposed || _isFrozen)
+        {
+            return Task.CompletedTask;
+        }
+
+        // Frame Dropping Gate: If previous frame is still being presented on UI thread, drop to maintain real-time playback
+        if (Interlocked.CompareExchange(ref _isProcessingFrame, 1, 0) != 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (!sharedBitmap.TryAddRef())
+        {
+            Interlocked.Exchange(ref _isProcessingFrame, 0);
+            return Task.CompletedTask;
+        }
+
+        // Decoupled non-blocking UI dispatch (worker thread never blocks on UI thread)
+        var enqueued = _dispatcherQueue.TryEnqueue(async () =>
+        {
+            try
+            {
+                if (!_isDisposed && !_isFrozen)
+                {
+                    await _softwareBitmapSource.SetBitmapAsync(sharedBitmap.Bitmap);
+                }
+            }
+            catch
+            {
+                // Ignore transient render errors during window resize or shutdown
+            }
+            finally
+            {
+                sharedBitmap.Release();
+                Interlocked.Exchange(ref _isProcessingFrame, 0);
+            }
+        });
+
+        if (!enqueued)
+        {
+            sharedBitmap.Release();
+            Interlocked.Exchange(ref _isProcessingFrame, 0);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Standalone fallback bitmap renderer.
+    /// </summary>
+    public Task RenderBitmapAsync(SoftwareBitmap bitmap)
     {
         ArgumentNullException.ThrowIfNull(bitmap);
 
         if (_isDisposed || _isFrozen)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        // Frame dropping / pacing: Skip if previous frame is still being presented to preserve real-time playback
         if (Interlocked.CompareExchange(ref _isProcessingFrame, 1, 0) != 0)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        try
+        var enqueued = _dispatcherQueue.TryEnqueue(async () =>
         {
-            var tcs = new TaskCompletionSource();
-            _dispatcherQueue.TryEnqueue(async () =>
+            try
             {
-                try
+                if (!_isDisposed && !_isFrozen)
                 {
-                    if (!_isDisposed && !_isFrozen)
-                    {
-                        await _softwareBitmapSource.SetBitmapAsync(bitmap);
-                    }
-                    tcs.TrySetResult();
+                    await _softwareBitmapSource.SetBitmapAsync(bitmap);
                 }
-                catch (Exception ex)
-                {
-                    tcs.TrySetException(ex);
-                }
-            });
+            }
+            catch
+            {
+                // Ignore transient render errors
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _isProcessingFrame, 0);
+            }
+        });
 
-            await tcs.Task.ConfigureAwait(false);
-        }
-        catch
-        {
-            // Ignore transient render errors during window resize or shutdown
-        }
-        finally
+        if (!enqueued)
         {
             Interlocked.Exchange(ref _isProcessingFrame, 0);
         }
+
+        return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Direct frame rendering fallback.
+    /// </summary>
     public async Task RenderFrameAsync(Direct3D11CaptureFrame frame)
     {
         ArgumentNullException.ThrowIfNull(frame);
@@ -93,12 +149,14 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
             var surface = frame.Surface;
             if (surface is null)
             {
+                Interlocked.Exchange(ref _isProcessingFrame, 0);
                 return;
             }
 
             using var softwareBitmap = await SoftwareBitmap.CreateCopyFromSurfaceAsync(surface);
             if (_isDisposed || _isFrozen || softwareBitmap is null)
             {
+                Interlocked.Exchange(ref _isProcessingFrame, 0);
                 return;
             }
 
@@ -116,7 +174,6 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
                 displayBitmap = SoftwareBitmap.Copy(softwareBitmap);
             }
 
-            var tcs = new TaskCompletionSource();
             _dispatcherQueue.TryEnqueue(async () =>
             {
                 try
@@ -125,25 +182,19 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
                     {
                         await _softwareBitmapSource.SetBitmapAsync(displayBitmap);
                     }
-                    tcs.TrySetResult();
                 }
-                catch (Exception ex)
+                catch
                 {
-                    tcs.TrySetException(ex);
+                    // Ignore transient render errors
                 }
                 finally
                 {
                     displayBitmap.Dispose();
+                    Interlocked.Exchange(ref _isProcessingFrame, 0);
                 }
             });
-
-            await tcs.Task.ConfigureAwait(false);
         }
         catch
-        {
-            // Ignore transient render errors during window resize or shutdown
-        }
-        finally
         {
             Interlocked.Exchange(ref _isProcessingFrame, 0);
         }

@@ -39,6 +39,7 @@
     <Compile Include="..\Services\Capture\IPresentationOutputRenderer.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\IGraphicsCaptureItemFactory.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\IDirect3D11DeviceProvider.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Capture\RefCountedSoftwareBitmap.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\FrameArrivedEventArgs.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\IWin32DiagnosticCaptureService.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\Win32DiagnosticCaptureService.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />

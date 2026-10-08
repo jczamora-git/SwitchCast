@@ -8,15 +8,24 @@ namespace SwitchCast.Services.Capture;
 /// </summary>
 public sealed class FrameArrivedEventArgs : EventArgs
 {
-    public FrameArrivedEventArgs(Direct3D11CaptureFrame? frame, SoftwareBitmap? softwareBitmap = null)
+    public FrameArrivedEventArgs(RefCountedSoftwareBitmap sharedBitmap, long generation = 0)
+    {
+        SharedBitmap = sharedBitmap ?? throw new ArgumentNullException(nameof(sharedBitmap));
+        SoftwareBitmap = sharedBitmap.Bitmap;
+        Generation = generation;
+    }
+
+    public FrameArrivedEventArgs(Direct3D11CaptureFrame? frame, SoftwareBitmap? softwareBitmap = null, long generation = 0)
     {
         Frame = frame;
         SoftwareBitmap = softwareBitmap;
+        Generation = generation;
     }
 
-    public FrameArrivedEventArgs(SoftwareBitmap softwareBitmap)
+    public FrameArrivedEventArgs(SoftwareBitmap softwareBitmap, long generation = 0)
     {
         SoftwareBitmap = softwareBitmap ?? throw new ArgumentNullException(nameof(softwareBitmap));
+        Generation = generation;
     }
 
     /// <summary>
@@ -28,5 +37,15 @@ public sealed class FrameArrivedEventArgs : EventArgs
     /// The independently owned SoftwareBitmap representation.
     /// </summary>
     public SoftwareBitmap? SoftwareBitmap { get; }
+
+    /// <summary>
+    /// Thread-safe ref-counted bitmap wrapper ensuring deterministic multi-renderer disposal without memory leaks.
+    /// </summary>
+    public RefCountedSoftwareBitmap? SharedBitmap { get; }
+
+    /// <summary>
+    /// Capture session generation identifier for dropping stale frames across source switches.
+    /// </summary>
+    public long Generation { get; }
 }
 

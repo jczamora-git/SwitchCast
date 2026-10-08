@@ -15,6 +15,11 @@ public interface ICapturePreviewRenderer : IDisposable
     ImageSource PreviewImageSource { get; }
 
     /// <summary>
+    /// Gets or sets whether the preview renderer is enabled to process incoming frames.
+    /// </summary>
+    bool IsEnabled { get; set; }
+
+    /// <summary>
     /// Processes and renders an acquired Direct3D 11 capture frame.
     /// </summary>
     Task RenderFrameAsync(Direct3D11CaptureFrame frame);
@@ -23,6 +28,11 @@ public interface ICapturePreviewRenderer : IDisposable
     /// Renders an independently owned SoftwareBitmap directly to the preview surface.
     /// </summary>
     Task RenderBitmapAsync(SoftwareBitmap bitmap);
+
+    /// <summary>
+    /// Renders a thread-safe ref-counted bitmap with preview rate-limiting (~15 FPS).
+    /// </summary>
+    Task RenderSharedBitmapAsync(RefCountedSoftwareBitmap sharedBitmap);
 
     /// <summary>
     /// Clears the active preview image and releases frame buffers.

@@ -150,9 +150,18 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
 
     private async void OnFrameArrived(object? sender, FrameArrivedEventArgs e)
     {
-        if (State == CaptureState.Capturing)
+        if (State != CaptureState.Capturing)
         {
-            if (e.SoftwareBitmap is not null)
+            return;
+        }
+
+        try
+        {
+            if (e.SharedBitmap is not null)
+            {
+                await _previewRenderer.RenderSharedBitmapAsync(e.SharedBitmap).ConfigureAwait(false);
+            }
+            else if (e.SoftwareBitmap is not null)
             {
                 await _previewRenderer.RenderBitmapAsync(e.SoftwareBitmap).ConfigureAwait(false);
             }
@@ -162,6 +171,10 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
             }
 
             FrameArrived?.Invoke(this, e);
+        }
+        catch
+        {
+            // Transient frame render exceptions are suppressed to prevent crashing in async void
         }
     }
 

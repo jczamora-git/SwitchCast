@@ -110,6 +110,20 @@ public sealed class Direct3D11DeviceProvider : IDirect3D11DeviceProvider
         }
     }
 
+    public void ResetDevice()
+    {
+        lock (_lock)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            ReleaseDeviceUnsafe();
+            EnsureDevice();
+        }
+    }
+
     private void ReleaseDeviceUnsafe()
     {
         _winrtDevice?.Dispose();

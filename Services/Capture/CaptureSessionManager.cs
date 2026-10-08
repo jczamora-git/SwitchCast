@@ -7,6 +7,7 @@ namespace SwitchCast.Services.Capture;
 
 /// <summary>
 /// Manages active GraphicsCaptureSession and Direct3D11CaptureFramePool lifecycles.
+/// Implements session generation tracking, backpressure frame draining, and zero-leak ref-counted bitmap delivery.
 /// </summary>
 public sealed class CaptureSessionManager : ICaptureSessionManager
 {
@@ -19,6 +20,7 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
     private bool _isCapturing;
     private bool _isDisposed;
     private int _isProcessingFrame;
+    private long _sessionGeneration;
 
     public event EventHandler<FrameArrivedEventArgs>? FrameArrived;
     public event EventHandler? SourceClosed;
@@ -34,6 +36,11 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
             }
         }
     }
+
+    /// <summary>
+    /// Current session generation counter.
+    /// </summary>
+    public long SessionGeneration => Volatile.Read(ref _sessionGeneration);
 
     public void StartCapture(GraphicsCaptureItem item, IDirect3D11DeviceProvider deviceProvider)
     {
@@ -54,6 +61,7 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
 
             try
             {
+                Interlocked.Increment(ref _sessionGeneration);
                 _item = item;
                 _deviceProvider = deviceProvider;
                 _lastSize = item.Size;
@@ -109,6 +117,7 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
     private void StopCaptureInternal()
     {
         _isCapturing = false;
+        Interlocked.Increment(ref _sessionGeneration);
         Interlocked.Exchange(ref _isProcessingFrame, 0);
 
         if (_item is not null)
@@ -123,7 +132,10 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
             {
                 _session.Dispose();
             }
-            catch { }
+            catch
+            {
+                // Ignore transient disposal exceptions
+            }
             _session = null;
         }
 
@@ -134,13 +146,18 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
             {
                 _framePool.Dispose();
             }
-            catch { }
+            catch
+            {
+                // Ignore transient disposal exceptions
+            }
             _framePool = null;
         }
     }
 
     private void OnFrameArrived(Direct3D11CaptureFramePool sender, object args)
     {
+        long currentGen = Volatile.Read(ref _sessionGeneration);
+
         // Pacing & Backpressure: If previous frame conversion is still running, drain and drop this frame
         if (Interlocked.CompareExchange(ref _isProcessingFrame, 1, 0) != 0)
         {
@@ -148,7 +165,10 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
             {
                 using var skipped = sender.TryGetNextFrame();
             }
-            catch { }
+            catch
+            {
+                // Ignored
+            }
             return;
         }
 
@@ -159,7 +179,7 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
                 Direct3D11CaptureFrame? frame = null;
                 lock (_syncLock)
                 {
-                    if (!_isCapturing || _framePool is null)
+                    if (!_isCapturing || _framePool is null || Volatile.Read(ref _sessionGeneration) != currentGen)
                     {
                         return;
                     }
@@ -176,7 +196,7 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
                 {
                     lock (_syncLock)
                     {
-                        if (_isCapturing && _framePool is not null && _deviceProvider is not null)
+                        if (_isCapturing && _framePool is not null && _deviceProvider is not null && Volatile.Read(ref _sessionGeneration) == currentGen)
                         {
                             _lastSize = frame.ContentSize;
                             _framePool.Recreate(
@@ -188,12 +208,12 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
                     }
                 }
 
-                // Keep frame alive throughout surface copy to prevent premature WinRT COM destruction
+                // Keep Direct3D frame alive throughout surface copy to prevent premature WinRT COM destruction
                 SoftwareBitmap? softwareBitmap = null;
                 try
                 {
                     var surface = frame.Surface;
-                    if (surface is not null)
+                    if (surface is not null && Volatile.Read(ref _sessionGeneration) == currentGen)
                     {
                         softwareBitmap = await SoftwareBitmap.CreateCopyFromSurfaceAsync(surface);
                     }
@@ -204,8 +224,9 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
                     frame = null;
                 }
 
-                if (softwareBitmap is null)
+                if (softwareBitmap is null || Volatile.Read(ref _sessionGeneration) != currentGen)
                 {
+                    softwareBitmap?.Dispose();
                     return;
                 }
 
@@ -225,7 +246,18 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
                     displayBitmap = softwareBitmap;
                 }
 
-                FrameArrived?.Invoke(this, new FrameArrivedEventArgs(displayBitmap));
+                if (Volatile.Read(ref _sessionGeneration) != currentGen)
+                {
+                    displayBitmap.Dispose();
+                    return;
+                }
+
+                // Wrap in RefCountedSoftwareBitmap: initial count is 1 for this scope.
+                // Renderers that want to present call TryAddRef() to reserve the bitmap for UI dispatch.
+                // When this using block finishes, Dispose() releases the initial ref.
+                // If no renderer took a ref, displayBitmap is disposed immediately.
+                using var sharedBitmap = new RefCountedSoftwareBitmap(displayBitmap, initialRefCount: 1);
+                FrameArrived?.Invoke(this, new FrameArrivedEventArgs(sharedBitmap, currentGen));
             }
             catch (Exception ex) when (ex is ObjectDisposedException or OperationCanceledException or System.Runtime.InteropServices.COMException)
             {

@@ -203,4 +203,45 @@ public class PresentationCoordinatorTests
         _mockCaptureCoordinator.Verify(c => c.SwitchPreviewSourceAsync(source2), Times.Once);
         _mockStateService.Verify(s => s.SetActiveSource(source2), Times.Once);
     }
+
+    [Fact]
+    public void OnCaptureFrameArrived_WhenActive_RendersSharedBitmapToOutput()
+    {
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object);
+
+        using var rawBitmap = new Windows.Graphics.Imaging.SoftwareBitmap(
+            Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, 10, 10, Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
+        using var sharedBitmap = new RefCountedSoftwareBitmap(rawBitmap, initialRefCount: 1);
+
+        // Raise FrameArrived on capture coordinator
+        _mockCaptureCoordinator.Raise(c => c.FrameArrived += null, _mockCaptureCoordinator.Object, new FrameArrivedEventArgs(sharedBitmap, 1));
+
+        _mockOutputRenderer.Verify(r => r.RenderSharedBitmapAsync(sharedBitmap), Times.Once);
+    }
+
+    [Fact]
+    public void OnCaptureFrameArrived_WhenNotActive_DoesNotRenderToOutput()
+    {
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Paused);
+
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object);
+
+        using var rawBitmap = new Windows.Graphics.Imaging.SoftwareBitmap(
+            Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, 10, 10, Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
+        using var sharedBitmap = new RefCountedSoftwareBitmap(rawBitmap, initialRefCount: 1);
+
+        _mockCaptureCoordinator.Raise(c => c.FrameArrived += null, _mockCaptureCoordinator.Object, new FrameArrivedEventArgs(sharedBitmap, 1));
+
+        _mockOutputRenderer.Verify(r => r.RenderSharedBitmapAsync(It.IsAny<RefCountedSoftwareBitmap>()), Times.Never);
+    }
 }

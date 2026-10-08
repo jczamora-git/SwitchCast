@@ -255,9 +255,18 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
     private async void OnCaptureFrameArrived(object? sender, FrameArrivedEventArgs e)
     {
-        if (Status == PresentationStatus.Active)
+        if (Status != PresentationStatus.Active)
         {
-            if (e.SoftwareBitmap is not null)
+            return;
+        }
+
+        try
+        {
+            if (e.SharedBitmap is not null)
+            {
+                await _outputRenderer.RenderSharedBitmapAsync(e.SharedBitmap).ConfigureAwait(false);
+            }
+            else if (e.SoftwareBitmap is not null)
             {
                 await _outputRenderer.RenderBitmapAsync(e.SoftwareBitmap).ConfigureAwait(false);
             }
@@ -265,6 +274,10 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             {
                 await _outputRenderer.RenderFrameAsync(e.Frame).ConfigureAwait(false);
             }
+        }
+        catch
+        {
+            // Transient frame render exceptions suppressed to prevent crashing in async void
         }
     }
 
