@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
@@ -9,6 +10,7 @@ using SwitchCast.Models;
 using SwitchCast.Services;
 using SwitchCast.ViewModels;
 using SwitchCast.Views;
+using Windows.Graphics;
 using WinRT.Interop;
 
 namespace SwitchCast;
@@ -44,27 +46,100 @@ public sealed partial class MainWindow : Window
 
     public MainViewModel ViewModel => _viewModel;
 
+    public IntPtr WindowHandle { get; private set; }
+
     private void InitializeAppWindow()
     {
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
 
-        var hwnd = WindowNative.GetWindowHandle(this);
-        var windowId = Win32Interop.GetWindowIdFromWindow(hwnd);
+        WindowHandle = WindowNative.GetWindowHandle(this);
+        var windowId = Win32Interop.GetWindowIdFromWindow(WindowHandle);
         _appWindow = AppWindow.GetFromWindowId(windowId);
 
         if (_appWindow is not null)
         {
             _appWindow.Title = _viewModel.WindowTitle;
 
-            var settings = _settingsService.CurrentSettings;
-            var width = (int)Math.Max(800, settings.WindowWidth);
-            var height = (int)Math.Max(600, settings.WindowHeight);
-
-            _appWindow.Resize(new Windows.Graphics.SizeInt32(width, height));
+            ApplyStartupWindowPlacement();
             _appWindow.Closing += OnAppWindowClosing;
 
             UpdateTitleBarColors(_viewModel.CurrentTheme);
+        }
+    }
+
+    private void ApplyStartupWindowPlacement()
+    {
+        if (_appWindow is null)
+        {
+            return;
+        }
+
+        var settings = _settingsService.CurrentSettings;
+        uint dpi = GetDpiForWindow(WindowHandle);
+        if (dpi == 0)
+        {
+            dpi = 96;
+        }
+        double scale = dpi / 96.0;
+
+        // Establish DPI-scaled window dimensions (minimum 800x600 DIPs)
+        double widthDip = Math.Max(800.0, settings.WindowWidth);
+        double heightDip = Math.Max(600.0, settings.WindowHeight);
+
+        int pixelWidth = (int)Math.Round(widthDip * scale);
+        int pixelHeight = (int)Math.Round(heightDip * scale);
+
+        bool placementApplied = false;
+
+        // Check if user has enabled remembering position and valid saved coordinates exist
+        if (settings.RememberWindowDimensions && settings.RememberWindowPosition &&
+            settings.WindowPositionX.HasValue && settings.WindowPositionY.HasValue)
+        {
+            int savedX = settings.WindowPositionX.Value;
+            int savedY = settings.WindowPositionY.Value;
+
+            // Verify if saved coordinates intersect with an active monitor's work area
+            var pt = new POINT { X = savedX, Y = savedY };
+            var hSavedMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONULL);
+
+            if (hSavedMonitor != IntPtr.Zero)
+            {
+                var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+                if (GetMonitorInfo(hSavedMonitor, ref info))
+                {
+                    // Clamp coordinates so the window is fully visible in the monitor work area
+                    int maxX = Math.Max(info.rcWork.Left, info.rcWork.Right - pixelWidth);
+                    int maxY = Math.Max(info.rcWork.Top, info.rcWork.Bottom - pixelHeight);
+                    int clampedX = Math.Clamp(savedX, info.rcWork.Left, maxX);
+                    int clampedY = Math.Clamp(savedY, info.rcWork.Top, maxY);
+
+                    _appWindow.MoveAndResize(new RectInt32(clampedX, clampedY, pixelWidth, pixelHeight));
+                    placementApplied = true;
+                }
+            }
+        }
+
+        if (!placementApplied)
+        {
+            // First launch, remember position disabled, or saved monitor disconnected: Center within active monitor work area
+            var hMonitor = MonitorFromWindow(WindowHandle, MONITOR_DEFAULTTOPRIMARY);
+            var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+
+            if (GetMonitorInfo(hMonitor, ref info))
+            {
+                int workAreaWidth = info.rcWork.Right - info.rcWork.Left;
+                int workAreaHeight = info.rcWork.Bottom - info.rcWork.Top;
+
+                int centerX = info.rcWork.Left + (workAreaWidth - pixelWidth) / 2;
+                int centerY = info.rcWork.Top + (workAreaHeight - pixelHeight) / 2;
+
+                _appWindow.MoveAndResize(new RectInt32(centerX, centerY, pixelWidth, pixelHeight));
+            }
+            else
+            {
+                _appWindow.Resize(new Windows.Graphics.SizeInt32(pixelWidth, pixelHeight));
+            }
         }
     }
 
@@ -226,8 +301,24 @@ public sealed partial class MainWindow : Window
 
                 if (_appWindow is not null)
                 {
+                    uint dpi = GetDpiForWindow(WindowHandle);
+                    if (dpi == 0)
+                    {
+                        dpi = 96;
+                    }
+                    double scale = dpi / 96.0;
+
                     var size = _appWindow.Size;
-                    await _settingsService.SetWindowDimensionsAsync(size.Width, size.Height);
+                    var pos = _appWindow.Position;
+
+                    double widthDip = size.Width / scale;
+                    double heightDip = size.Height / scale;
+
+                    await _settingsService.SetWindowPlacementAsync(
+                        widthDip,
+                        heightDip,
+                        pos.X,
+                        pos.Y);
                 }
 
                 await _lifecycleService.ExecuteShutdownAsync();
@@ -245,4 +336,48 @@ public sealed partial class MainWindow : Window
             _lifecycleService.IsExitConfirmationOpen = false;
         }
     }
+
+    #region Win32 P/Invoke
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    private struct MONITORINFO
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public int dwFlags;
+    }
+
+    private const uint MONITOR_DEFAULTTONULL = 0;
+    private const uint MONITOR_DEFAULTTOPRIMARY = 1;
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    #endregion
 }

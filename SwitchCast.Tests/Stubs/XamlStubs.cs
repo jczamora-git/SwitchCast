@@ -19,3 +19,21 @@ namespace Microsoft.UI.Xaml.Media
     {
     }
 }
+
+namespace Microsoft.UI.Xaml.Media.Imaging
+{
+    /// <summary>
+    /// Stubs Microsoft.UI.Xaml.Media.Imaging.SoftwareBitmapSource for headless test runner.
+    /// </summary>
+    public class SoftwareBitmapSource : ImageSource, IDisposable
+    {
+        public Task SetBitmapAsync(Windows.Graphics.Imaging.SoftwareBitmap softwareBitmap)
+        {
+            return Task.CompletedTask;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+}

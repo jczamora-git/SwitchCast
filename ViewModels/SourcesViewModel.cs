@@ -15,6 +15,7 @@ public partial class SourcesViewModel : ObservableObject
     private readonly IPresentationStateService _presentationStateService;
     private readonly IWindowDiscoveryService _windowDiscoveryService;
     private readonly IMonitorDiscoveryService _monitorDiscoveryService;
+    private readonly IWindowIconService? _windowIconService;
 
     private readonly List<SelectableSourceItem> _allWindows = [];
     private readonly List<SelectableSourceItem> _allDisplays = [];
@@ -43,11 +44,13 @@ public partial class SourcesViewModel : ObservableObject
     public SourcesViewModel(
         IPresentationStateService presentationStateService,
         IWindowDiscoveryService windowDiscoveryService,
-        IMonitorDiscoveryService monitorDiscoveryService)
+        IMonitorDiscoveryService monitorDiscoveryService,
+        IWindowIconService? windowIconService = null)
     {
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
         _windowDiscoveryService = windowDiscoveryService ?? throw new ArgumentNullException(nameof(windowDiscoveryService));
         _monitorDiscoveryService = monitorDiscoveryService ?? throw new ArgumentNullException(nameof(monitorDiscoveryService));
+        _windowIconService = windowIconService;
 
         DisplayedSources = [];
         _presentationStateService.PropertyChanged += OnPresentationStatePropertyChanged;
@@ -117,6 +120,9 @@ public partial class SourcesViewModel : ObservableObject
             DisplayCategoryHeader = $"Displays & Monitors ({_allDisplays.Count})";
 
             ApplyFilter();
+
+            // Asynchronously resolve icons without blocking UI responsiveness
+            _ = LoadIconsAsync(_allWindows);
         }
         catch (Exception ex)
         {
@@ -130,6 +136,34 @@ public partial class SourcesViewModel : ObservableObject
             OnPropertyChanged(nameof(IsEmpty));
             OnPropertyChanged(nameof(EmptyStateTitle));
             OnPropertyChanged(nameof(EmptyStateSubtitle));
+        }
+    }
+
+    private async Task LoadIconsAsync(IEnumerable<SelectableSourceItem> items)
+    {
+        if (_windowIconService is null)
+        {
+            return;
+        }
+
+        foreach (var item in items)
+        {
+            if (item.Source is WindowSource winSource)
+            {
+                try
+                {
+                    var icon = await _windowIconService.GetIconForSourceAsync(winSource).ConfigureAwait(true);
+                    if (icon is not null)
+                    {
+                        item.IconSource = icon;
+                        item.HasIconSource = true;
+                    }
+                }
+                catch
+                {
+                    // Fallback glyph remains visible on any error
+                }
+            }
         }
     }
 

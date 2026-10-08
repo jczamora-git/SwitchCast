@@ -7,6 +7,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Desktop UX Hotfix — Presenter Actions Bring-to-Front, Centered Startup & Dynamic Application Icons] - 2026-10-09
+
+### Added (feat / UI / test / docs)
+- **Presenter Actions Bring-to-Front & Window Focus Handoff**:
+  - Fixed Presenter Actions ("Control Dashboard" and "Presentation Output") in [Views/PresenterDockMenuWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml.cs) by detaching owner HWND parent (`GWLP_HWNDPARENT = IntPtr.Zero`) prior to menu closure, preventing Windows from automatically reclaiming focus to the floating dock.
+  - Enhanced [Services/Win32WindowActivationService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowActivationService.cs) and [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs) `ActivateMainWindow()` to restore minimized windows (`SW_RESTORE`) and request foreground activation (`SetForegroundWindow`) without creating duplicate `MainWindow` instances.
+  - Enhanced [Services/PresentationWindowService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationWindowService.cs) with injected `IWindowActivationService`, ensuring existing `PresentationWindow` instances are restored and brought forward without recreating the window or disrupting capture.
+- **Centered MainWindow Startup & DPI-Aware Saved Placement**:
+  - Implemented DPI-aware startup window placement in [MainWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/MainWindow.xaml.cs).
+  - Calculates target monitor usable work area center coordinates via `MonitorFromWindow` and `GetMonitorInfo` (`centerX = workArea.Left + (workArea.Width - windowWidth) / 2`, `centerY = workArea.Top + (workArea.Height - windowHeight) / 2`), supporting secondary displays with negative coordinates and taskbar offsets.
+  - Added `WindowPositionX`, `WindowPositionY`, and `RememberWindowPosition` in [Models/UserSettings.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/UserSettings.cs) and [Services/ApplicationSettingsService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/ApplicationSettingsService.cs), restoring valid positions with automatic work-area boundary clamping or recovering to center when a saved display is disconnected.
+- **Dynamic Native Application Icons Engine**:
+  - Implemented [Services/IWindowIconService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IWindowIconService.cs) and [Services/Win32WindowIconService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowIconService.cs) to extract authentic Windows application icons via local Win32 / Shell APIs:
+    1. Window icon: `SendMessageTimeout` with `WM_GETICON` (`ICON_SMALL2` -> `ICON_SMALL` -> `ICON_BIG`) with 200ms timeout.
+    2. Class icon: `GetClassLongPtr` (`GCLP_HICONSM` -> `GCLP_HICON`).
+    3. Shell icon: `SHGetFileInfo` / process executable icon extraction.
+    4. Safe native handle ownership: `DestroyIcon` strictly released on owned shell handles, never on borrowed window/class icons.
+    5. GDI 32-bit DIB section extraction with full alpha-channel validation and conversion to WinUI `SoftwareBitmapSource`.
+    6. In-memory thread-safe caching (`ConcurrentDictionary`) keyed by source ID.
+  - Updated [ViewModels/SelectableSourceItem.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SelectableSourceItem.cs) and [ViewModels/SourcesViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SourcesViewModel.cs) to load icons asynchronously upon discovery refresh.
+  - Updated [Views/SourcesPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SourcesPage.xaml) to display true-color native 20x20 application icons with theme-adaptive fallback glyphs for displays or unresolved windows.
+- **Automated Unit & Regression Tests**:
+  - Added [SwitchCast.Tests/Services/WindowIconServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/WindowIconServiceTests.cs), [SwitchCast.Tests/Services/MainWindowPositioningMathTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/MainWindowPositioningMathTests.cs), [SwitchCast.Tests/Services/PresenterDockActionsActivationTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresenterDockActionsActivationTests.cs), and [SwitchCast.Tests/ViewModels/SourcesViewModelIconTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/SourcesViewModelIconTests.cs).
+  - Expanded the test suite from 135 to 152 automated passing tests (100% pass rate).
+
+---
+
 ## [Window Hierarchy & Safe Application Shutdown] - 2026-10-09
 
 ### Added (feat / UI / test / docs)

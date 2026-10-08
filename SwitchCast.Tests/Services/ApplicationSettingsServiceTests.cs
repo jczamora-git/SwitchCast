@@ -81,4 +81,50 @@ public class ApplicationSettingsServiceTests : IDisposable
         Assert.Equal(1000, service.CurrentSettings.WindowWidth);
         Assert.Equal(700, service.CurrentSettings.WindowHeight);
     }
+
+    [Fact]
+    public async Task SetWindowPositionAsync_WhenRememberPositionTrue_PersistsCoordinates()
+    {
+        var service = new ApplicationSettingsService(_tempSettingsPath);
+        service.CurrentSettings.RememberWindowPosition = true;
+
+        await service.SetWindowPositionAsync(250, 150);
+
+        Assert.Equal(250, service.CurrentSettings.WindowPositionX);
+        Assert.Equal(150, service.CurrentSettings.WindowPositionY);
+
+        var reloaded = new ApplicationSettingsService(_tempSettingsPath);
+        await reloaded.LoadSettingsAsync();
+        Assert.Equal(250, reloaded.CurrentSettings.WindowPositionX);
+        Assert.Equal(150, reloaded.CurrentSettings.WindowPositionY);
+    }
+
+    [Fact]
+    public async Task SetWindowPositionAsync_WhenRememberPositionFalse_DoesNotUpdate()
+    {
+        var service = new ApplicationSettingsService(_tempSettingsPath);
+        service.CurrentSettings.RememberWindowPosition = false;
+        service.CurrentSettings.WindowPositionX = null;
+        service.CurrentSettings.WindowPositionY = null;
+
+        await service.SetWindowPositionAsync(250, 150);
+
+        Assert.Null(service.CurrentSettings.WindowPositionX);
+        Assert.Null(service.CurrentSettings.WindowPositionY);
+    }
+
+    [Fact]
+    public async Task SetWindowPlacementAsync_RespectsFlagsAndPersists()
+    {
+        var service = new ApplicationSettingsService(_tempSettingsPath);
+        service.CurrentSettings.RememberWindowDimensions = true;
+        service.CurrentSettings.RememberWindowPosition = true;
+
+        await service.SetWindowPlacementAsync(1280, 800, 300, 200);
+
+        Assert.Equal(1280, service.CurrentSettings.WindowWidth);
+        Assert.Equal(800, service.CurrentSettings.WindowHeight);
+        Assert.Equal(300, service.CurrentSettings.WindowPositionX);
+        Assert.Equal(200, service.CurrentSettings.WindowPositionY);
+    }
 }

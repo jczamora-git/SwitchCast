@@ -144,7 +144,7 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <!-- Type Glyph Tile -->
+                            <!-- Type Glyph Tile / Real Application Icon -->
                             <Border Grid.Column="0"
                                     Width="32"
                                     Height="32"
@@ -153,7 +153,22 @@
                                     BorderThickness="1"
                                     CornerRadius="6"
                                     Margin="0,0,12,0">
-                                <FontIcon Glyph="{x:Bind TypeGlyph}" FontSize="13" Foreground="{ThemeResource AppAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <!-- Real Native Application Icon -->
+                                    <Image Source="{x:Bind IconSource, Mode=OneWay}"
+                                           Width="20"
+                                           Height="20"
+                                           Stretch="Uniform"
+                                           Visibility="{x:Bind HasIconSource, Mode=OneWay}" />
+
+                                    <!-- Fallback Glyph Icon -->
+                                    <FontIcon Glyph="{x:Bind TypeGlyph}"
+                                              FontSize="13"
+                                              Foreground="{ThemeResource AppAccentBrush}"
+                                              Visibility="{x:Bind HasNoIconSource, Mode=OneWay}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                                </Grid>
                             </Border>
 
                             <!-- Title & Metadata -->

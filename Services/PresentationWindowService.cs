@@ -8,7 +8,13 @@ namespace SwitchCast.Services;
 /// </summary>
 public sealed class PresentationWindowService : IPresentationWindowService
 {
+    private readonly IWindowActivationService? _windowActivationService;
     private PresentationWindow? _window;
+
+    public PresentationWindowService(IWindowActivationService? windowActivationService = null)
+    {
+        _windowActivationService = windowActivationService;
+    }
 
     public bool IsWindowOpen => _window is not null;
 
@@ -30,6 +36,11 @@ public sealed class PresentationWindowService : IPresentationWindowService
         {
             _window.Activate();
             WindowOpened?.Invoke(this, EventArgs.Empty);
+        }
+
+        if (_window.WindowHandle != IntPtr.Zero && _windowActivationService is not null)
+        {
+            _windowActivationService.ActivateWindow(_window.WindowHandle);
         }
     }
 

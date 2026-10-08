@@ -235,14 +235,14 @@ public sealed partial class PresenterDockMenuWindow : Window
 
     private void OnShowDashboardClicked(object sender, RoutedEventArgs e)
     {
-        _viewModel.ShowDashboardCommand.Execute(null);
         CloseMenu();
+        _viewModel.ShowDashboardCommand.Execute(null);
     }
 
     private void OnShowOutputWindowClicked(object sender, RoutedEventArgs e)
     {
-        _viewModel.ShowOutputWindowCommand.Execute(null);
         CloseMenu();
+        _viewModel.ShowOutputWindowCommand.Execute(null);
     }
 
     private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
@@ -274,6 +274,12 @@ public sealed partial class PresenterDockMenuWindow : Window
 
         _isClosing = true;
         Activated -= OnWindowActivated;
+
+        if (WindowHandle != IntPtr.Zero)
+        {
+            // Detach owner before closing so Windows does not automatically reactivate the owner dock window
+            SetWindowLongPtr(WindowHandle, GWLP_HWNDPARENT, IntPtr.Zero);
+        }
 
         try
         {

@@ -3,69 +3,85 @@
 ---
 
 ## Task Details
-- **Task**: Window Hierarchy & Safe Application Shutdown (Main Window Exit Confirmation + Multi-Window Lifecycle)
-- **Date**: 2026-10-09T02:00:00+08:00 (UTC+8)
+- **Task**: Desktop UX Hotfix (Presenter Actions Bring-to-Front, Centered Startup & Dynamic Application Icons)
+- **Date**: 2026-10-09T03:00:00+08:00 (UTC+8)
 - **Status**: Completed
 
 ---
 
 ## 1. Objective
-Establish an authoritative window hierarchy and safe application exit lifecycle across SwitchCast's multi-window desktop architecture:
-1. `MainWindow`: Primary management window. Closing `MainWindow` initiates a native WinUI 3 `ContentDialog` asking for confirmation before exiting.
-2. `PresentationWindow`: Independent audience-facing output. Closing it stops the presentation safely without terminating `MainWindow` or the application.
-3. `PresenterDockWindow`: Independent presenter companion dock. Closing it closes only the dock without stopping active presentations or closing `MainWindow`.
-4. Implement a centralized lifecycle coordinator ([ApplicationLifecycleService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/ApplicationLifecycleService.cs)) that orchestrates safe teardown (stopping capture, closing secondary windows, unregistering hotkeys, and saving settings).
+Implement three targeted desktop usability hotfixes in SwitchCast:
+1. **Presenter Actions Bring-to-Front**: Ensure selecting *Control Dashboard* or *Presentation Output* from the Floating Presenter Dock's Presenter Actions menu reliably restores minimized windows (`ShowWindowAsync(SW_RESTORE)`), brings the target window to the foreground (`SetForegroundWindow`), and prevents dock/popup focus handoff races without recreating existing instances.
+2. **Centered MainWindow Startup**: Center `MainWindow` on the target monitor work area on cold launch / first launch with DPI awareness (`GetDpiForWindow`, `MonitorFromWindow`, `GetMonitorInfo`), while respecting saved user window dimensions/coordinates and recovering gracefully from disconnected monitors.
+3. **Dynamic Windows Application Icons**: Replace generic orange monitor icons on the Sources page with real local application/window icons extracted via Win32 Shell APIs (`SendMessageTimeout` with `WM_GETICON`, `GetClassLongPtr` with `GCLP_HICONSM`/`GCLP_HICON`, `SHGetFileInfo` / process executable icon fallback), managed via a dedicated `IWindowIconService` with caching and safe native `HICON` lifetime management.
 
 ---
 
 ## 2. Architecture & Solutions Applied
-1. **Window Hierarchy & Exit Authority**:
-   - `MainWindow`: Primary window holding exit authority. Intercepts `AppWindow.Closing` synchronously (`args.Cancel = true`) to prevent immediate window destruction.
-   - Evaluates presentation state:
-     - When presenting: `"Your live presentation will stop, and all SwitchCast windows will close. Are you sure you want to exit?"`
-     - When idle: `"Are you sure you want to exit SwitchCast?"`
-   - Primary Action: `"Exit SwitchCast"`.
-   - Close/Cancel Action: `"Cancel"` (set as safe default button).
-   - Re-entrancy prevention: `_lifecycleService.IsExitConfirmationOpen` guards against duplicate dialogs from rapid `X` clicks or `Alt+F4`.
-2. **Centralized Application Lifecycle Coordinator ([ApplicationLifecycleService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/ApplicationLifecycleService.cs))**:
-   - Registered as singleton `IApplicationLifecycleService` in DI container.
-   - Coordinates deterministic shutdown sequence:
-     1. Stop active live presentation (`_presentationCoordinator.StopPresentationAsync()`).
-     2. Stop live preview capture (`_captureCoordinator.StopPreviewAsync()`).
-     3. Close Presentation Output window (`_presentationWindowService.ClosePresentationWindow()`).
-     4. Close Floating Presenter Dock window (`_presenterDockService.CloseDock()`).
-     5. Unregister and dispose global hotkeys (`_hotkeyService.Dispose()`).
-     6. Persist user settings (`_settingsService.SaveSettingsAsync()`).
-   - Thread-safe and idempotent via `Interlocked.CompareExchange`.
-   - Error resilient (individual service exceptions are caught and logged, ensuring teardown continues).
-3. **Secondary Window Close Isolation**:
-   - **Presenter Dock**: Closing the dock only disposes the dock window and any open popup menus. Active presentations, capture, hotkeys, and MainWindow remain alive and fully functional. Reopenable via `Ctrl+Shift+D` or Dashboard.
-   - **Presentation Output**: Closing the output window notifies `PresentationCoordinator`, stops the presentation cleanly, sets status to `Idle`, and leaves `MainWindow` open. Reopenable anytime by starting a new presentation.
+
+1. **Presenter Actions Bring-to-Front & Focus Handoff**:
+   - **Root Cause**: `PresenterDockMenuWindow` was owned by `PresenterDockWindow` (`GWLP_HWNDPARENT`), causing Windows to automatically return focus to the floating dock whenever the menu closed, overriding the target window activation. Furthermore, `MainWindow` and `PresentationWindow` were using bare `Window.Activate()` calls without `ShowWindowAsync(SW_RESTORE)`.
+   - **Solution**:
+     - Detached `GWLP_HWNDPARENT = IntPtr.Zero` in `PresenterDockMenuWindow.CloseMenu()` prior to window closure.
+     - Enhanced `ActivateMainWindow()` in `App.xaml.cs` to invoke `IWindowActivationService.ActivateWindow(mw.WindowHandle)`.
+     - Injected `IWindowActivationService` into `PresentationWindowService` to restore and activate existing `PresentationWindow` instances.
+     - Never recreates existing `MainWindow` or `PresentationWindow` instances; preserves capture and presentation state.
+
+2. **Centered Startup Placement & Saved Dimensions/Coordinates**:
+   - Implemented DPI-aware calculation in `MainWindow.xaml.cs` using `GetDpiForWindow`, `MonitorFromWindow`, and `GetMonitorInfo`.
+   - Centering math: `centerX = workArea.Left + (workArea.Width - windowWidth) / 2`, `centerY = workArea.Top + (workArea.Height - windowHeight) / 2`.
+   - Added `WindowPositionX`, `WindowPositionY`, and `RememberWindowPosition` in `UserSettings` and `ApplicationSettingsService`.
+   - On shutdown, saves physical positions and DIP dimensions; on startup, checks `MonitorFromPoint` to validate saved coordinates within connected monitor work areas, clamping to visible work area or defaulting to center if monitor was disconnected.
+
+3. **Dynamic Application Icon Engine & Safe Native Lifetime**:
+   - Implemented `IWindowIconService` and `Win32WindowIconService`.
+   - Extraction sequence:
+     1. Window icon: `SendMessageTimeout` with `WM_GETICON` (`ICON_SMALL2` -> `ICON_SMALL` -> `ICON_BIG`) with 200ms timeout.
+     2. Class icon: `GetClassLongPtr` (`GCLP_HICONSM` -> `GCLP_HICON`).
+     3. Shell icon: `SHGetFileInfo` on `ProcessPath`.
+   - Safe handle lifetime: `DestroyIcon` is strictly called on owned shell handles, never on borrowed window/class handles.
+   - GDI 32-bit DIB section rendering via `DrawIconEx` with alpha-channel verification, converting to `SoftwareBitmapSource`.
+   - Thread-safe caching in `ConcurrentDictionary<string, ImageSource>`.
+   - Sources page template updated with true-color 20x20 `<Image>` and theme-adaptive `<FontIcon>` fallback.
 
 ---
 
 ## 3. Files Modified / Created
 
 ### New Files
-- [Services/IApplicationLifecycleService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IApplicationLifecycleService.cs)
-- [Services/ApplicationLifecycleService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/ApplicationLifecycleService.cs)
-- [SwitchCast.Tests/Services/ApplicationLifecycleServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/ApplicationLifecycleServiceTests.cs)
+- [Services/IWindowIconService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IWindowIconService.cs)
+- [Services/Win32WindowIconService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowIconService.cs)
+- [SwitchCast.Tests/Services/WindowIconServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/WindowIconServiceTests.cs)
+- [SwitchCast.Tests/Services/MainWindowPositioningMathTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/MainWindowPositioningMathTests.cs)
+- [SwitchCast.Tests/Services/PresenterDockActionsActivationTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresenterDockActionsActivationTests.cs)
+- [SwitchCast.Tests/ViewModels/SourcesViewModelIconTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/SourcesViewModelIconTests.cs)
 
 ### Modified Files
 - [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs)
 - [MainWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/MainWindow.xaml.cs)
+- [Models/UserSettings.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/UserSettings.cs)
+- [Services/IApplicationSettingsService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IApplicationSettingsService.cs)
+- [Services/ApplicationSettingsService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/ApplicationSettingsService.cs)
+- [Services/PresentationWindowService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationWindowService.cs)
+- [ViewModels/SelectableSourceItem.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SelectableSourceItem.cs)
+- [ViewModels/SourcesViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SourcesViewModel.cs)
+- [Views/PresenterDockMenuWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml.cs)
+- [Views/SourcesPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SourcesPage.xaml)
+- [SwitchCast.Tests/Services/ApplicationSettingsServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/ApplicationSettingsServiceTests.cs)
+- [SwitchCast.Tests/Stubs/XamlStubs.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Stubs/XamlStubs.cs)
 - [SwitchCast.Tests/SwitchCast.Tests.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/SwitchCast.Tests.csproj)
 
 ---
 
 ## 4. Validation Performed
-- **Level 1 (Build)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 6.19s).
+- **Level 1 (Build)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 3.00s).
 - **Level 2 (Static Analysis)**: Analyzers and nullable reference checks -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (135 passed, 0 failed, 0 skipped in 1s).
-- **Level 4 (Lifecycle Verification)**: 6 targeted automated unit tests in `ApplicationLifecycleServiceTests` verifying initial state, approval flag, confirmation tracking, coordinated teardown, idempotency, and exception resilience.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (152 passed, 0 failed, 0 skipped in 690ms).
+- **Level 4 (Presenter Actions, Startup Centering & Dynamic Icons)**: Window focus handoff, restoration of minimized windows, DPI work-area centering, and native Win32 icon extraction verified.
 
 ---
 
 ## 5. Next Steps
 - **Next Task**: **Phase 6 — Stability & Performance Optimization**
 - Implement Direct3D 11 device loss resilience, dynamic multi-monitor DPI scaling adaptation, and extended load verification.
+

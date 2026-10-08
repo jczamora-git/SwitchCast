@@ -36,4 +36,14 @@ public interface IApplicationSettingsService
     /// Updates window dimensions and persists if enabled.
     /// </summary>
     Task SetWindowDimensionsAsync(double width, double height);
+
+    /// <summary>
+    /// Updates window position coordinates and persists if enabled.
+    /// </summary>
+    Task SetWindowPositionAsync(int x, int y);
+
+    /// <summary>
+    /// Updates both window dimensions and position and persists if enabled.
+    /// </summary>
+    Task SetWindowPlacementAsync(double width, double height, int? x, int? y);
 }

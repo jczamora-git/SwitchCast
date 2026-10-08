@@ -108,4 +108,33 @@ public class ApplicationSettingsService : IApplicationSettingsService
         CurrentSettings.WindowHeight = height;
         await SaveSettingsAsync().ConfigureAwait(false);
     }
+
+    public async Task SetWindowPositionAsync(int x, int y)
+    {
+        if (!CurrentSettings.RememberWindowPosition)
+        {
+            return;
+        }
+
+        CurrentSettings.WindowPositionX = x;
+        CurrentSettings.WindowPositionY = y;
+        await SaveSettingsAsync().ConfigureAwait(false);
+    }
+
+    public async Task SetWindowPlacementAsync(double width, double height, int? x, int? y)
+    {
+        if (CurrentSettings.RememberWindowDimensions)
+        {
+            CurrentSettings.WindowWidth = width;
+            CurrentSettings.WindowHeight = height;
+        }
+
+        if (CurrentSettings.RememberWindowPosition)
+        {
+            CurrentSettings.WindowPositionX = x;
+            CurrentSettings.WindowPositionY = y;
+        }
+
+        await SaveSettingsAsync().ConfigureAwait(false);
+    }
 }

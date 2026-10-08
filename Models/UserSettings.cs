@@ -21,9 +21,24 @@ public class UserSettings
     public double WindowHeight { get; set; } = 700;
 
     /// <summary>
+    /// Last saved window position X in screen physical pixels.
+    /// </summary>
+    public int? WindowPositionX { get; set; } = null;
+
+    /// <summary>
+    /// Last saved window position Y in screen physical pixels.
+    /// </summary>
+    public int? WindowPositionY { get; set; } = null;
+
+    /// <summary>
     /// Whether to restore window dimensions on startup.
     /// </summary>
     public bool RememberWindowDimensions { get; set; } = true;
+
+    /// <summary>
+    /// Whether to restore window position on startup.
+    /// </summary>
+    public bool RememberWindowPosition { get; set; } = false;
 
     /// <summary>
     /// Whether system-wide global hotkeys are enabled.

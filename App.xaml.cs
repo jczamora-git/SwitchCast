@@ -23,11 +23,23 @@ public partial class App : Application
 
     public IServiceProvider Services { get; }
 
+    public MainWindow? MainWindow => _mainWindow as MainWindow;
+
     /// <summary>
-    /// Activates and brings the primary application window to the foreground.
+    /// Activates and brings the primary application window to the foreground, restoring if minimized.
     /// </summary>
     public void ActivateMainWindow()
     {
+        if (_mainWindow is MainWindow mw && mw.WindowHandle != IntPtr.Zero)
+        {
+            var activationService = Services.GetService<IWindowActivationService>();
+            if (activationService is not null)
+            {
+                activationService.ActivateWindow(mw.WindowHandle);
+                return;
+            }
+        }
+
         _mainWindow?.Activate();
     }
 
@@ -41,6 +53,7 @@ public partial class App : Application
         services.AddSingleton<INavigationService, NavigationService>();
         services.AddSingleton<IWindowDiscoveryService, Win32WindowDiscoveryService>();
         services.AddSingleton<IMonitorDiscoveryService, Win32MonitorDiscoveryService>();
+        services.AddSingleton<IWindowIconService, Win32WindowIconService>();
 
         // Native Capture Pipeline Services
         services.AddSingleton<IWin32DiagnosticCaptureService, Win32DiagnosticCaptureService>();
@@ -116,7 +129,7 @@ public partial class App : Application
                     presenterDockService.ToggleDock();
                     break;
                 case Models.HotkeyAction.ShowDashboard:
-                    _mainWindow?.Activate();
+                    ActivateMainWindow();
                     break;
                 case Models.HotkeyAction.SelectSource1:
                     _ = presentationCoordinator.SwitchToSourceIndexAsync(0);
@@ -136,7 +149,7 @@ public partial class App : Application
             }
         };
 
-        presenterDockService.RequestShowDashboard += (s, e) => _mainWindow?.Activate();
+        presenterDockService.RequestShowDashboard += (s, e) => ActivateMainWindow();
 
         hotkeyService.Initialize();
 

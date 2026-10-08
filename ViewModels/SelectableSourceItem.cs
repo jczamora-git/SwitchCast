@@ -17,6 +17,14 @@ public partial class SelectableSourceItem : ObservableObject
     [ObservableProperty]
     private bool _isAvailable = true;
 
+    [ObservableProperty]
+    private Microsoft.UI.Xaml.Media.ImageSource? _iconSource;
+
+    [ObservableProperty]
+    private bool _hasIconSource;
+
+    public bool HasNoIconSource => !HasIconSource;
+
     public SelectableSourceItem(
         CaptureSource source,
         bool isInitiallySelected = false,
@@ -59,5 +67,10 @@ public partial class SelectableSourceItem : ObservableObject
     partial void OnIsAvailableChanged(bool value)
     {
         OnPropertyChanged(nameof(UnavailableBadgeVisibility));
+    }
+
+    partial void OnHasIconSourceChanged(bool value)
+    {
+        OnPropertyChanged(nameof(HasNoIconSource));
     }
 }
