@@ -9,7 +9,7 @@ namespace SwitchCast.Services.Capture;
 
 /// <summary>
 /// GPU-backed preview renderer presenting capture frames onto WinUI 3 SoftwareBitmapSource.
-/// Implements decoupled non-blocking UI delivery and ~15 FPS rate-limiting for secondary dashboard preview.
+/// Implements decoupled non-blocking UI delivery, generation validation, and ~15 FPS rate-limiting.
 /// </summary>
 public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
 {
@@ -18,6 +18,7 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
     private readonly DispatcherQueue _dispatcherQueue;
     private readonly SoftwareBitmapSource _softwareBitmapSource;
     private long _lastRenderTimestamp;
+    private long _currentGeneration;
     private int _isProcessingFrame;
     private bool _isEnabled = true;
     private bool _isDisposed;
@@ -38,13 +39,19 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
     }
 
     /// <summary>
-    /// Renders a thread-safe ref-counted bitmap with preview rate-limiting (~15 FPS) and non-blocking UI dispatch.
+    /// Renders a thread-safe ref-counted bitmap with preview rate-limiting (~15 FPS), generation validation, and non-blocking UI dispatch.
     /// </summary>
-    public Task RenderSharedBitmapAsync(RefCountedSoftwareBitmap sharedBitmap)
+    public Task RenderSharedBitmapAsync(RefCountedSoftwareBitmap sharedBitmap, long generation = 0)
     {
         ArgumentNullException.ThrowIfNull(sharedBitmap);
 
         if (_isDisposed || !_isEnabled)
+        {
+            return Task.CompletedTask;
+        }
+
+        // Generation check: drop stale frames from superseded capture sessions
+        if (generation != 0 && generation < Volatile.Read(ref _currentGeneration))
         {
             return Task.CompletedTask;
         }
@@ -70,20 +77,22 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
         }
 
         _lastRenderTimestamp = now;
+        long targetGen = generation != 0 ? generation : Volatile.Read(ref _currentGeneration);
 
         // Decoupled non-blocking UI dispatch (worker thread never blocks on UI thread)
         var enqueued = _dispatcherQueue.TryEnqueue(async () =>
         {
             try
             {
-                if (!_isDisposed && _isEnabled)
+                if (!_isDisposed && _isEnabled && (targetGen == 0 || targetGen >= Volatile.Read(ref _currentGeneration)))
                 {
                     await _softwareBitmapSource.SetBitmapAsync(sharedBitmap.Bitmap);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore transient render errors during window resize or navigation
+                // Transient render errors during window resize or navigation safely observed
+                Debug.WriteLine($"[Direct3D11PreviewRenderer] Render exception observed: {ex.Message}");
             }
             finally
             {
@@ -127,9 +136,9 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
                     await _softwareBitmapSource.SetBitmapAsync(bitmap);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore transient render errors
+                Debug.WriteLine($"[Direct3D11PreviewRenderer] Fallback render exception: {ex.Message}");
             }
             finally
             {
@@ -201,9 +210,9 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
                         await _softwareBitmapSource.SetBitmapAsync(displayBitmap);
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignore transient render errors
+                    Debug.WriteLine($"[Direct3D11PreviewRenderer] Frame fallback render exception: {ex.Message}");
                 }
                 finally
                 {
@@ -212,24 +221,29 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
                 }
             });
         }
-        catch
+        catch (Exception ex)
         {
+            Debug.WriteLine($"[Direct3D11PreviewRenderer] Surface copy exception: {ex.Message}");
             Interlocked.Exchange(ref _isProcessingFrame, 0);
         }
     }
 
     public void Clear()
     {
-        _dispatcherQueue.TryEnqueue(() =>
+        Interlocked.Increment(ref _currentGeneration);
+        _dispatcherQueue.TryEnqueue(async () =>
         {
             try
             {
-                using var emptyBitmap = new SoftwareBitmap(BitmapPixelFormat.Bgra8, 1, 1, BitmapAlphaMode.Premultiplied);
-                _ = _softwareBitmapSource.SetBitmapAsync(emptyBitmap);
+                if (!_isDisposed)
+                {
+                    using var emptyBitmap = new SoftwareBitmap(BitmapPixelFormat.Bgra8, 1, 1, BitmapAlphaMode.Premultiplied);
+                    await _softwareBitmapSource.SetBitmapAsync(emptyBitmap);
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignored during cleanup
+                Debug.WriteLine($"[Direct3D11PreviewRenderer] Clear exception: {ex.Message}");
             }
         });
     }
@@ -243,7 +257,18 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
 
         _isDisposed = true;
         _isEnabled = false;
-        Clear();
-        _softwareBitmapSource.Dispose();
+        Interlocked.Increment(ref _currentGeneration);
+
+        _dispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                _softwareBitmapSource.Dispose();
+            }
+            catch
+            {
+                // Ignored during cleanup
+            }
+        });
     }
 }

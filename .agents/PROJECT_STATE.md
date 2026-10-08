@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Phase 4.6 — Performance Profiling & Stability Optimization
+- **Current Phase**: Phase 4.7 — Rapid Source Switching Crash Fix & Concurrency Hardening
 - **Overall Status**: **Completed (Ready for Phase 5)**
-- **Last Updated**: 2026-10-08T21:30:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-08T22:30:00+08:00 (UTC+8)
 
 ---
 
@@ -35,6 +35,13 @@ This is the authoritative progress, state, and environmental tracking document f
   - Single-conversion frame distribution preventing duplicate GPU-to-CPU copies across preview and presentation renderers.
   - Non-blocking UI dispatcher integration eliminating `0xC000027B` stowed exception and deadlock vectors.
   - Authoritative report documented in [docs/PERFORMANCE_BASELINE.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/PERFORMANCE_BASELINE.md).
+- [x] **Rapid Source Switching Hardening & Concurrency Serialization (Phase 4.7)**:
+  - Root cause analysis and resolution of `0xC000027B` stowed exception crash during rapid switching.
+  - Fixed premature disposal of `emptyBitmap` in `Clear()` while `SoftwareBitmapSource.SetBitmapAsync` was in-flight on the compositor.
+  - Ensured `SoftwareBitmapSource.Dispose()` executes exclusively on UI thread `DispatcherQueue`.
+  - Implemented Latest-Request-Wins request coalescing and transition sequence tracking in `CaptureCoordinator` and `PresentationCoordinator`, discarding obsolete intermediate transitions without redundant native session churn.
+  - Converted `OnFrameArrived` and `OnCaptureFrameArrived` event handlers from `async void` to synchronous `void` with strict try/catch boundaries to prevent unobserved asynchronous exceptions from escaping to the UI SynchronizationContext.
+  - Added session generation filtering in both `Direct3D11PreviewRenderer` and `Direct3D11PresentationRenderer` to drop stale in-flight UI frame renders across source switches.
 - [x] **Dashboard Live Preview UI (Phase 3)**: [DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml) featuring live preview video surface, source switcher dropdown, "Start Live Preview" and "Stop Preview" buttons, live status pill, progress indicators, and error InfoBars.
 - [x] **Dedicated Presentation Output Window (Phase 4)**:
   - Native WinUI 3 top-level window [PresentationWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml) titled `"SwitchCast Presentation Output"`, 1280x720 default aspect ratio, capturable by Google Meet, Zoom, and Teams (no `WDA_EXCLUDEFROMCAPTURE` on output window).
@@ -43,7 +50,7 @@ This is the authoritative progress, state, and environmental tracking document f
   - Unified frame distribution pipeline and output renderer [Direct3D11PresentationRenderer.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11PresentationRenderer.cs).
   - Presentation coordinator [PresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationCoordinator.cs) supporting Start Presenting, Stop Presenting, Freeze/Pause, Resume, Blackout, and on-the-fly source switching without closing or recreating the output window.
   - Dashboard presentation controls in [DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml) and [DashboardViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/DashboardViewModel.cs).
-- [x] **Automated Unit Test Suite**: 70 comprehensive unit tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) verifying ref-counted bitmap lifecycles, presentation coordinator, presentation window states, capture transitions, win32 diagnostic capture, discovery orchestration, search filtering, selection sync, and reconciliation (100% pass rate).
+- [x] **Automated Unit & Concurrency Test Suite**: 86 comprehensive unit & regression tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) verifying rapid source switching (Latest-Request-Wins), concurrent transitions, ref-counted bitmap lifecycles, presentation coordinator, presentation window states, capture transitions, win32 diagnostic capture, discovery orchestration, search filtering, selection sync, and reconciliation (100% pass rate).
 
 ### Planned (Upcoming)
 - [ ] **Phase 5**: Switching System (Global hotkeys, instant source switching, shortcut customization).
@@ -65,7 +72,7 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ## 4. ARCHITECTURE DECISION RECORDS
 
-- [ADR-0001: Technology Stack & Clean Architecture Core](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/decisions/ADR-0001-architecture.md) — Implemented in Phase 1, 2, 3, 4, and 4.6.
+- [ADR-0001: Technology Stack & Clean Architecture Core](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/decisions/ADR-0001-architecture.md) — Implemented in Phase 1, 2, 3, 4, 4.6, and 4.7.
 
 ---
 
@@ -81,10 +88,10 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ## 6. VERIFICATION RECORD
 
-- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 2.8s).
+- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 4.0s).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (70 passed, 0 failed, 0 skipped in 669ms).
-- **Level 4 (Deterministic Lifecycle & Non-Blocking Delivery)**: RefCountedSoftwareBitmap zero-leak memory lifecycle, non-blocking UI dispatcher queues, and 15 FPS preview rate limiting verified.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (86 passed, 0 failed, 0 skipped in 418ms).
+- **Level 4 (Deterministic Lifecycle & Concurrency Hardening)**: RefCountedSoftwareBitmap zero-leak memory lifecycle, Latest-Request-Wins transition serialization, safe Clear/Dispose teardown, and session generation validation verified.
 
 ---
 

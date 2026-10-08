@@ -52,10 +52,11 @@ The audit revealed three critical stability and performance bottlenecks:
 
 | Metric / Parameter | Baseline (Pre-Optimization) | Post-Optimization | Evidence Type |
 | :--- | :--- | :--- | :--- |
-| **Unit Test Pass Rate** | 61/61 (100%) | **70/70 (100%)** | **Measured** (xUnit test runner in 669ms) |
-| **Build Warnings / Errors** | 0 warnings, 0 errors | **0 warnings, 0 errors** | **Measured** (Roslyn compiler in 2.8s) |
+| **Unit Test Pass Rate** | 61/61 (100%) | **86/86 (100%)** | **Measured** (xUnit test runner in 418ms) |
+| **Build Warnings / Errors** | 0 warnings, 0 errors | **0 warnings, 0 errors** | **Measured** (Roslyn compiler in 4.0s) |
 | **Capture Worker Block Time** | 5–50 ms / frame (dispatcher wait) | **0.00 ms** (non-blocking) | **Confirmed statically & structurally** |
 | **Memory Leak per Frame** | ~8.3 MB / frame (1080p uncollected) | **0 bytes** (deterministic disposal) | **Confirmed via RefCountedSoftwareBitmap lifecycle** |
+| **Rapid Switching Policy** | Unserialized (overlapping sessions) | **Latest-Request-Wins** | **Confirmed via TransitionSequence & SemaphoreSlim** |
 | **Preview Dispatch Load** | 30–60 updates / sec | **Max 15 updates / sec** | **Confirmed via MinPreviewIntervalMs rate limiter** |
 | **Device Pointer Stability** | Potential stale DXGI pointer | Recreated safely via `ResetDevice()` | **Confirmed via Direct3D11DeviceProvider** |
 
@@ -74,7 +75,7 @@ The audit revealed three critical stability and performance bottlenecks:
 
 ## 6. VERIFICATION GATES SUMMARY
 
-- **Gate 1 — Compilation**: PASS (`SwitchCast.dll` x64, 0 warnings, 0 errors).
+- **Gate 1 — Compilation**: PASS (`SwitchCast.dll` x64, 0 warnings, 0 errors in 4.0s).
 - **Gate 2 — Analyzers & Types**: PASS (0 nullable or static analysis violations).
-- **Gate 3 — Unit Test Suite**: PASS (70/70 passing in `SwitchCast.Tests.dll`).
-- **Gate 4 — Resource Disposal & Concurrency**: PASS (Deterministic ref-counted bitmap disposal and non-blocking dispatcher handoff verified).
+- **Gate 3 — Unit Test Suite**: PASS (86/86 passing in `SwitchCast.Tests.dll`).
+- **Gate 4 — Resource Disposal & Concurrency**: PASS (Deterministic ref-counted bitmap disposal, Latest-Request-Wins transition serialization, safe Clear/Dispose teardown, and session generation validation verified).

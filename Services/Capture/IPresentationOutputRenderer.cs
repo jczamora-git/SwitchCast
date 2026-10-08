@@ -30,9 +30,9 @@ public interface IPresentationOutputRenderer : IDisposable
     Task RenderBitmapAsync(SoftwareBitmap bitmap);
 
     /// <summary>
-    /// Renders a thread-safe ref-counted bitmap directly to the presentation output surface.
+    /// Renders a thread-safe ref-counted bitmap directly to the presentation output surface with session generation validation.
     /// </summary>
-    Task RenderSharedBitmapAsync(RefCountedSoftwareBitmap sharedBitmap);
+    Task RenderSharedBitmapAsync(RefCountedSoftwareBitmap sharedBitmap, long generation = 0);
 
     /// <summary>
     /// Freezes the current frame on screen (for pause).

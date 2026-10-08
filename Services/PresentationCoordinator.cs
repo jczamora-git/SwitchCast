@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.UI.Xaml.Media;
 using SwitchCast.Models;
@@ -7,6 +8,7 @@ namespace SwitchCast.Services;
 
 /// <summary>
 /// Authoritative coordinator managing the Presentation Output Window, presentation lifecycle, freeze/blackout, and frame distribution.
+/// Implements serialized transition management, latest-request-wins coalescing, and non-blocking frame forwarding.
 /// </summary>
 public sealed partial class PresentationCoordinator : ObservableObject, IPresentationCoordinator
 {
@@ -16,6 +18,8 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     private readonly IPresentationOutputRenderer _outputRenderer;
     private readonly SemaphoreSlim _transitionSemaphore = new(1, 1);
 
+    private CaptureSource? _targetRequestedPresentationSource;
+    private long _presentationSequenceNumber;
     private PresentationStatus _previousStatusBeforeBlackout = PresentationStatus.Active;
 
     [ObservableProperty]
@@ -84,16 +88,27 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
     public async Task StartPresentationAsync(CaptureSource? source = null)
     {
+        var targetSource = source ??
+                           _presentationStateService.ActiveSource ??
+                           _presentationStateService.SelectedSources.FirstOrDefault(s => s.IsAvailable);
+
+        if (targetSource is null || !targetSource.IsAvailable)
+        {
+            throw new InvalidOperationException("No available presentation source selected.");
+        }
+
+        long sequence = Interlocked.Increment(ref _presentationSequenceNumber);
+        Volatile.Write(ref _targetRequestedPresentationSource, targetSource);
+
+        Debug.WriteLine($"[PresentationCoordinator] StartPresentation requested seq={sequence} source={targetSource.Id}");
+
         await _transitionSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
-            var targetSource = source ??
-                               _presentationStateService.ActiveSource ??
-                               _presentationStateService.SelectedSources.FirstOrDefault(s => s.IsAvailable);
-
-            if (targetSource is null || !targetSource.IsAvailable)
+            if (Volatile.Read(ref _presentationSequenceNumber) != sequence)
             {
-                throw new InvalidOperationException("No available presentation source selected.");
+                Debug.WriteLine($"[PresentationCoordinator] StartPresentation superseded seq={sequence}");
+                return;
             }
 
             LastErrorMessage = null;
@@ -113,15 +128,23 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                 await _captureCoordinator.SwitchPreviewSourceAsync(targetSource).ConfigureAwait(false);
             }
 
+            if (Volatile.Read(ref _presentationSequenceNumber) != sequence)
+            {
+                Debug.WriteLine($"[PresentationCoordinator] StartPresentation superseded after capture start seq={sequence}");
+                return;
+            }
+
             _outputRenderer.Resume();
             _presentationStateService.SetActiveSource(targetSource);
             _presentationStateService.SetStatus(PresentationStatus.Active);
+            Debug.WriteLine($"[PresentationCoordinator] StartPresentation completed seq={sequence} source={targetSource.Id}");
         }
         catch (Exception ex)
         {
             LastErrorMessage = ex.Message;
             _presentationStateService.SetStatus(PresentationStatus.Error);
             _outputRenderer.Clear();
+            Debug.WriteLine($"[PresentationCoordinator] StartPresentation failed seq={sequence} error={ex.Message}");
             throw;
         }
         finally
@@ -132,6 +155,11 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
     public async Task StopPresentationAsync()
     {
+        long sequence = Interlocked.Increment(ref _presentationSequenceNumber);
+        Volatile.Write(ref _targetRequestedPresentationSource, null);
+
+        Debug.WriteLine($"[PresentationCoordinator] StopPresentation requested seq={sequence}");
+
         await _transitionSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -140,6 +168,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             _presentationStateService.SetStatus(PresentationStatus.Idle);
             LastErrorMessage = null;
             await _captureCoordinator.StopPreviewAsync().ConfigureAwait(false);
+            Debug.WriteLine($"[PresentationCoordinator] StopPresentation completed seq={sequence}");
         }
         finally
         {
@@ -151,9 +180,20 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     {
         ArgumentNullException.ThrowIfNull(newSource);
 
+        long sequence = Interlocked.Increment(ref _presentationSequenceNumber);
+        Volatile.Write(ref _targetRequestedPresentationSource, newSource);
+
+        Debug.WriteLine($"[PresentationCoordinator] SwitchPresentation requested seq={sequence} target={newSource.Id}");
+
         await _transitionSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
+            if (Volatile.Read(ref _presentationSequenceNumber) != sequence)
+            {
+                Debug.WriteLine($"[PresentationCoordinator] SwitchPresentation superseded seq={sequence}");
+                return;
+            }
+
             if (!newSource.IsAvailable)
             {
                 throw new InvalidOperationException($"Source '{newSource.Title}' is marked unavailable.");
@@ -166,8 +206,14 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
             LastErrorMessage = null;
 
-            // Switch capture engine source while keeping the presentation output window open
+            // Switch capture engine source while keeping presentation output window open
             await _captureCoordinator.SwitchPreviewSourceAsync(newSource).ConfigureAwait(false);
+
+            if (Volatile.Read(ref _presentationSequenceNumber) != sequence)
+            {
+                Debug.WriteLine($"[PresentationCoordinator] SwitchPresentation superseded after capture switch seq={sequence}");
+                return;
+            }
 
             _presentationStateService.SetActiveSource(newSource);
             if (Status != PresentationStatus.Paused && Status != PresentationStatus.Blackout)
@@ -175,12 +221,14 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                 _outputRenderer.Resume();
                 _presentationStateService.SetStatus(PresentationStatus.Active);
             }
+            Debug.WriteLine($"[PresentationCoordinator] SwitchPresentation completed seq={sequence} target={newSource.Id}");
         }
         catch (Exception ex)
         {
             LastErrorMessage = ex.Message;
             _presentationStateService.SetStatus(PresentationStatus.Error);
             _outputRenderer.Clear();
+            Debug.WriteLine($"[PresentationCoordinator] SwitchPresentation failed seq={sequence} error={ex.Message}");
             throw;
         }
         finally
@@ -253,7 +301,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         }
     }
 
-    private async void OnCaptureFrameArrived(object? sender, FrameArrivedEventArgs e)
+    private void OnCaptureFrameArrived(object? sender, FrameArrivedEventArgs e)
     {
         if (Status != PresentationStatus.Active)
         {
@@ -264,20 +312,20 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         {
             if (e.SharedBitmap is not null)
             {
-                await _outputRenderer.RenderSharedBitmapAsync(e.SharedBitmap).ConfigureAwait(false);
+                _ = _outputRenderer.RenderSharedBitmapAsync(e.SharedBitmap, e.Generation);
             }
             else if (e.SoftwareBitmap is not null)
             {
-                await _outputRenderer.RenderBitmapAsync(e.SoftwareBitmap).ConfigureAwait(false);
+                _ = _outputRenderer.RenderBitmapAsync(e.SoftwareBitmap);
             }
             else if (e.Frame is not null)
             {
-                await _outputRenderer.RenderFrameAsync(e.Frame).ConfigureAwait(false);
+                _ = _outputRenderer.RenderFrameAsync(e.Frame);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Transient frame render exceptions suppressed to prevent crashing in async void
+            Debug.WriteLine($"[PresentationCoordinator] OnCaptureFrameArrived handled error: {ex.Message}");
         }
     }
 

@@ -157,6 +157,6 @@ public class CaptureCoordinatorTests
         _mockSessionManager.Raise(s => s.FrameArrived += null, _mockSessionManager.Object, new FrameArrivedEventArgs(sharedBitmap, 1));
 
         Assert.True(eventFired);
-        _mockPreviewRenderer.Verify(r => r.RenderSharedBitmapAsync(sharedBitmap), Times.Once);
+        _mockPreviewRenderer.Verify(r => r.RenderSharedBitmapAsync(sharedBitmap, It.IsAny<long>()), Times.Once);
     }
 }

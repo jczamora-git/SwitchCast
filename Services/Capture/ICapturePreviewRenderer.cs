@@ -30,9 +30,9 @@ public interface ICapturePreviewRenderer : IDisposable
     Task RenderBitmapAsync(SoftwareBitmap bitmap);
 
     /// <summary>
-    /// Renders a thread-safe ref-counted bitmap with preview rate-limiting (~15 FPS).
+    /// Renders a thread-safe ref-counted bitmap with preview rate-limiting (~15 FPS) and session generation validation.
     /// </summary>
-    Task RenderSharedBitmapAsync(RefCountedSoftwareBitmap sharedBitmap);
+    Task RenderSharedBitmapAsync(RefCountedSoftwareBitmap sharedBitmap, long generation = 0);
 
     /// <summary>
     /// Clears the active preview image and releases frame buffers.

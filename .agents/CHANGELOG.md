@@ -7,6 +7,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Phase 4.7 — Rapid Source Switching Crash Fix & Concurrency Hardening] - 2026-10-08
+
+### Fixed (fix / test / docs)
+- **WinRT 0xC000027B Stowed Exception & Native Lifetime Hardening**:
+  - Eliminated premature disposal of `emptyBitmap` in `Clear()` across `Direct3D11PreviewRenderer` and `Direct3D11PresentationRenderer`, which was disposing the underlying COM `SoftwareBitmap` while `SoftwareBitmapSource.SetBitmapAsync` was in-flight on the compositor.
+  - Ensured `SoftwareBitmapSource.Dispose()` is strictly scheduled on the UI thread's `DispatcherQueue`.
+- **Latest-Request-Wins Source Switching Serialization**:
+  - Implemented transition sequence numbers (`_transitionSequenceNumber`, `_presentationSequenceNumber`) and requested target sources in `CaptureCoordinator` and `PresentationCoordinator`.
+  - Coalesces rapid sequential requests (A -> B -> C) by dropping superseded intermediate switches immediately upon acquiring the transition semaphore, preventing duplicate/overlapping native capture session creation and frame pool destruction.
+- **Synchronous Exception Boundaries in Event Handlers**:
+  - Converted `OnFrameArrived` and `OnCaptureFrameArrived` from `async void` to synchronous `void` with top-level try/catch blocks, eliminating unobserved asynchronous exception escapes to the UI SynchronizationContext.
+- **Session Generation Filtering in Renderers**:
+  - Enhanced `ICapturePreviewRenderer` and `IPresentationOutputRenderer` with session generation checks (`long generation = 0`), discarding stale in-flight UI frame renders arriving after a session transition.
+- **Automated Concurrency Regression Tests**:
+  - Added [SwitchCast.Tests/Services/RapidSwitchingConcurrencyTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/RapidSwitchingConcurrencyTests.cs) with 16 automated concurrency test scenarios, expanding the test suite to 86 tests (100% pass rate).
+
+---
+
 ## [Phase 4.6 — Performance & Stability Optimization] - 2026-10-08
 
 ### Added (perf / test / docs)

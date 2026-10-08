@@ -222,7 +222,7 @@ public class PresentationCoordinatorTests
         // Raise FrameArrived on capture coordinator
         _mockCaptureCoordinator.Raise(c => c.FrameArrived += null, _mockCaptureCoordinator.Object, new FrameArrivedEventArgs(sharedBitmap, 1));
 
-        _mockOutputRenderer.Verify(r => r.RenderSharedBitmapAsync(sharedBitmap), Times.Once);
+        _mockOutputRenderer.Verify(r => r.RenderSharedBitmapAsync(sharedBitmap, It.IsAny<long>()), Times.Once);
     }
 
     [Fact]
@@ -242,6 +242,6 @@ public class PresentationCoordinatorTests
 
         _mockCaptureCoordinator.Raise(c => c.FrameArrived += null, _mockCaptureCoordinator.Object, new FrameArrivedEventArgs(sharedBitmap, 1));
 
-        _mockOutputRenderer.Verify(r => r.RenderSharedBitmapAsync(It.IsAny<RefCountedSoftwareBitmap>()), Times.Never);
+        _mockOutputRenderer.Verify(r => r.RenderSharedBitmapAsync(It.IsAny<RefCountedSoftwareBitmap>(), It.IsAny<long>()), Times.Never);
     }
 }

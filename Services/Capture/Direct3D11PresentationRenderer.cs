@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -8,12 +9,13 @@ namespace SwitchCast.Services.Capture;
 
 /// <summary>
 /// GPU-backed presentation renderer presenting capture frames onto WinUI 3 SoftwareBitmapSource for the Presentation Output Window.
-/// Implements high-priority non-blocking UI delivery and frame-pacing to ensure smooth presentation output.
+/// Implements high-priority non-blocking UI delivery, generation validation, and frame-pacing to ensure smooth presentation output.
 /// </summary>
 public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
 {
     private readonly DispatcherQueue _dispatcherQueue;
     private readonly SoftwareBitmapSource _softwareBitmapSource;
+    private long _currentGeneration;
     private int _isProcessingFrame;
     private bool _isFrozen;
     private bool _isDisposed;
@@ -30,13 +32,19 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
     public bool IsFrozen => _isFrozen;
 
     /// <summary>
-    /// Renders a thread-safe ref-counted bitmap to the presentation output surface with non-blocking UI dispatch.
+    /// Renders a thread-safe ref-counted bitmap to the presentation output surface with non-blocking UI dispatch and generation validation.
     /// </summary>
-    public Task RenderSharedBitmapAsync(RefCountedSoftwareBitmap sharedBitmap)
+    public Task RenderSharedBitmapAsync(RefCountedSoftwareBitmap sharedBitmap, long generation = 0)
     {
         ArgumentNullException.ThrowIfNull(sharedBitmap);
 
         if (_isDisposed || _isFrozen)
+        {
+            return Task.CompletedTask;
+        }
+
+        // Generation check: drop stale frames from superseded capture sessions
+        if (generation != 0 && generation < Volatile.Read(ref _currentGeneration))
         {
             return Task.CompletedTask;
         }
@@ -53,19 +61,22 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
             return Task.CompletedTask;
         }
 
+        long targetGen = generation != 0 ? generation : Volatile.Read(ref _currentGeneration);
+
         // Decoupled non-blocking UI dispatch (worker thread never blocks on UI thread)
         var enqueued = _dispatcherQueue.TryEnqueue(async () =>
         {
             try
             {
-                if (!_isDisposed && !_isFrozen)
+                if (!_isDisposed && !_isFrozen && (targetGen == 0 || targetGen >= Volatile.Read(ref _currentGeneration)))
                 {
                     await _softwareBitmapSource.SetBitmapAsync(sharedBitmap.Bitmap);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore transient render errors during window resize or shutdown
+                // Transient render errors during window resize or shutdown safely observed
+                Debug.WriteLine($"[Direct3D11PresentationRenderer] Render exception observed: {ex.Message}");
             }
             finally
             {
@@ -109,9 +120,9 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
                     await _softwareBitmapSource.SetBitmapAsync(bitmap);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore transient render errors
+                Debug.WriteLine($"[Direct3D11PresentationRenderer] Fallback render exception: {ex.Message}");
             }
             finally
             {
@@ -183,9 +194,9 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
                         await _softwareBitmapSource.SetBitmapAsync(displayBitmap);
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignore transient render errors
+                    Debug.WriteLine($"[Direct3D11PresentationRenderer] Frame fallback render exception: {ex.Message}");
                 }
                 finally
                 {
@@ -194,8 +205,9 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
                 }
             });
         }
-        catch
+        catch (Exception ex)
         {
+            Debug.WriteLine($"[Direct3D11PresentationRenderer] Surface copy exception: {ex.Message}");
             Interlocked.Exchange(ref _isProcessingFrame, 0);
         }
     }
@@ -213,16 +225,20 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
     public void Clear()
     {
         _isFrozen = false;
-        _dispatcherQueue.TryEnqueue(() =>
+        Interlocked.Increment(ref _currentGeneration);
+        _dispatcherQueue.TryEnqueue(async () =>
         {
             try
             {
-                using var emptyBitmap = new SoftwareBitmap(BitmapPixelFormat.Bgra8, 1, 1, BitmapAlphaMode.Premultiplied);
-                _ = _softwareBitmapSource.SetBitmapAsync(emptyBitmap);
+                if (!_isDisposed)
+                {
+                    using var emptyBitmap = new SoftwareBitmap(BitmapPixelFormat.Bgra8, 1, 1, BitmapAlphaMode.Premultiplied);
+                    await _softwareBitmapSource.SetBitmapAsync(emptyBitmap);
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignored during cleanup
+                Debug.WriteLine($"[Direct3D11PresentationRenderer] Clear exception: {ex.Message}");
             }
         });
     }
@@ -236,7 +252,18 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
 
         _isDisposed = true;
         _isFrozen = false;
-        Clear();
-        _softwareBitmapSource.Dispose();
+        Interlocked.Increment(ref _currentGeneration);
+
+        _dispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                _softwareBitmapSource.Dispose();
+            }
+            catch
+            {
+                // Ignored during cleanup
+            }
+        });
     }
 }

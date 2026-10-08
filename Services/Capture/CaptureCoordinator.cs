@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.UI.Xaml.Media;
 using SwitchCast.Models;
@@ -6,6 +7,7 @@ namespace SwitchCast.Services.Capture;
 
 /// <summary>
 /// Authoritative coordinator managing the capture item factory, DirectX device, session manager, and preview renderer.
+/// Implements serialized transition management, latest-request-wins coalescing, and non-blocking frame forwarding.
 /// </summary>
 public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoordinator
 {
@@ -15,6 +17,9 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
     private readonly ICapturePreviewRenderer _previewRenderer;
     private readonly IPresentationStateService _presentationStateService;
     private readonly SemaphoreSlim _transitionSemaphore = new(1, 1);
+
+    private CaptureSource? _targetRequestedSource;
+    private long _transitionSequenceNumber;
 
     [ObservableProperty]
     private CaptureState _state = CaptureState.Idle;
@@ -51,9 +56,20 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
     {
         ArgumentNullException.ThrowIfNull(source);
 
+        long sequence = Interlocked.Increment(ref _transitionSequenceNumber);
+        Volatile.Write(ref _targetRequestedSource, source);
+
+        Debug.WriteLine($"[CaptureCoordinator] StartPreview requested seq={sequence} source={source.Id}");
+
         await _transitionSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
+            if (Volatile.Read(ref _transitionSequenceNumber) != sequence)
+            {
+                Debug.WriteLine($"[CaptureCoordinator] StartPreview superseded seq={sequence}");
+                return;
+            }
+
             if (!source.IsAvailable)
             {
                 throw new InvalidOperationException($"Source '{source.Title}' is marked unavailable.");
@@ -62,6 +78,12 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
             if (State != CaptureState.Idle)
             {
                 await StopPreviewInternalAsync().ConfigureAwait(false);
+            }
+
+            if (Volatile.Read(ref _transitionSequenceNumber) != sequence)
+            {
+                Debug.WriteLine($"[CaptureCoordinator] StartPreview superseded after stop seq={sequence}");
+                return;
             }
 
             State = CaptureState.Starting;
@@ -73,12 +95,14 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
 
             State = CaptureState.Capturing;
             _presentationStateService.SetActiveSource(source);
+            Debug.WriteLine($"[CaptureCoordinator] StartPreview completed seq={sequence} source={source.Id}");
         }
         catch (Exception ex)
         {
             LastErrorMessage = ex.Message;
             State = CaptureState.Failed;
             await StopPreviewInternalAsync().ConfigureAwait(false);
+            Debug.WriteLine($"[CaptureCoordinator] StartPreview failed seq={sequence} error={ex.Message}");
             throw;
         }
         finally
@@ -89,12 +113,18 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
 
     public async Task StopPreviewAsync()
     {
+        long sequence = Interlocked.Increment(ref _transitionSequenceNumber);
+        Volatile.Write(ref _targetRequestedSource, null);
+
+        Debug.WriteLine($"[CaptureCoordinator] StopPreview requested seq={sequence}");
+
         await _transitionSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
             await StopPreviewInternalAsync().ConfigureAwait(false);
             State = CaptureState.Idle;
             LastErrorMessage = null;
+            Debug.WriteLine($"[CaptureCoordinator] StopPreview completed seq={sequence}");
         }
         finally
         {
@@ -106,31 +136,58 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
     {
         ArgumentNullException.ThrowIfNull(newSource);
 
+        long sequence = Interlocked.Increment(ref _transitionSequenceNumber);
+        Volatile.Write(ref _targetRequestedSource, newSource);
+
+        Debug.WriteLine($"[CaptureCoordinator] SwitchPreview requested seq={sequence} target={newSource.Id}");
+
         await _transitionSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (CurrentPreviewSource?.Id == newSource.Id && State == CaptureState.Capturing)
+            // Check if superseded while waiting for semaphore
+            if (Volatile.Read(ref _transitionSequenceNumber) != sequence)
+            {
+                Debug.WriteLine($"[CaptureCoordinator] SwitchPreview superseded seq={sequence}");
+                return;
+            }
+
+            var targetSource = Volatile.Read(ref _targetRequestedSource);
+            if (targetSource is null)
+            {
+                return;
+            }
+
+            if (CurrentPreviewSource?.Id == targetSource.Id && State == CaptureState.Capturing)
             {
                 return;
             }
 
             await StopPreviewInternalAsync().ConfigureAwait(false);
 
+            // Double check if superseded during stop
+            if (Volatile.Read(ref _transitionSequenceNumber) != sequence)
+            {
+                Debug.WriteLine($"[CaptureCoordinator] SwitchPreview superseded after stop seq={sequence}");
+                return;
+            }
+
             State = CaptureState.Starting;
-            CurrentPreviewSource = newSource;
+            CurrentPreviewSource = targetSource;
             LastErrorMessage = null;
 
-            var captureItem = _itemFactory.CreateItemForSource(newSource);
+            var captureItem = _itemFactory.CreateItemForSource(targetSource);
             _sessionManager.StartCapture(captureItem, _deviceProvider);
 
             State = CaptureState.Capturing;
-            _presentationStateService.SetActiveSource(newSource);
+            _presentationStateService.SetActiveSource(targetSource);
+            Debug.WriteLine($"[CaptureCoordinator] SwitchPreview completed seq={sequence} target={targetSource.Id}");
         }
         catch (Exception ex)
         {
             LastErrorMessage = ex.Message;
             State = CaptureState.Failed;
             await StopPreviewInternalAsync().ConfigureAwait(false);
+            Debug.WriteLine($"[CaptureCoordinator] SwitchPreview failed seq={sequence} error={ex.Message}");
             throw;
         }
         finally
@@ -148,7 +205,7 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
         await Task.CompletedTask;
     }
 
-    private async void OnFrameArrived(object? sender, FrameArrivedEventArgs e)
+    private void OnFrameArrived(object? sender, FrameArrivedEventArgs e)
     {
         if (State != CaptureState.Capturing)
         {
@@ -159,22 +216,22 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
         {
             if (e.SharedBitmap is not null)
             {
-                await _previewRenderer.RenderSharedBitmapAsync(e.SharedBitmap).ConfigureAwait(false);
+                _ = _previewRenderer.RenderSharedBitmapAsync(e.SharedBitmap, e.Generation);
             }
             else if (e.SoftwareBitmap is not null)
             {
-                await _previewRenderer.RenderBitmapAsync(e.SoftwareBitmap).ConfigureAwait(false);
+                _ = _previewRenderer.RenderBitmapAsync(e.SoftwareBitmap);
             }
             else if (e.Frame is not null)
             {
-                await _previewRenderer.RenderFrameAsync(e.Frame).ConfigureAwait(false);
+                _ = _previewRenderer.RenderFrameAsync(e.Frame);
             }
 
             FrameArrived?.Invoke(this, e);
         }
-        catch
+        catch (Exception ex)
         {
-            // Transient frame render exceptions are suppressed to prevent crashing in async void
+            Debug.WriteLine($"[CaptureCoordinator] OnFrameArrived handled error: {ex.Message}");
         }
     }
 
