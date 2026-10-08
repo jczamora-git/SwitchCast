@@ -113,14 +113,17 @@ This roadmap outlines the structured, phased development plan for SwitchCast. Al
   - Floating companion dock window `PresenterDockWindow.xaml` and `PresenterDockViewModel.cs` with always-on-top, compact mode, and quick source switcher.
   - Single-instance `PresenterDockService` with automatic opening on presentation start.
   - Quick sequential cycling (`SwitchToNextSourceAsync`, `SwitchToPreviousSourceAsync`) and direct slot switching.
+  - Three strongly typed source switching modes (`ActiveAndLive`, `ActiveOnly`, `LiveOnly`) with native window activation focus management (`IWindowActivationService`).
+  - Minimal single-row floating presenter dock in both Expanded (660×52 DIP) and Compact (460×46 DIP) modes with strict single-line ellipsis truncation.
   - Settings UI in `SettingsPage.xaml` and `SettingsViewModel.cs` for hotkeys and dock preferences.
 - **Dependencies**: Phase 4 presentation output.
 - **Acceptance Criteria**:
   - [x] Switching between queued sources occurs instantly with Latest-Request-Wins and zero session recreation.
   - [x] Global hotkeys work reliably system-wide even when SwitchCast is not focused.
-  - [x] Compact floating presenter companion dock allows full presenter control without focusing the dashboard.
+  - [x] Minimal single-row floating presenter companion dock allows full presenter control without focusing the dashboard.
+  - [x] Three switching modes (Active + Live, Active Only, Live Only) operate seamlessly across dock controls and global hotkeys.
   - [x] 100% offline, zero telemetry, local persistence in `settings.json`.
-- **Validation**: 109 automated unit and concurrency tests; Level 1 compilation clean (0 warnings, 0 errors).
+- **Validation**: 122 automated unit and concurrency tests; Level 1 compilation clean (0 warnings, 0 errors).
 
 ---
 

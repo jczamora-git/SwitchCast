@@ -34,6 +34,9 @@ public partial class SettingsViewModel : ObservableObject
     private bool _startDockInCompactMode;
 
     [ObservableProperty]
+    private int _selectedSwitchModeIndex;
+
+    [ObservableProperty]
     private IReadOnlyList<HotkeyBinding> _hotkeyBindings;
 
     public SettingsViewModel(IApplicationSettingsService settingsService, IHotkeyService? hotkeyService = null)
@@ -48,6 +51,7 @@ public partial class SettingsViewModel : ObservableObject
         _autoOpenPresenterDock = current.AutoOpenPresenterDock;
         _dockAlwaysOnTop = current.DockAlwaysOnTop;
         _startDockInCompactMode = current.StartDockInCompactMode;
+        _selectedSwitchModeIndex = (int)current.SwitchMode;
         _hotkeyBindings = current.HotkeyBindings.ToList();
     }
 
@@ -96,6 +100,13 @@ public partial class SettingsViewModel : ObservableObject
     async partial void OnStartDockInCompactModeChanged(bool value)
     {
         _settingsService.CurrentSettings.StartDockInCompactMode = value;
+        await _settingsService.SaveSettingsAsync();
+    }
+
+    async partial void OnSelectedSwitchModeIndexChanged(int value)
+    {
+        var mode = (PresenterSwitchMode)value;
+        _settingsService.CurrentSettings.SwitchMode = mode;
         await _settingsService.SaveSettingsAsync();
     }
 

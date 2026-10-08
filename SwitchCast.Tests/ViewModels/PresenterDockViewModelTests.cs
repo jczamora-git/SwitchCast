@@ -25,6 +25,7 @@ public class PresenterDockViewModelTests
         _mockSettingsService.SetupGet(s => s.CurrentSettings).Returns(new UserSettings());
         _mockStateService.SetupGet(s => s.SelectedSources).Returns(new List<CaptureSource>());
         _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Idle);
+        _mockStateService.SetupGet(s => s.SwitchMode).Returns(PresenterSwitchMode.LiveOnly);
     }
 
     [Fact]
@@ -40,10 +41,47 @@ public class PresenterDockViewModelTests
         Assert.Equal(PresentationStatus.Idle, vm.Status);
         Assert.Equal("STANDBY", vm.StatusDisplayText);
         Assert.Equal("No Active Source", vm.ActiveSourceTitle);
+        Assert.Equal("L", vm.SwitchModeBadge);
+        Assert.True(vm.IsModeLiveOnly);
+        Assert.False(vm.IsModeActiveAndLive);
+        Assert.False(vm.IsModeActiveOnly);
         Assert.False(vm.IsLive);
         Assert.False(vm.IsPaused);
         Assert.False(vm.IsBlackout);
         Assert.False(vm.HasActiveSource);
+    }
+
+    [Fact]
+    public async Task SetSwitchModeCommand_UpdatesStateServiceAndSavesSettings()
+    {
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object);
+
+        await vm.SetSwitchModeCommand.ExecuteAsync(PresenterSwitchMode.ActiveAndLive);
+
+        _mockStateService.Verify(s => s.SetSwitchMode(PresenterSwitchMode.ActiveAndLive), Times.Once);
+        _mockSettingsService.Verify(s => s.SaveSettingsAsync(), Times.Once);
+    }
+
+    [Fact]
+    public void SwitchModeBadge_And_Tooltip_ReflectMode()
+    {
+        _mockStateService.SetupGet(s => s.SwitchMode).Returns(PresenterSwitchMode.ActiveAndLive);
+
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object);
+
+        Assert.Equal("A+L", vm.SwitchModeBadge);
+        Assert.Contains("Active + Live", vm.SwitchModeTooltip);
+        Assert.True(vm.IsModeActiveAndLive);
     }
 
     [Fact]
@@ -77,7 +115,7 @@ public class PresenterDockViewModelTests
     }
 
     [Fact]
-    public async Task SwitchSourceCommand_CallsCoordinatorSwitchPresentationSourceAsync()
+    public async Task SwitchSourceCommand_CallsCoordinatorExecuteSourceSwitchAsync()
     {
         _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
 
@@ -91,7 +129,7 @@ public class PresenterDockViewModelTests
         var source = new WindowSource { Id = "win-1", Title = "Window 1", IsAvailable = true };
         await vm.SwitchSourceCommand.ExecuteAsync(source);
 
-        _mockCoordinator.Verify(c => c.SwitchPresentationSourceAsync(source), Times.Once);
+        _mockCoordinator.Verify(c => c.ExecuteSourceSwitchAsync(source), Times.Once);
     }
 
     [Fact]

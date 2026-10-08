@@ -30,6 +30,8 @@
     <Compile Include="..\Services\IMonitorDiscoveryService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IPresentationWindowService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IPresenterDockService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\IWindowActivationService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Win32WindowActivationService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IHotkeyService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Win32HotkeyService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IPresentationCoordinator.cs" Link="Linked\Services\%(Filename)%(Extension)" />

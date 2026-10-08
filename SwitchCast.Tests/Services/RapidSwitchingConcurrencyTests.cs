@@ -16,6 +16,7 @@ public class RapidSwitchingConcurrencyTests
     private readonly Mock<IPresentationStateService> _mockPresentationStateService;
     private readonly Mock<IPresentationWindowService> _mockWindowService;
     private readonly Mock<IPresentationOutputRenderer> _mockOutputRenderer;
+    private readonly Mock<IWindowActivationService> _mockWindowActivationService;
 
     public RapidSwitchingConcurrencyTests()
     {
@@ -26,6 +27,7 @@ public class RapidSwitchingConcurrencyTests
         _mockPresentationStateService = new Mock<IPresentationStateService>();
         _mockWindowService = new Mock<IPresentationWindowService>();
         _mockOutputRenderer = new Mock<IPresentationOutputRenderer>();
+        _mockWindowActivationService = new Mock<IWindowActivationService>();
     }
 
     [Fact]
@@ -207,7 +209,8 @@ public class RapidSwitchingConcurrencyTests
             _mockPresentationStateService.Object,
             _mockWindowService.Object,
             mockCapture.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         await presCoordinator.SwitchPresentationSourceAsync(sourceB);
 
@@ -230,7 +233,8 @@ public class RapidSwitchingConcurrencyTests
             _mockPresentationStateService.Object,
             _mockWindowService.Object,
             mockCapture.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         await presCoordinator.SwitchPresentationSourceAsync(sourceB);
 
@@ -250,7 +254,8 @@ public class RapidSwitchingConcurrencyTests
             _mockPresentationStateService.Object,
             _mockWindowService.Object,
             mockCapture.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         var taskSwitch = presCoordinator.SwitchPresentationSourceAsync(sourceB);
         var taskStop = presCoordinator.StopPresentationAsync();
@@ -269,7 +274,8 @@ public class RapidSwitchingConcurrencyTests
             _mockPresentationStateService.Object,
             _mockWindowService.Object,
             mockCapture.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         _mockWindowService.Raise(w => w.WindowClosed += null, _mockWindowService.Object, EventArgs.Empty);
 

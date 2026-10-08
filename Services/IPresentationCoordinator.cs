@@ -15,7 +15,22 @@ public interface IPresentationCoordinator : INotifyPropertyChanged, IDisposable
     PresentationStatus Status { get; }
 
     /// <summary>
-    /// Currently presented capture source, or null if idle.
+    /// Active source switching mode for presenter dock and global hotkeys.
+    /// </summary>
+    PresenterSwitchMode SwitchMode { get; }
+
+    /// <summary>
+    /// Logical selection cursor in the queued sources list.
+    /// </summary>
+    CaptureSource? SelectedSource { get; }
+
+    /// <summary>
+    /// Last confirmed foreground activated application window source.
+    /// </summary>
+    CaptureSource? ForegroundSource { get; }
+
+    /// <summary>
+    /// Currently presented capture source (on-air), or null if idle.
     /// </summary>
     CaptureSource? CurrentPresentationSource { get; }
 
@@ -90,17 +105,27 @@ public interface IPresentationCoordinator : INotifyPropertyChanged, IDisposable
     Task ToggleBlackoutAsync();
 
     /// <summary>
-    /// Switches to the next available source in the queued sources list.
+    /// Sets the source switching mode (LiveOnly, ActiveAndLive, ActiveOnly).
+    /// </summary>
+    Task SetSwitchModeAsync(PresenterSwitchMode mode);
+
+    /// <summary>
+    /// Switches to the specified source following the active PresenterSwitchMode rules.
+    /// </summary>
+    Task ExecuteSourceSwitchAsync(CaptureSource targetSource);
+
+    /// <summary>
+    /// Switches to the next available source in the queued sources list following active switch mode rules.
     /// </summary>
     Task SwitchToNextSourceAsync();
 
     /// <summary>
-    /// Switches to the previous available source in the queued sources list.
+    /// Switches to the previous available source in the queued sources list following active switch mode rules.
     /// </summary>
     Task SwitchToPreviousSourceAsync();
 
     /// <summary>
-    /// Switches to the source at the specified zero-based index in the queued sources list.
+    /// Switches to the source at the specified zero-based index in the queued sources list following active switch mode rules.
     /// </summary>
     Task SwitchToSourceIndexAsync(int index);
 }

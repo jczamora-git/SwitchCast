@@ -7,6 +7,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Phase 5.3 — Minimal Presenter Dock & Three-Mode Source Switching] - 2026-10-09
+
+### Added (feat / UI / test / docs)
+- **Three-Mode Source Switching Architecture (`PresenterSwitchMode`)**:
+  - Implemented [Models/PresenterSwitchMode.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/PresenterSwitchMode.cs) supporting `LiveOnly` (default), `ActiveAndLive`, and `ActiveOnly`.
+  - Implemented [Services/IWindowActivationService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IWindowActivationService.cs) and [Services/Win32WindowActivationService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowActivationService.cs) handling native `SetForegroundWindow` and `ShowWindowAsync` (`SW_RESTORE`).
+  - Added navigation cursor (`SelectedSource`), foreground tracking (`ForegroundSource`), and live on-air (`ActiveSource`) separation in [IPresentationStateService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresentationStateService.cs) and [PresentationStateService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationStateService.cs).
+  - Integrated three-mode routing in `PresentationCoordinator.ExecuteSourceSwitchAsync`, ensuring Dock buttons, quick switcher flyout, and Global Hotkeys (`Ctrl+Shift+Right`, `Ctrl+Shift+Left`, `Ctrl+Shift+1..5`) follow the active mode.
+- **Minimal Single-Row Presenter Toolbar (Both Modes)**:
+  - Redesigned [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml) into an ultra-compact single-row toolbar in both Expanded (660×52 DIP) and Compact (460×46 DIP) modes.
+  - Enforced single-line source titles with `TextTrimming="CharacterEllipsis"`, `TextWrapping="NoWrap"`, and `MaxLines="1"` with rich multi-line tooltips.
+  - Added mode dropdown selector buttons with concise badges ("A+L", "A", "L"), informative tooltips, and checkmarked selection flyouts on both modes.
+  - Added icon-first buttons for Pause/Resume, Blackout, Stop Presenting, and More actions (Dashboard, Output window) with full accessibility tooltips.
+- **Automated Unit & Regression Tests**:
+  - Added [SwitchCast.Tests/Services/WindowActivationServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/WindowActivationServiceTests.cs).
+  - Expanded [SwitchCast.Tests/Services/PresentationCoordinatorTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresentationCoordinatorTests.cs) with tests for all three switching modes, window activation error resilience, and monitor source fallbacks.
+  - Expanded [SwitchCast.Tests/Services/PresentationStateServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresentationStateServiceTests.cs) and [SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs), expanding the automated test suite to 122 passing tests (100% pass rate).
+
+---
+
 ## [Phase 5.1 — Floating Presenter Dock UI & Window Chrome Fix] - 2026-10-08
 
 ### Fixed (fix / UI / test)

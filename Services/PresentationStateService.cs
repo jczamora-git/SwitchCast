@@ -16,6 +16,15 @@ public partial class PresentationStateService : ObservableObject, IPresentationS
     private PresentationStatus _status = PresentationStatus.Idle;
 
     [ObservableProperty]
+    private PresenterSwitchMode _switchMode = PresenterSwitchMode.LiveOnly;
+
+    [ObservableProperty]
+    private CaptureSource? _selectedSource;
+
+    [ObservableProperty]
+    private CaptureSource? _foregroundSource;
+
+    [ObservableProperty]
     private CaptureSource? _activeSource;
 
     public PresentationStateService()
@@ -48,11 +57,39 @@ public partial class PresentationStateService : ObservableObject, IPresentationS
         }
     }
 
+    public void SetSwitchMode(PresenterSwitchMode mode)
+    {
+        lock (_lock)
+        {
+            SwitchMode = mode;
+        }
+    }
+
+    public void SetSelectedSource(CaptureSource? source)
+    {
+        lock (_lock)
+        {
+            SelectedSource = source;
+        }
+    }
+
+    public void SetForegroundSource(CaptureSource? source)
+    {
+        lock (_lock)
+        {
+            ForegroundSource = source;
+        }
+    }
+
     public void SetActiveSource(CaptureSource? source)
     {
         lock (_lock)
         {
             ActiveSource = source;
+            if (source is not null && SelectedSource is null)
+            {
+                SelectedSource = source;
+            }
         }
     }
 
@@ -91,6 +128,14 @@ public partial class PresentationStateService : ObservableObject, IPresentationS
             {
                 ActiveSource = null;
             }
+            if (SelectedSource?.Id == sourceId)
+            {
+                SelectedSource = _selectedSources.FirstOrDefault(s => s.IsAvailable) ?? _selectedSources.FirstOrDefault();
+            }
+            if (ForegroundSource?.Id == sourceId)
+            {
+                ForegroundSource = null;
+            }
 
             OnPropertyChanged(nameof(SelectedSourceCount));
             OnPropertyChanged(nameof(SelectedSources));
@@ -123,6 +168,8 @@ public partial class PresentationStateService : ObservableObject, IPresentationS
         {
             _selectedSources.Clear();
             ActiveSource = null;
+            SelectedSource = null;
+            ForegroundSource = null;
             OnPropertyChanged(nameof(SelectedSourceCount));
             OnPropertyChanged(nameof(SelectedSources));
         }

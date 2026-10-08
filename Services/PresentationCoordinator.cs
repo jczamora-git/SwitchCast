@@ -16,6 +16,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     private readonly IPresentationWindowService _presentationWindowService;
     private readonly ICaptureCoordinator _captureCoordinator;
     private readonly IPresentationOutputRenderer _outputRenderer;
+    private readonly IWindowActivationService _windowActivationService;
     private readonly SemaphoreSlim _transitionSemaphore = new(1, 1);
 
     private CaptureSource? _targetRequestedPresentationSource;
@@ -29,20 +30,28 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         IPresentationStateService presentationStateService,
         IPresentationWindowService presentationWindowService,
         ICaptureCoordinator captureCoordinator,
-        IPresentationOutputRenderer outputRenderer)
+        IPresentationOutputRenderer outputRenderer,
+        IWindowActivationService windowActivationService)
     {
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
         _presentationWindowService = presentationWindowService ?? throw new ArgumentNullException(nameof(presentationWindowService));
         _captureCoordinator = captureCoordinator ?? throw new ArgumentNullException(nameof(captureCoordinator));
         _outputRenderer = outputRenderer ?? throw new ArgumentNullException(nameof(outputRenderer));
+        _windowActivationService = windowActivationService ?? throw new ArgumentNullException(nameof(windowActivationService));
 
         _presentationStateService.PropertyChanged += (s, e) =>
         {
             if (e.PropertyName == nameof(IPresentationStateService.Status) ||
-                e.PropertyName == nameof(IPresentationStateService.ActiveSource))
+                e.PropertyName == nameof(IPresentationStateService.ActiveSource) ||
+                e.PropertyName == nameof(IPresentationStateService.SwitchMode) ||
+                e.PropertyName == nameof(IPresentationStateService.SelectedSource) ||
+                e.PropertyName == nameof(IPresentationStateService.ForegroundSource))
             {
                 OnPropertyChanged(nameof(Status));
                 OnPropertyChanged(nameof(CurrentPresentationSource));
+                OnPropertyChanged(nameof(SelectedSource));
+                OnPropertyChanged(nameof(ForegroundSource));
+                OnPropertyChanged(nameof(SwitchMode));
                 OnPropertyChanged(nameof(IsLive));
                 OnPropertyChanged(nameof(IsPaused));
                 OnPropertyChanged(nameof(IsBlackout));
@@ -56,6 +65,12 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
     public PresentationStatus Status => _presentationStateService.Status;
 
+    public PresenterSwitchMode SwitchMode => _presentationStateService.SwitchMode;
+
+    public CaptureSource? SelectedSource => _presentationStateService.SelectedSource;
+
+    public CaptureSource? ForegroundSource => _presentationStateService.ForegroundSource;
+
     public CaptureSource? CurrentPresentationSource => _presentationStateService.ActiveSource;
 
     public bool IsOutputWindowOpen => _presentationWindowService.IsWindowOpen;
@@ -65,6 +80,12 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     public bool IsPaused => Status == PresentationStatus.Paused;
 
     public bool IsBlackout => Status == PresentationStatus.Blackout;
+
+    public Task SetSwitchModeAsync(PresenterSwitchMode mode)
+    {
+        _presentationStateService.SetSwitchMode(mode);
+        return Task.CompletedTask;
+    }
 
     public ImageSource? PresentationImageSource => _outputRenderer.PresentationImageSource;
 
@@ -136,6 +157,15 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
             _outputRenderer.Resume();
             _presentationStateService.SetActiveSource(targetSource);
+            _presentationStateService.SetSelectedSource(targetSource);
+            if (SwitchMode == PresenterSwitchMode.ActiveAndLive)
+            {
+                bool activated = _windowActivationService.ActivateSource(targetSource);
+                if (activated)
+                {
+                    _presentationStateService.SetForegroundSource(targetSource);
+                }
+            }
             _presentationStateService.SetStatus(PresentationStatus.Active);
             Debug.WriteLine($"[PresentationCoordinator] StartPresentation completed seq={sequence} source={targetSource.Id}");
         }
@@ -165,6 +195,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         {
             _outputRenderer.Clear();
             _presentationStateService.SetActiveSource(null);
+            _presentationStateService.SetForegroundSource(null);
             _presentationStateService.SetStatus(PresentationStatus.Idle);
             LastErrorMessage = null;
             await _captureCoordinator.StopPreviewAsync().ConfigureAwait(false);
@@ -301,6 +332,56 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         }
     }
 
+    public async Task ExecuteSourceSwitchAsync(CaptureSource targetSource)
+    {
+        ArgumentNullException.ThrowIfNull(targetSource);
+
+        _presentationStateService.SetSelectedSource(targetSource);
+
+        var mode = SwitchMode;
+        Debug.WriteLine($"[PresentationCoordinator] ExecuteSourceSwitch mode={mode} target={targetSource.Id} ({targetSource.Title})");
+
+        switch (mode)
+        {
+            case PresenterSwitchMode.ActiveAndLive:
+                bool activated = _windowActivationService.ActivateSource(targetSource);
+                if (activated)
+                {
+                    _presentationStateService.SetForegroundSource(targetSource);
+                }
+
+                if (Status == PresentationStatus.Idle)
+                {
+                    await StartPresentationAsync(targetSource).ConfigureAwait(false);
+                }
+                else
+                {
+                    await SwitchPresentationSourceAsync(targetSource).ConfigureAwait(false);
+                }
+                break;
+
+            case PresenterSwitchMode.ActiveOnly:
+                bool actOnly = _windowActivationService.ActivateSource(targetSource);
+                if (actOnly)
+                {
+                    _presentationStateService.SetForegroundSource(targetSource);
+                }
+                break;
+
+            case PresenterSwitchMode.LiveOnly:
+            default:
+                if (Status == PresentationStatus.Idle)
+                {
+                    await StartPresentationAsync(targetSource).ConfigureAwait(false);
+                }
+                else
+                {
+                    await SwitchPresentationSourceAsync(targetSource).ConfigureAwait(false);
+                }
+                break;
+        }
+    }
+
     public async Task SwitchToNextSourceAsync()
     {
         var availableSources = _presentationStateService.SelectedSources.Where(s => s.IsAvailable).ToList();
@@ -309,19 +390,12 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             return;
         }
 
-        var current = CurrentPresentationSource ?? _presentationStateService.ActiveSource;
+        var current = SelectedSource ?? CurrentPresentationSource ?? _presentationStateService.ActiveSource;
         int currentIndex = current is not null ? availableSources.FindIndex(s => s.Id == current.Id) : -1;
         int nextIndex = (currentIndex + 1) % availableSources.Count;
         var nextSource = availableSources[nextIndex];
 
-        if (Status == PresentationStatus.Idle)
-        {
-            await StartPresentationAsync(nextSource).ConfigureAwait(false);
-        }
-        else
-        {
-            await SwitchPresentationSourceAsync(nextSource).ConfigureAwait(false);
-        }
+        await ExecuteSourceSwitchAsync(nextSource).ConfigureAwait(false);
     }
 
     public async Task SwitchToPreviousSourceAsync()
@@ -332,19 +406,12 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             return;
         }
 
-        var current = CurrentPresentationSource ?? _presentationStateService.ActiveSource;
+        var current = SelectedSource ?? CurrentPresentationSource ?? _presentationStateService.ActiveSource;
         int currentIndex = current is not null ? availableSources.FindIndex(s => s.Id == current.Id) : -1;
         int prevIndex = (currentIndex - 1 + availableSources.Count) % availableSources.Count;
         var prevSource = availableSources[prevIndex];
 
-        if (Status == PresentationStatus.Idle)
-        {
-            await StartPresentationAsync(prevSource).ConfigureAwait(false);
-        }
-        else
-        {
-            await SwitchPresentationSourceAsync(prevSource).ConfigureAwait(false);
-        }
+        await ExecuteSourceSwitchAsync(prevSource).ConfigureAwait(false);
     }
 
     public async Task SwitchToSourceIndexAsync(int index)
@@ -356,14 +423,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         }
 
         var targetSource = availableSources[index];
-        if (Status == PresentationStatus.Idle)
-        {
-            await StartPresentationAsync(targetSource).ConfigureAwait(false);
-        }
-        else
-        {
-            await SwitchPresentationSourceAsync(targetSource).ConfigureAwait(false);
-        }
+        await ExecuteSourceSwitchAsync(targetSource).ConfigureAwait(false);
     }
 
     private void OnCaptureFrameArrived(object? sender, FrameArrivedEventArgs e)

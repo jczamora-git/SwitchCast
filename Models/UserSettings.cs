@@ -46,6 +46,11 @@ public class UserSettings
     public bool StartDockInCompactMode { get; set; } = false;
 
     /// <summary>
+    /// Active source switching mode for presenter dock and global hotkeys.
+    /// </summary>
+    public PresenterSwitchMode SwitchMode { get; set; } = PresenterSwitchMode.LiveOnly;
+
+    /// <summary>
     /// Configured global hotkey bindings.
     /// </summary>
     public List<HotkeyBinding> HotkeyBindings { get; set; } = GetDefaultHotkeys();

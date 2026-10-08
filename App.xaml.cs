@@ -51,6 +51,7 @@ public partial class App : Application
         services.AddSingleton<ICaptureCoordinator, CaptureCoordinator>();
 
         // Presentation Output & Orchestration Services
+        services.AddSingleton<IWindowActivationService, Win32WindowActivationService>();
         services.AddSingleton<IPresentationWindowService, PresentationWindowService>();
         services.AddSingleton<IPresentationOutputRenderer, Direct3D11PresentationRenderer>();
         services.AddSingleton<IPresentationCoordinator, PresentationCoordinator>();
@@ -75,6 +76,9 @@ public partial class App : Application
         // Preload persistent user settings before initializing UI
         var settingsService = Services.GetRequiredService<IApplicationSettingsService>();
         await settingsService.LoadSettingsAsync();
+
+        var presentationStateService = Services.GetRequiredService<IPresentationStateService>();
+        presentationStateService.SetSwitchMode(settingsService.CurrentSettings.SwitchMode);
 
         // Initialize and wire up system-wide global hotkeys
         var hotkeyService = Services.GetRequiredService<IHotkeyService>();

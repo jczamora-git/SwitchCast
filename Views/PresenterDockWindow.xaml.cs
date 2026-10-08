@@ -14,7 +14,7 @@ using WinRT.Interop;
 namespace SwitchCast.Views;
 
 /// <summary>
-/// Compact floating presenter companion dock window designed for quick source switching during live presentations.
+/// Minimal single-row floating presenter companion dock window designed for instant source switching during live presentations.
 /// </summary>
 public sealed partial class PresenterDockWindow : Window
 {
@@ -93,9 +93,9 @@ public sealed partial class PresenterDockWindow : Window
 
         double scale = dpi / 96.0;
 
-        // Establish target DIP dimensions
-        double widthDip = isCompact ? 480.0 : 620.0;
-        double heightDip = isCompact ? 54.0 : 110.0;
+        // Establish minimal single-row target DIP dimensions
+        double widthDip = isCompact ? 460.0 : 660.0;
+        double heightDip = isCompact ? 46.0 : 52.0;
 
         int pixelWidth = (int)Math.Round(widthDip * scale);
         int pixelHeight = (int)Math.Round(heightDip * scale);
@@ -129,7 +129,7 @@ public sealed partial class PresenterDockWindow : Window
                 dpi = 96;
             }
             double scale = dpi / 96.0;
-            int targetY = info.rcWork.Top + (int)Math.Round(32.0 * scale);
+            int targetY = info.rcWork.Top + (int)Math.Round(24.0 * scale);
 
             _appWindow.Move(new PointInt32(targetX, targetY));
         }
@@ -151,6 +151,27 @@ public sealed partial class PresenterDockWindow : Window
             // Close the source flyout
             SourceDropDownButton?.Flyout?.Hide();
         }
+    }
+
+    private void OnModeActiveAndLiveClicked(object sender, RoutedEventArgs e)
+    {
+        _ = ViewModel.SetSwitchModeCommand.ExecuteAsync(PresenterSwitchMode.ActiveAndLive);
+        ExpandedModeDropDownButton?.Flyout?.Hide();
+        CompactModeDropDownButton?.Flyout?.Hide();
+    }
+
+    private void OnModeActiveOnlyClicked(object sender, RoutedEventArgs e)
+    {
+        _ = ViewModel.SetSwitchModeCommand.ExecuteAsync(PresenterSwitchMode.ActiveOnly);
+        ExpandedModeDropDownButton?.Flyout?.Hide();
+        CompactModeDropDownButton?.Flyout?.Hide();
+    }
+
+    private void OnModeLiveOnlyClicked(object sender, RoutedEventArgs e)
+    {
+        _ = ViewModel.SetSwitchModeCommand.ExecuteAsync(PresenterSwitchMode.LiveOnly);
+        ExpandedModeDropDownButton?.Flyout?.Hide();
+        CompactModeDropDownButton?.Flyout?.Hide();
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)

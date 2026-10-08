@@ -14,7 +14,22 @@ public interface IPresentationStateService : INotifyPropertyChanged
     PresentationStatus Status { get; }
 
     /// <summary>
-    /// Currently active presentation source being captured / displayed, or null if none.
+    /// Active source switching mode for presenter dock and global hotkeys.
+    /// </summary>
+    PresenterSwitchMode SwitchMode { get; }
+
+    /// <summary>
+    /// Currently selected source in the navigation queue cursor.
+    /// </summary>
+    CaptureSource? SelectedSource { get; }
+
+    /// <summary>
+    /// Last confirmed foreground activated source, or null if none.
+    /// </summary>
+    CaptureSource? ForegroundSource { get; }
+
+    /// <summary>
+    /// Currently active presentation source being captured / displayed (on-air), or null if none.
     /// </summary>
     CaptureSource? ActiveSource { get; }
 
@@ -37,6 +52,21 @@ public interface IPresentationStateService : INotifyPropertyChanged
     /// Updates the current presentation status.
     /// </summary>
     void SetStatus(PresentationStatus status);
+
+    /// <summary>
+    /// Sets the active presentation switching mode.
+    /// </summary>
+    void SetSwitchMode(PresenterSwitchMode mode);
+
+    /// <summary>
+    /// Sets the selected source cursor position.
+    /// </summary>
+    void SetSelectedSource(CaptureSource? source);
+
+    /// <summary>
+    /// Sets the confirmed foreground application window source.
+    /// </summary>
+    void SetForegroundSource(CaptureSource? source);
 
     /// <summary>
     /// Sets the active presentation source.

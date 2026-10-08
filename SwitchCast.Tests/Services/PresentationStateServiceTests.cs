@@ -12,7 +12,10 @@ public class PresentationStateServiceTests
         var service = new PresentationStateService();
 
         Assert.Equal(PresentationStatus.Idle, service.Status);
+        Assert.Equal(PresenterSwitchMode.LiveOnly, service.SwitchMode);
         Assert.Null(service.ActiveSource);
+        Assert.Null(service.SelectedSource);
+        Assert.Null(service.ForegroundSource);
         Assert.Empty(service.SelectedSources);
         Assert.Equal(0, service.SelectedSourceCount);
     }
@@ -34,6 +37,38 @@ public class PresentationStateServiceTests
 
         Assert.Equal(PresentationStatus.Active, service.Status);
         Assert.True(raised);
+    }
+
+    [Fact]
+    public void SetSwitchMode_UpdatesSwitchMode_AndRaisesPropertyChanged()
+    {
+        var service = new PresentationStateService();
+        var raised = false;
+        service.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(IPresentationStateService.SwitchMode))
+            {
+                raised = true;
+            }
+        };
+
+        service.SetSwitchMode(PresenterSwitchMode.ActiveAndLive);
+
+        Assert.Equal(PresenterSwitchMode.ActiveAndLive, service.SwitchMode);
+        Assert.True(raised);
+    }
+
+    [Fact]
+    public void SetSelectedSource_And_SetForegroundSource_UpdateCorrectly()
+    {
+        var service = new PresentationStateService();
+        var source = new WindowSource { Id = "win-1", Title = "Window 1" };
+
+        service.SetSelectedSource(source);
+        service.SetForegroundSource(source);
+
+        Assert.Equal(source, service.SelectedSource);
+        Assert.Equal(source, service.ForegroundSource);
     }
 
     [Fact]
@@ -106,12 +141,16 @@ public class PresentationStateServiceTests
         service.AddSelectedSource(source1);
         service.AddSelectedSource(source2);
         service.SetActiveSource(source1);
+        service.SetSelectedSource(source1);
+        service.SetForegroundSource(source1);
 
         service.ClearSelectedSources();
 
         Assert.Empty(service.SelectedSources);
         Assert.Equal(0, service.SelectedSourceCount);
         Assert.Null(service.ActiveSource);
+        Assert.Null(service.SelectedSource);
+        Assert.Null(service.ForegroundSource);
     }
 
     [Fact]
@@ -171,4 +210,3 @@ public class PresentationStateServiceTests
         Assert.True(service.SelectedSources[0].IsAvailable);
     }
 }
-

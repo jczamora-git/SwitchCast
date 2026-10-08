@@ -12,6 +12,7 @@ public class PresentationCoordinatorTests
     private readonly Mock<IPresentationWindowService> _mockWindowService;
     private readonly Mock<ICaptureCoordinator> _mockCaptureCoordinator;
     private readonly Mock<IPresentationOutputRenderer> _mockOutputRenderer;
+    private readonly Mock<IWindowActivationService> _mockWindowActivationService;
 
     public PresentationCoordinatorTests()
     {
@@ -19,13 +20,16 @@ public class PresentationCoordinatorTests
         _mockWindowService = new Mock<IPresentationWindowService>();
         _mockCaptureCoordinator = new Mock<ICaptureCoordinator>();
         _mockOutputRenderer = new Mock<IPresentationOutputRenderer>();
+        _mockWindowActivationService = new Mock<IWindowActivationService>();
 
         _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Idle);
         _mockStateService.SetupGet(s => s.ActiveSource).Returns((CaptureSource?)null);
         _mockStateService.SetupGet(s => s.SelectedSources).Returns(new List<CaptureSource>());
+        _mockStateService.SetupGet(s => s.SwitchMode).Returns(PresenterSwitchMode.LiveOnly);
 
         _mockWindowService.SetupGet(w => w.IsWindowOpen).Returns(false);
         _mockCaptureCoordinator.SetupGet(c => c.State).Returns(CaptureState.Idle);
+        _mockWindowActivationService.Setup(w => w.ActivateSource(It.IsAny<CaptureSource>())).Returns(true);
     }
 
     [Fact]
@@ -35,7 +39,8 @@ public class PresentationCoordinatorTests
             _mockStateService.Object,
             _mockWindowService.Object,
             _mockCaptureCoordinator.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         Assert.Equal(PresentationStatus.Idle, coordinator.Status);
         Assert.False(coordinator.IsOutputWindowOpen);
@@ -43,6 +48,7 @@ public class PresentationCoordinatorTests
         Assert.False(coordinator.IsPaused);
         Assert.False(coordinator.IsBlackout);
         Assert.Null(coordinator.CurrentPresentationSource);
+        Assert.Equal(PresenterSwitchMode.LiveOnly, coordinator.SwitchMode);
     }
 
     [Fact]
@@ -52,7 +58,8 @@ public class PresentationCoordinatorTests
             _mockStateService.Object,
             _mockWindowService.Object,
             _mockCaptureCoordinator.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         await coordinator.OpenOutputWindowAsync();
 
@@ -66,7 +73,8 @@ public class PresentationCoordinatorTests
             _mockStateService.Object,
             _mockWindowService.Object,
             _mockCaptureCoordinator.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         await coordinator.CloseOutputWindowAsync();
 
@@ -83,7 +91,8 @@ public class PresentationCoordinatorTests
             _mockStateService.Object,
             _mockWindowService.Object,
             _mockCaptureCoordinator.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         await coordinator.StartPresentationAsync(source);
 
@@ -103,7 +112,8 @@ public class PresentationCoordinatorTests
             _mockStateService.Object,
             _mockWindowService.Object,
             _mockCaptureCoordinator.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.StartPresentationAsync(null));
     }
@@ -115,7 +125,8 @@ public class PresentationCoordinatorTests
             _mockStateService.Object,
             _mockWindowService.Object,
             _mockCaptureCoordinator.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         await coordinator.StopPresentationAsync();
 
@@ -134,7 +145,8 @@ public class PresentationCoordinatorTests
             _mockStateService.Object,
             _mockWindowService.Object,
             _mockCaptureCoordinator.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         await coordinator.PausePresentationAsync();
 
@@ -151,7 +163,8 @@ public class PresentationCoordinatorTests
             _mockStateService.Object,
             _mockWindowService.Object,
             _mockCaptureCoordinator.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         await coordinator.ResumePresentationAsync();
 
@@ -168,7 +181,8 @@ public class PresentationCoordinatorTests
             _mockStateService.Object,
             _mockWindowService.Object,
             _mockCaptureCoordinator.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         // Toggle to Blackout
         await coordinator.ToggleBlackoutAsync();
@@ -196,12 +210,108 @@ public class PresentationCoordinatorTests
             _mockStateService.Object,
             _mockWindowService.Object,
             _mockCaptureCoordinator.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         await coordinator.SwitchPresentationSourceAsync(source2);
 
         _mockCaptureCoordinator.Verify(c => c.SwitchPreviewSourceAsync(source2), Times.Once);
         _mockStateService.Verify(s => s.SetActiveSource(source2), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteSourceSwitchAsync_ActiveAndLive_ActivatesWindowAndSwitchesPresentation()
+    {
+        var source1 = new WindowSource { Id = "win-1", Title = "PowerPoint", IsAvailable = true, WindowHandle = 0x1001 };
+        var source2 = new WindowSource { Id = "win-2", Title = "Chrome", IsAvailable = true, WindowHandle = 0x1002 };
+
+        _mockStateService.SetupGet(s => s.SwitchMode).Returns(PresenterSwitchMode.ActiveAndLive);
+        _mockStateService.SetupGet(s => s.ActiveSource).Returns(source1);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+        _mockCaptureCoordinator.SetupGet(c => c.State).Returns(CaptureState.Capturing);
+
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
+
+        await coordinator.ExecuteSourceSwitchAsync(source2);
+
+        _mockStateService.Verify(s => s.SetSelectedSource(source2), Times.Once);
+        _mockWindowActivationService.Verify(w => w.ActivateSource(source2), Times.Once);
+        _mockStateService.Verify(s => s.SetForegroundSource(source2), Times.Once);
+        _mockCaptureCoordinator.Verify(c => c.SwitchPreviewSourceAsync(source2), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteSourceSwitchAsync_ActiveOnly_ActivatesWindowWithoutSwitchingPresentation()
+    {
+        var source1 = new WindowSource { Id = "win-1", Title = "PowerPoint", IsAvailable = true, WindowHandle = 0x1001 };
+        var source2 = new WindowSource { Id = "win-2", Title = "VS Code", IsAvailable = true, WindowHandle = 0x1002 };
+
+        _mockStateService.SetupGet(s => s.SwitchMode).Returns(PresenterSwitchMode.ActiveOnly);
+        _mockStateService.SetupGet(s => s.ActiveSource).Returns(source1);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+        _mockCaptureCoordinator.SetupGet(c => c.State).Returns(CaptureState.Capturing);
+
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
+
+        await coordinator.ExecuteSourceSwitchAsync(source2);
+
+        _mockStateService.Verify(s => s.SetSelectedSource(source2), Times.Once);
+        _mockWindowActivationService.Verify(w => w.ActivateSource(source2), Times.Once);
+        _mockStateService.Verify(s => s.SetForegroundSource(source2), Times.Once);
+
+        // Verify capture was NOT changed
+        _mockCaptureCoordinator.Verify(c => c.SwitchPreviewSourceAsync(It.IsAny<CaptureSource>()), Times.Never);
+        _mockStateService.Verify(s => s.SetActiveSource(source2), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteSourceSwitchAsync_LiveOnly_SwitchesPresentationWithoutActivatingWindow()
+    {
+        var source1 = new WindowSource { Id = "win-1", Title = "PowerPoint", IsAvailable = true, WindowHandle = 0x1001 };
+        var source2 = new WindowSource { Id = "win-2", Title = "Chrome", IsAvailable = true, WindowHandle = 0x1002 };
+
+        _mockStateService.SetupGet(s => s.SwitchMode).Returns(PresenterSwitchMode.LiveOnly);
+        _mockStateService.SetupGet(s => s.ActiveSource).Returns(source1);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+        _mockCaptureCoordinator.SetupGet(c => c.State).Returns(CaptureState.Capturing);
+
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
+
+        await coordinator.ExecuteSourceSwitchAsync(source2);
+
+        _mockStateService.Verify(s => s.SetSelectedSource(source2), Times.Once);
+        _mockWindowActivationService.Verify(w => w.ActivateSource(It.IsAny<CaptureSource>()), Times.Never);
+        _mockCaptureCoordinator.Verify(c => c.SwitchPreviewSourceAsync(source2), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetSwitchModeAsync_UpdatesStateServiceSwitchMode()
+    {
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
+
+        await coordinator.SetSwitchModeAsync(PresenterSwitchMode.ActiveAndLive);
+
+        _mockStateService.Verify(s => s.SetSwitchMode(PresenterSwitchMode.ActiveAndLive), Times.Once);
     }
 
     [Fact]
@@ -213,7 +323,8 @@ public class PresentationCoordinatorTests
             _mockStateService.Object,
             _mockWindowService.Object,
             _mockCaptureCoordinator.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         using var rawBitmap = new Windows.Graphics.Imaging.SoftwareBitmap(
             Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, 10, 10, Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
@@ -234,7 +345,8 @@ public class PresentationCoordinatorTests
             _mockStateService.Object,
             _mockWindowService.Object,
             _mockCaptureCoordinator.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         using var rawBitmap = new Windows.Graphics.Imaging.SoftwareBitmap(
             Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, 10, 10, Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
@@ -262,7 +374,8 @@ public class PresentationCoordinatorTests
             _mockStateService.Object,
             _mockWindowService.Object,
             _mockCaptureCoordinator.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         await coordinator.SwitchToNextSourceAsync();
         _mockCaptureCoordinator.Verify(c => c.SwitchPreviewSourceAsync(src2), Times.Once);
@@ -285,7 +398,8 @@ public class PresentationCoordinatorTests
             _mockStateService.Object,
             _mockWindowService.Object,
             _mockCaptureCoordinator.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         await coordinator.SwitchToPreviousSourceAsync();
         _mockCaptureCoordinator.Verify(c => c.SwitchPreviewSourceAsync(src3), Times.Once);
@@ -306,7 +420,8 @@ public class PresentationCoordinatorTests
             _mockStateService.Object,
             _mockWindowService.Object,
             _mockCaptureCoordinator.Object,
-            _mockOutputRenderer.Object);
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object);
 
         await coordinator.SwitchToSourceIndexAsync(1);
         _mockCaptureCoordinator.Verify(c => c.SwitchPreviewSourceAsync(src2), Times.Once);

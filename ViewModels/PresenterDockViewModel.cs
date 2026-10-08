@@ -7,7 +7,7 @@ using SwitchCast.Services;
 namespace SwitchCast.ViewModels;
 
 /// <summary>
-/// ViewModel managing the compact floating presenter companion dock window.
+/// ViewModel managing the compact floating presenter companion dock window and three-mode source switching.
 /// </summary>
 public partial class PresenterDockViewModel : ObservableObject
 {
@@ -41,6 +41,28 @@ public partial class PresenterDockViewModel : ObservableObject
 
     public PresentationStatus Status => _presentationStateService.Status;
 
+    public PresenterSwitchMode SwitchMode => _presentationStateService.SwitchMode;
+
+    public string SwitchModeBadge => SwitchMode switch
+    {
+        PresenterSwitchMode.ActiveAndLive => "A+L",
+        PresenterSwitchMode.ActiveOnly => "A",
+        _ => "L"
+    };
+
+    public string SwitchModeTooltip => SwitchMode switch
+    {
+        PresenterSwitchMode.ActiveAndLive => "Switching Mode: Active + Live (Focus window & switch audience presentation)",
+        PresenterSwitchMode.ActiveOnly => "Switching Mode: Active Only (Focus window without changing audience presentation)",
+        _ => "Switching Mode: Live Only (Switch audience presentation without changing window focus)"
+    };
+
+    public bool IsModeActiveAndLive => SwitchMode == PresenterSwitchMode.ActiveAndLive;
+
+    public bool IsModeActiveOnly => SwitchMode == PresenterSwitchMode.ActiveOnly;
+
+    public bool IsModeLiveOnly => SwitchMode == PresenterSwitchMode.LiveOnly;
+
     public string StatusDisplayText => Status switch
     {
         PresentationStatus.Active => "LIVE",
@@ -51,12 +73,27 @@ public partial class PresenterDockViewModel : ObservableObject
         _ => "STANDBY"
     };
 
+    public CaptureSource? SelectedSource =>
+        _presentationStateService.SelectedSource ??
+        _presentationCoordinator.CurrentPresentationSource ??
+        _presentationStateService.ActiveSource;
+
     public string ActiveSourceTitle =>
+        SelectedSource?.Title ??
         _presentationCoordinator.CurrentPresentationSource?.Title ??
         _presentationStateService.ActiveSource?.Title ??
         "No Active Source";
 
+    public string OnAirSourceTitle =>
+        _presentationCoordinator.CurrentPresentationSource?.Title ??
+        _presentationStateService.ActiveSource?.Title ??
+        "None";
+
+    public string SourceFullTooltip =>
+        $"Selected: {ActiveSourceTitle}\nOn-Air: {OnAirSourceTitle}\nMode: {SwitchModeBadge} ({SwitchMode})";
+
     public bool HasActiveSource =>
+        SelectedSource is not null ||
         _presentationCoordinator.CurrentPresentationSource is not null ||
         _presentationStateService.ActiveSource is not null;
 
@@ -95,6 +132,30 @@ public partial class PresenterDockViewModel : ObservableObject
     }
 
     [RelayCommand]
+    public async Task SetSwitchModeAsync(object? parameter)
+    {
+        PresenterSwitchMode targetMode;
+        if (parameter is PresenterSwitchMode mode)
+        {
+            targetMode = mode;
+        }
+        else if (parameter is string modeStr && Enum.TryParse<PresenterSwitchMode>(modeStr, ignoreCase: true, out var parsed))
+        {
+            targetMode = parsed;
+        }
+        else
+        {
+            return;
+        }
+
+        _presentationStateService.SetSwitchMode(targetMode);
+        _settingsService.CurrentSettings.SwitchMode = targetMode;
+        await _settingsService.SaveSettingsAsync();
+
+        NotifyModeProperties();
+    }
+
+    [RelayCommand]
     private async Task NextSourceAsync()
     {
         await _presentationCoordinator.SwitchToNextSourceAsync();
@@ -111,14 +172,7 @@ public partial class PresenterDockViewModel : ObservableObject
     {
         if (source is not null && source.IsAvailable)
         {
-            if (Status == PresentationStatus.Idle)
-            {
-                await _presentationCoordinator.StartPresentationAsync(source);
-            }
-            else
-            {
-                await _presentationCoordinator.SwitchPresentationSourceAsync(source);
-            }
+            await _presentationCoordinator.ExecuteSourceSwitchAsync(source);
         }
     }
 
@@ -175,7 +229,10 @@ public partial class PresenterDockViewModel : ObservableObject
     {
         if (e.PropertyName == nameof(IPresentationStateService.Status) ||
             e.PropertyName == nameof(IPresentationStateService.ActiveSource) ||
-            e.PropertyName == nameof(IPresentationStateService.SelectedSources))
+            e.PropertyName == nameof(IPresentationStateService.SelectedSources) ||
+            e.PropertyName == nameof(IPresentationStateService.SwitchMode) ||
+            e.PropertyName == nameof(IPresentationStateService.SelectedSource) ||
+            e.PropertyName == nameof(IPresentationStateService.ForegroundSource))
         {
             NotifyAllProperties();
         }
@@ -186,11 +243,24 @@ public partial class PresenterDockViewModel : ObservableObject
         NotifyAllProperties();
     }
 
+    private void NotifyModeProperties()
+    {
+        OnPropertyChanged(nameof(SwitchMode));
+        OnPropertyChanged(nameof(SwitchModeBadge));
+        OnPropertyChanged(nameof(SwitchModeTooltip));
+        OnPropertyChanged(nameof(IsModeActiveAndLive));
+        OnPropertyChanged(nameof(IsModeActiveOnly));
+        OnPropertyChanged(nameof(IsModeLiveOnly));
+        OnPropertyChanged(nameof(SourceFullTooltip));
+    }
+
     private void NotifyAllProperties()
     {
         OnPropertyChanged(nameof(Status));
         OnPropertyChanged(nameof(StatusDisplayText));
         OnPropertyChanged(nameof(ActiveSourceTitle));
+        OnPropertyChanged(nameof(OnAirSourceTitle));
+        OnPropertyChanged(nameof(SourceFullTooltip));
         OnPropertyChanged(nameof(HasActiveSource));
         OnPropertyChanged(nameof(IsLive));
         OnPropertyChanged(nameof(IsPaused));
@@ -205,5 +275,6 @@ public partial class PresenterDockViewModel : ObservableObject
         OnPropertyChanged(nameof(BlackoutButtonGlyph));
         OnPropertyChanged(nameof(CompactModeGlyph));
         OnPropertyChanged(nameof(CompactModeTooltip));
+        NotifyModeProperties();
     }
 }
