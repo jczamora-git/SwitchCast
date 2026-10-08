@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "SwitchCast (Unpackaged)": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    }
+  }
+}

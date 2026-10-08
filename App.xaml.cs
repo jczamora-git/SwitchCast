@@ -1,0 +1,56 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI.Xaml;
+using SwitchCast.Services;
+using SwitchCast.ViewModels;
+
+namespace SwitchCast;
+
+/// <summary>
+/// Provides application-specific behavior to supplement the default Application class.
+/// </summary>
+public partial class App : Application
+{
+    private Window? _mainWindow;
+
+    public App()
+    {
+        InitializeComponent();
+        Services = ConfigureServices();
+    }
+
+    public static new App Current => (App)Application.Current;
+
+    public IServiceProvider Services { get; }
+
+    private static IServiceProvider ConfigureServices()
+    {
+        var services = new ServiceCollection();
+
+        // Core & Application Services
+        services.AddSingleton<IPresentationStateService, PresentationStateService>();
+        services.AddSingleton<IApplicationSettingsService, ApplicationSettingsService>();
+        services.AddSingleton<INavigationService, NavigationService>();
+        services.AddSingleton<IWindowDiscoveryService, Win32WindowDiscoveryService>();
+        services.AddSingleton<IMonitorDiscoveryService, Win32MonitorDiscoveryService>();
+
+        // ViewModels
+        services.AddSingleton<MainViewModel>();
+        services.AddTransient<DashboardViewModel>();
+        services.AddTransient<SourcesViewModel>();
+        services.AddTransient<SettingsViewModel>();
+
+        return services.BuildServiceProvider();
+    }
+
+    protected override async void OnLaunched(LaunchActivatedEventArgs args)
+    {
+        base.OnLaunched(args);
+
+        // Preload persistent user settings before initializing UI
+        var settingsService = Services.GetRequiredService<IApplicationSettingsService>();
+        await settingsService.LoadSettingsAsync();
+
+        _mainWindow = new MainWindow();
+        _mainWindow.Activate();
+    }
+}

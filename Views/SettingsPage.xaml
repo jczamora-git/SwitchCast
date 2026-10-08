@@ -1,0 +1,130 @@
+<Page
+    x:Class="SwitchCast.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:SwitchCast.ViewModels"
+    mc:Ignorable="d">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="24" Padding="32,24,32,32" MaxWidth="1000" HorizontalAlignment="Left">
+            
+            <!-- Header -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="Settings" Style="{ThemeResource TitleTextBlockStyle}" FontWeight="SemiBold" />
+                <TextBlock Text="Customize application theme, window behavior, and view system information."
+                           Style="{ThemeResource BodyTextBlockStyle}"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+
+            <!-- SECTION A: APPEARANCE -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="Appearance &amp; Theme" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" />
+
+                <Border Padding="20"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="App Theme" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                        <TextBlock Text="Select your preferred application color mode. Changes take effect immediately."
+                                   Style="{ThemeResource CaptionTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                        <RadioButtons SelectedIndex="{x:Bind ViewModel.SelectedThemeIndex, Mode=TwoWay}" Margin="0,8,0,0">
+                            <RadioButton Content="Use system setting (Default)" Tag="0" Margin="0,0,0,4" />
+                            <RadioButton Content="Light mode" Tag="1" Margin="0,0,0,4" />
+                            <RadioButton Content="Dark mode" Tag="2" />
+                        </RadioButtons>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- SECTION B: WINDOW PREFERENCES -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="Window Preferences" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" />
+
+                <Border Padding="20"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                            <TextBlock Text="Remember Window Dimensions" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                            <TextBlock Text="Automatically restore the last window size and position upon starting SwitchCast."
+                                       Style="{ThemeResource CaptionTextBlockStyle}"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+
+                        <ToggleSwitch Grid.Column="1"
+                                      IsOn="{x:Bind ViewModel.RememberWindowDimensions, Mode=TwoWay}"
+                                      OnContent="Enabled"
+                                      OffContent="Disabled"
+                                      VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <!-- SECTION C: ABOUT & SYSTEM INFO -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="About SwitchCast" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" />
+
+                <Border Padding="24"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <StackPanel Spacing="16">
+                        <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                            <Border Width="48" Height="48"
+                                    Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                    CornerRadius="8">
+                                <FontIcon Glyph="&#xE7F4;" FontSize="24" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="{x:Bind ViewModel.AppName, Mode=OneWay}" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="Bold" />
+                                <TextBlock Text="{x:Bind ViewModel.AppVersion, Mode=OneWay}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <TextBlock Text="{x:Bind ViewModel.AppDescription, Mode=OneWay}"
+                                   Style="{ThemeResource BodyTextBlockStyle}"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                        <MenuFlyoutSeparator Margin="0,4" />
+
+                        <Grid ColumnSpacing="24" RowSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Target Framework" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontWeight="SemiBold" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{x:Bind ViewModel.TargetFramework, Mode=OneWay}" Style="{ThemeResource CaptionTextBlockStyle}" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Operating System" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontWeight="SemiBold" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{x:Bind ViewModel.PlatformDescription, Mode=OneWay}" Style="{ThemeResource CaptionTextBlockStyle}" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Privacy Architecture" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontWeight="SemiBold" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="100% Offline &amp; Local • Zero Telemetry • No Network Access" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemFillColorSuccessBrush}" FontWeight="SemiBold" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

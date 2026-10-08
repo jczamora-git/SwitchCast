@@ -1,0 +1,23 @@
+## Visual Studio & MSBuild build artifacts
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+TestResults/
+*.nupkg
+Generated Files/
+[Aa]pp[Pp]ackages/
+BundleArtifacts/
+Package.StoreAssociation.xml
+_pkginfo.txt
+
+## OS generated files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini

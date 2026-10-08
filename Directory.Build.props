@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <!-- Prevent Windows App SDK from searching for C++ MSVC tools in Visual Studio when building pure C# projects -->
+    <VCInstallPath32 Condition="'$(VCInstallPath32)' == ''">none</VCInstallPath32>
+    <VCInstallPath64 Condition="'$(VCInstallPath64)' == ''">none</VCInstallPath64>
+    <VCToolsInstallDir Condition="'$(VCToolsInstallDir)' == ''">none</VCToolsInstallDir>
+  </PropertyGroup>
+</Project>

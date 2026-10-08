@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Models\*.cs" Link="Linked\Models\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\IPresentationStateService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\PresentationStateService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\IApplicationSettingsService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\ApplicationSettingsService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\INavigationService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\IWindowDiscoveryService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\IMonitorDiscoveryService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\ViewModels\DashboardViewModel.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />
+    <Compile Include="..\ViewModels\SourcesViewModel.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />
+    <Compile Include="..\ViewModels\SelectableSourceItem.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />
+    <Compile Include="..\ViewModels\SettingsViewModel.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

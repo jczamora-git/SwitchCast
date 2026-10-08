@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>SwitchCast</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+
+    <!-- Prevent Windows App SDK from searching for C++ MSVC tools in Visual Studio when building pure C# projects -->
+    <VCInstallPath32 Condition="'$(VCInstallPath32)' == ''">none</VCInstallPath32>
+    <VCInstallPath64 Condition="'$(VCInstallPath64)' == ''">none</VCInstallPath64>
+    <VCToolsInstallDir Condition="'$(VCToolsInstallDir)' == ''">none</VCToolsInstallDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="SwitchCast.Tests\**" />
+    <EmbeddedResource Remove="SwitchCast.Tests\**" />
+    <None Remove="SwitchCast.Tests\**" />
+    <Page Remove="SwitchCast.Tests\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.240802000" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.1" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+</Project>
