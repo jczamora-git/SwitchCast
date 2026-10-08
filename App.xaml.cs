@@ -57,6 +57,7 @@ public partial class App : Application
         services.AddSingleton<IPresentationCoordinator, PresentationCoordinator>();
         services.AddSingleton<IPresenterDockService, PresenterDockService>();
         services.AddSingleton<IHotkeyService, Win32HotkeyService>();
+        services.AddSingleton<IApplicationLifecycleService, ApplicationLifecycleService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();

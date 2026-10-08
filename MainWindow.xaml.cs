@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
@@ -20,6 +21,8 @@ public sealed partial class MainWindow : Window
     private readonly MainViewModel _viewModel;
     private readonly INavigationService _navigationService;
     private readonly IApplicationSettingsService _settingsService;
+    private readonly IApplicationLifecycleService _lifecycleService;
+    private readonly IPresentationCoordinator _presentationCoordinator;
     private AppWindow? _appWindow;
 
     public MainWindow()
@@ -29,6 +32,8 @@ public sealed partial class MainWindow : Window
         _viewModel = App.Current.Services.GetRequiredService<MainViewModel>();
         _navigationService = App.Current.Services.GetRequiredService<INavigationService>();
         _settingsService = App.Current.Services.GetRequiredService<IApplicationSettingsService>();
+        _lifecycleService = App.Current.Services.GetRequiredService<IApplicationLifecycleService>();
+        _presentationCoordinator = App.Current.Services.GetRequiredService<IPresentationCoordinator>();
 
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _navigationService.Navigated += OnNavigationServiceNavigated;
@@ -169,10 +174,75 @@ public sealed partial class MainWindow : Window
 
     private async void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
-        if (_appWindow is not null)
+        if (_lifecycleService.IsShutdownApproved)
         {
-            var size = _appWindow.Size;
-            await _settingsService.SetWindowDimensionsAsync(size.Width, size.Height);
+            // Shutdown has already been confirmed and authorized; allow closure to complete.
+            return;
+        }
+
+        // Synchronously intercept and cancel window destruction to prompt the user.
+        args.Cancel = true;
+
+        if (_lifecycleService.IsExitConfirmationOpen)
+        {
+            // Prevent duplicate dialog prompts if user rapidly clicks X or presses Alt+F4.
+            return;
+        }
+
+        _lifecycleService.IsExitConfirmationOpen = true;
+
+        try
+        {
+            if (Content?.XamlRoot is null)
+            {
+                // Fallback if visual root is not accessible
+                _lifecycleService.ApproveShutdown();
+                await _lifecycleService.ExecuteShutdownAsync();
+                Close();
+                return;
+            }
+
+            bool isPresenting = _presentationCoordinator.IsLive ||
+                                _presentationCoordinator.IsPaused ||
+                                _presentationCoordinator.IsBlackout;
+
+            var dialog = new ContentDialog
+            {
+                Title = "Exit SwitchCast?",
+                Content = isPresenting
+                    ? "Your live presentation will stop, and all SwitchCast windows will close. Are you sure you want to exit?"
+                    : "Are you sure you want to exit SwitchCast?",
+                PrimaryButtonText = "Exit SwitchCast",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = Content.XamlRoot
+            };
+
+            var result = await dialog.ShowAsync();
+
+            if (result == ContentDialogResult.Primary)
+            {
+                _lifecycleService.ApproveShutdown();
+
+                if (_appWindow is not null)
+                {
+                    var size = _appWindow.Size;
+                    await _settingsService.SetWindowDimensionsAsync(size.Width, size.Height);
+                }
+
+                await _lifecycleService.ExecuteShutdownAsync();
+
+                // Close MainWindow through the authorized exit path
+                Close();
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MainWindow] Exit confirmation dialog error: {ex.Message}");
+        }
+        finally
+        {
+            _lifecycleService.IsExitConfirmationOpen = false;
         }
     }
 }

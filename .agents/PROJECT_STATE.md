@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Phase 5.3 Hotfix — Floating Presenter Dock Dropdown Overflow & External Menu Positioning
+- **Current Phase**: Window Hierarchy & Safe Application Shutdown (Main Window Exit Confirmation + Multi-Window Lifecycle)
 - **Overall Status**: **Completed (Ready for Phase 6)**
-- **Last Updated**: 2026-10-09T01:30:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-09T02:00:00+08:00 (UTC+8)
 
 ---
 
@@ -22,7 +22,13 @@ This is the authoritative progress, state, and environmental tracking document f
   - Native caption buttons styled dynamically via `AppWindow.TitleBar` (transparent backgrounds, theme-adaptive foreground and hover states, double-click to maximize, Windows 11 Snap Layouts).
   - Modern, near-black dark theme design system (`App.xaml`) with centralized semantic brush tokens (`AppBackgroundBrush`, `AppSidebarBrush`, `AppSurfaceBrush`, `AppSurfaceElevatedBrush`, `AppHoverBrush`, `AppBorderBrush`, `AppAccentBrush` coral `#FF7A59`, `AppBadgeBackgroundBrush`, `AppPreviewCanvasBrush`) and complete light theme fidelity.
   - Compact, responsive left navigation sidebar integrated smoothly with the shell.
-- [x] **Dependency Injection & Architecture**: Full DI container configured via `Microsoft.Extensions.DependencyInjection` in [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs) registering all core services, discovery engines, capture pipelines, presentation coordinators, window activation service, dock services, hotkey services, and ViewModels.
+- [x] **Application Window Hierarchy & Safe Exit Confirmation**:
+  - `MainWindow`: Primary management window. Intercepts `AppWindow.Closing` synchronously (`args.Cancel = true`) and displays a native WinUI 3 `ContentDialog` asking for confirmation before exiting.
+  - Cancel keeps all windows and active presentation intact; Exit SwitchCast authorizes shutdown, stops capture, cleans up secondary windows, unregisters hotkeys, and completes clean process termination.
+  - `PresentationWindow`: Independent audience-facing output. Closing it stops the presentation safely without terminating MainWindow or the application.
+  - `PresenterDockWindow`: Independent presenter companion dock. Closing it closes only the dock without stopping active presentations or closing MainWindow.
+  - Centralized lifecycle coordinator [ApplicationLifecycleService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/ApplicationLifecycleService.cs) governing safe multi-window teardown.
+- [x] **Dependency Injection & Architecture**: Full DI container configured via `Microsoft.Extensions.DependencyInjection` in [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs) registering all core services, discovery engines, capture pipelines, presentation coordinators, window activation service, dock services, hotkey services, lifecycle service, and ViewModels.
 - [x] **MVVM Pattern**: ViewModels and commands powered by `CommunityToolkit.Mvvm` ([MainViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/MainViewModel.cs), [DashboardViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/DashboardViewModel.cs), [PresentationViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/PresentationViewModel.cs), [PresenterDockViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/PresenterDockViewModel.cs), [SourcesViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SourcesViewModel.cs), [SettingsViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SettingsViewModel.cs), [SelectableSourceItem.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SelectableSourceItem.cs)).
 - [x] **Centralized Application State & Selection Management**: [IPresentationStateService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresentationStateService.cs) & [PresentationStateService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationStateService.cs) managing session status (`Idle`, `Active`, `Paused`, `Blackout`), active capture source (`ActiveSource`), selected navigation cursor (`SelectedSource`), confirmed foreground focus (`ForegroundSource`), three-mode switching preferences (`SwitchMode`), queued sources list, and availability reconciliation.
 - [x] **Real Window Discovery Engine (Phase 2)**: [IWindowDiscoveryService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IWindowDiscoveryService.cs) & [Win32WindowDiscoveryService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowDiscoveryService.cs) enumerating active top-level application windows using `EnumWindows`, `IsWindowVisible`, `GetWindowTextW`, `DwmGetWindowAttribute` (`DWMWA_CLOAKED`), `WS_EX_TOOLWINDOW` filtering, process name resolution, and SwitchCast self-exclusion.
@@ -63,8 +69,8 @@ This is the authoritative progress, state, and environmental tracking document f
   - System-wide global hotkeys via native Win32 `RegisterHotKey` / `UnregisterHotKey` in [Win32HotkeyService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32HotkeyService.cs).
   - Three source switching modes: `ActiveAndLive` (A+L), `ActiveOnly` (A), `LiveOnly` (L, default).
   - Minimal single-row floating presenter dock in Expanded and Compact modes.
-  - **Unclipped External Dropdown Host ([PresenterDockMenuWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml))**: Solved the Windows App SDK root bounds popup clipping limitation using a dedicated borderless topmost window host, DPI-aware placement via [PresenterDockMenuPositioner.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresenterDockMenuPositioner.cs), work area bounds clamping, automatic deactivation dismissal, and complete multi-monitor compatibility.
-- [x] **Automated Unit & Regression Test Suite**: 129 comprehensive unit & regression tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) with 100% pass rate.
+  - Unclipped external dropdown host [PresenterDockMenuWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml) with DPI-aware positioning.
+- [x] **Automated Unit & Regression Test Suite**: 135 comprehensive unit & regression tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) with 100% pass rate.
 
 ### Planned (Upcoming)
 - [ ] **Phase 6**: Stability & Performance Optimization (Device loss recovery, leak audits, DPI dynamic multi-monitor adaptation).
@@ -98,10 +104,10 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ## 6. VERIFICATION RECORD
 
-- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 34.4s).
+- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 6.19s).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (129 passed, 0 failed, 0 skipped in 826ms).
-- **Level 4 (Presenter Dock Menu & Dropdown Overflow)**: External dropdown positioning, flip-above/flip-below, work-area clamping, and single-instance lifecycle verified.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (135 passed, 0 failed, 0 skipped in 1s).
+- **Level 4 (Window Hierarchy & Safe Shutdown)**: Main Window exit confirmation, secondary window close isolation, and coordinated multi-window teardown verified.
 
 ---
 
@@ -109,4 +115,3 @@ This is the authoritative progress, state, and environmental tracking document f
 
 **Task**: **Phase 6 — Stability & Performance Optimization**
 - **Objective**: Direct3D 11 device loss resilience, DPI dynamic scaling across multi-monitor setups, and extended presentation load tests.
-

@@ -7,6 +7,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Window Hierarchy & Safe Application Shutdown] - 2026-10-09
+
+### Added (feat / UI / test / docs)
+- **Application Window Hierarchy & Main Window Exit Authority**:
+  - Implemented synchronous close interception (`AppWindow.Closing` with `args.Cancel = true`) on `MainWindow`.
+  - Added native WinUI 3 `ContentDialog` confirmation:
+    - Presenting prompt: `"Your live presentation will stop, and all SwitchCast windows will close. Are you sure you want to exit?"`
+    - Idle prompt: `"Are you sure you want to exit SwitchCast?"`
+    - Safe "Cancel" default action vs. "Exit SwitchCast" primary action.
+    - Protected against re-entrant confirmation dialogs during rapid `X` clicks or `Alt+F4`.
+- **Centralized Application Lifecycle Coordinator**:
+  - Implemented [Services/IApplicationLifecycleService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IApplicationLifecycleService.cs) and [Services/ApplicationLifecycleService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/ApplicationLifecycleService.cs) registered as a singleton in DI container.
+  - Governs deterministic, idempotent teardown: stopping presentation, stopping capture, closing secondary windows, unregistering hotkeys, and persisting user settings.
+- **Secondary Window Close Isolation**:
+  - **Presenter Dock**: Closing the dock closes only the dock window and any open popups; leaves active capture, presentation output, and MainWindow untouched.
+  - **Presentation Output**: Closing the output window safely stops active presentations, clears the renderer, sets status to `Idle`, and leaves `MainWindow` open.
+- **Automated Unit Tests**:
+  - Added [SwitchCast.Tests/Services/ApplicationLifecycleServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/ApplicationLifecycleServiceTests.cs) verifying 6 lifecycle scenarios (initial state, approval, confirmation tracking, teardown coordination, idempotency, exception resilience), bringing total passing tests to 135 (100% pass rate).
+
+---
+
 ## [Phase 5.3 Hotfix — Floating Dock Dropdown Overflow & External Menu Positioning] - 2026-10-09
 
 ### Fixed (fix / UI / test / docs)

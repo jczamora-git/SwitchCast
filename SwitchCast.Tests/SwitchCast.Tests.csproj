@@ -25,6 +25,8 @@
     <Compile Include="..\Services\PresentationStateService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IApplicationSettingsService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\ApplicationSettingsService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\IApplicationLifecycleService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\ApplicationLifecycleService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\INavigationService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IWindowDiscoveryService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IMonitorDiscoveryService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
