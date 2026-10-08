@@ -9,7 +9,7 @@ This is the authoritative progress, state, and environmental tracking document f
 - **Project**: SwitchCast
 - **Current Phase**: Phase 5.1 — Floating Presenter Dock UI & Window Chrome Fix
 - **Overall Status**: **Completed (Ready for Phase 6)**
-- **Last Updated**: 2026-10-08T23:20:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-08T23:45:00+08:00 (UTC+8)
 
 ---
 
@@ -53,7 +53,7 @@ This is the authoritative progress, state, and environmental tracking document f
 - [x] **Global Hotkeys & Floating Presenter Companion Dock (Phase 5 & 5.1)**:
   - System-wide global hotkeys via native Win32 `RegisterHotKey` / `UnregisterHotKey` in [Win32HotkeyService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32HotkeyService.cs) hosted on a dedicated message-only window (`HWND_MESSAGE`).
   - Hotkey actions for Next Source (`Ctrl+Shift+Right`), Previous Source (`Ctrl+Shift+Left`), Pause/Resume (`Ctrl+Shift+P`), Blackout (`Ctrl+Shift+B`), Stop Presenting (`Ctrl+Shift+S`), Toggle Presenter Dock (`Ctrl+Shift+D`), Focus Dashboard (`Ctrl+Shift+M`), and Direct Source Switching (`Ctrl+Shift+1..5`).
-  - Native WinUI 3 compact floating presenter dock [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml) with custom borderless styling (`SetBorderAndTitleBar(false, false)`), always-on-top mode (`OverlappedPresenter.IsAlwaysOnTop`), custom title bar drag handle (`WM_NCLBUTTONDOWN` / `ReleaseCapture`), monitor work-area centering, DPI scaling calculations, live status badge, quick switcher flyout with queued source list, next/previous buttons, pause, blackout, stop, show output, and show dashboard actions.
+  - Native WinUI 3 compact floating presenter dock [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml) with custom borderless styling (`SetBorderAndTitleBar(false, false)`), explicit local style resources (`DockSubtleButtonStyle`, resolving runtime `0x802B000A XamlParseException`), always-on-top mode (`OverlappedPresenter.IsAlwaysOnTop`), custom title bar drag handle (`WM_NCLBUTTONDOWN` / `ReleaseCapture`), monitor work-area centering, DPI scaling calculations, live status badge, quick switcher flyout with queued source list, next/previous buttons, pause, blackout, stop, show output, and show dashboard actions.
   - Two distinct presenter modes: Expanded 2-row layout (620×110 DIP) and Compact 1-row layout (480×54 DIP) with dynamic animated window resizing and setting persistence.
   - Single-instance dock window service [PresenterDockService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresenterDockService.cs) for opening, closing, and toggling dock visibility.
   - Configurable presenter controls in Settings ([SettingsPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SettingsPage.xaml)) for global hotkey toggles, auto-open dock on start presenting, always-on-top preference, and active keybinding display table.

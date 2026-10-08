@@ -12,6 +12,17 @@
 
     <!-- Floating Dock Surface with rounded border -->
     <Grid Background="Transparent">
+        <Grid.Resources>
+            <!-- Subtle / Chromeless Button Style for Presenter Dock -->
+            <Style x:Key="DockSubtleButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="6,4" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+        </Grid.Resources>
         <Border x:Name="DockCardBorder"
                 Background="{ThemeResource LayerFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
@@ -79,7 +90,7 @@
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                             <!-- Toggle Compact Mode -->
                             <Button Command="{x:Bind ViewModel.ToggleCompactModeCommand}"
-                                    Style="{ThemeResource SubtleButtonStyle}"
+                                    Style="{StaticResource DockSubtleButtonStyle}"
                                     Padding="6,4"
                                     ToolTipService.ToolTip="{x:Bind ViewModel.CompactModeTooltip, Mode=OneWay}">
                                 <FontIcon Glyph="&#xE73F;" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -87,7 +98,7 @@
 
                             <!-- Close Dock -->
                             <Button Command="{x:Bind ViewModel.CloseDockCommand}"
-                                    Style="{ThemeResource SubtleButtonStyle}"
+                                    Style="{StaticResource DockSubtleButtonStyle}"
                                     Padding="6,4"
                                     ToolTipService.ToolTip="Close Presenter Dock (Ctrl+Shift+D)">
                                 <FontIcon Glyph="&#xE8BB;" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -224,7 +235,7 @@
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
                             <!-- Show Presentation Output Window -->
                             <Button Command="{x:Bind ViewModel.ShowOutputWindowCommand}"
-                                    Style="{ThemeResource SubtleButtonStyle}"
+                                    Style="{StaticResource DockSubtleButtonStyle}"
                                     Padding="6,5"
                                     ToolTipService.ToolTip="Bring Presentation Output Window to Front">
                                 <FontIcon Glyph="&#xE7F4;" FontSize="12" />
@@ -232,7 +243,7 @@
 
                             <!-- Show Dashboard -->
                             <Button Command="{x:Bind ViewModel.ShowDashboardCommand}"
-                                    Style="{ThemeResource SubtleButtonStyle}"
+                                    Style="{StaticResource DockSubtleButtonStyle}"
                                     Padding="6,5"
                                     ToolTipService.ToolTip="Bring Main Dashboard to Front (Ctrl+Shift+M)">
                                 <FontIcon Glyph="&#xE80F;" FontSize="12" />
@@ -344,7 +355,7 @@
                     <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
                         <!-- Expand Button -->
                         <Button Command="{x:Bind ViewModel.ToggleCompactModeCommand}"
-                                Style="{ThemeResource SubtleButtonStyle}"
+                                Style="{StaticResource DockSubtleButtonStyle}"
                                 Padding="5,4"
                                 ToolTipService.ToolTip="{x:Bind ViewModel.CompactModeTooltip, Mode=OneWay}">
                             <FontIcon Glyph="&#xE740;" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -352,7 +363,7 @@
 
                         <!-- Close Button -->
                         <Button Command="{x:Bind ViewModel.CloseDockCommand}"
-                                Style="{ThemeResource SubtleButtonStyle}"
+                                Style="{StaticResource DockSubtleButtonStyle}"
                                 Padding="5,4"
                                 ToolTipService.ToolTip="Close Presenter Dock (Ctrl+Shift+D)">
                             <FontIcon Glyph="&#xE8BB;" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />

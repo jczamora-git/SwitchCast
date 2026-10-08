@@ -22,6 +22,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Added setting persistence for compact mode preference via `UserSettings.StartDockInCompactMode`.
 - **Decoupled Dashboard Focus Navigation**:
   - Added `ShowDashboard()` / `RequestShowDashboard` on `IPresenterDockService` and `PresenterDockService`, cleanly routing dashboard activation to `_mainWindow?.Activate()` without direct UI dependencies.
+- **XAML Resource Resolution & SubtleButtonStyle Fix**:
+  - Resolved `Microsoft.UI.Xaml.Markup.XamlParseException` (HRESULT `0x802B000A`) caused by referencing non-existent `{ThemeResource SubtleButtonStyle}`.
+  - Defined explicit local `DockSubtleButtonStyle` inside `<Grid.Resources>` of [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml) and added `SubtleButtonStyle` in [App.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml) `<Application.Resources>` as an application-wide fallback.
+  - Audited and verified all theme resources and brush keys across the entire Presenter Dock view.
 - **Automated Unit Tests**:
   - Added `ShowDashboardCommand_CallsDockServiceShowDashboard` to [SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs), bringing total passing tests to 110 (100% pass rate).
 

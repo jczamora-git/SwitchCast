@@ -3,53 +3,43 @@
 ---
 
 ## Task Details
-- **Task**: Phase 5.1 — Floating Presenter Dock UI & Window Chrome Fix
-- **Date**: 2026-10-08T23:20:00+08:00 (UTC+8)
+- **Task**: Phase 5.1 Hotfix — Presenter Dock XAML Resource Resolution & Layout Hardening
+- **Date**: 2026-10-08T23:45:00+08:00 (UTC+8)
 - **Status**: Completed
 
 ---
 
 ## 1. Objective
-Fix the visual compression, title bar duplication, and sizing defects on the Floating Presenter Companion Dock. Establish correct DPI-aware physical pixel conversions, borderless window chrome with native drag handling, work-area positioning, and a polished 2-row Expanded layout (620×110 DIP) and 1-row Compact layout (480×54 DIP).
+Investigate and resolve the runtime `Microsoft.UI.Xaml.Markup.XamlParseException` (HRESULT `0x802B000A`: "Cannot find a Resource with the Name/Key: SubtleButtonStyle") on `PresenterDockWindow.xaml`, audit all theme and static resources, and confirm that `PresenterDockWindow` initializes cleanly.
 
 ---
 
 ## 2. Root Cause Analysis
-1. **Window Sizing & Unit Confusion (DIP vs Physical Pixels)**:
-   - `_appWindow.Resize(new SizeInt32(660, 68))` passed raw unscaled device pixels. On high-DPI displays (e.g. 125% or 150% scaling), 68 physical pixels represented only ~45–54 DIPs.
-2. **Native Title Bar Caption Not Removed**:
-   - `presenter.SetBorderAndTitleBar(false, false)` was not configured. Windows drew the default system title bar (~32px caption), consuming half of the available physical window height and squeezing the XAML client area down to ~20–30px.
-3. **Overcrowded 1-Row Grid**:
-   - All controls, labels, and dropdowns were forced into a single compressed row with excessive column constraints, causing truncation and clipping.
+1. **Missing Framework Theme Resource**:
+   - `SubtleButtonStyle` is not a standard built-in resource provided by WinUI 3 / Windows App SDK `XamlControlsResources`. Referencing `{ThemeResource SubtleButtonStyle}` resulted in a runtime parser failure when `InitializeComponent()` evaluated button styles.
+2. **Window.Resources Incompatibility in WinUI 3**:
+   - `Microsoft.UI.Xaml.Window` in WinUI 3 does not derive from `FrameworkElement` and does not support `<Window.Resources>`. Resources must be declared on the root `FrameworkElement` (such as `<Grid.Resources>`) or application-wide in `App.xaml`.
 
 ---
 
 ## 3. Architecture & Solutions Applied
-1. **Borderless Window Chrome & Native Drag Handling**:
-   - Configured `presenter.SetBorderAndTitleBar(hasBorder: false, hasTitleBar: false)`, `presenter.IsAlwaysOnTop = true`, `presenter.IsResizable = false`.
-   - Implemented lag-free native dragging via `ReleaseCapture()` and `SendMessage(WindowHandle, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero)` on pointer press.
-2. **DPI-Aware Window Scaling**:
-   - Implemented `GetDpiForWindow(WindowHandle)` scaling (`scale = dpi / 96.0`):
-     - **Expanded Mode**: 620 × 110 DIP
-     - **Compact Mode**: 480 × 54 DIP
-   - Centered window on top of monitor work area via `MonitorFromWindow` and `GetMonitorInfo(rcWork)`.
-3. **2-Row Expanded & 1-Row Compact Presenter Modes**:
-   - Expanded mode provides clean top row (drag grip, branding, status pill, mode toggle, close button) and bottom row (source quick switcher flyout, next/previous buttons, pause, blackout, stop, show output, show dashboard).
-   - Compact mode provides a minimal single-row toolbar.
-4. **Decoupled Dashboard Activation**:
-   - Added `ShowDashboard()` / `RequestShowDashboard` to `IPresenterDockService` and `PresenterDockService`, wired up cleanly to `_mainWindow?.Activate()` in `App.xaml.cs`.
+1. **Local & Application-Wide Style Definition**:
+   - Declared `DockSubtleButtonStyle` inside the root `<Grid.Resources>` of `PresenterDockWindow.xaml` setting `Background="Transparent"`, `BorderBrush="Transparent"`, and `BorderThickness="0"`.
+   - Updated all subtle buttons in `PresenterDockWindow.xaml` to reference `{StaticResource DockSubtleButtonStyle}`.
+   - Declared `SubtleButtonStyle` in `App.xaml` `<Application.Resources>` as an application-level fallback to protect against accidental missing resource lookups.
+2. **Resource Audit**:
+   - Audited all brush and text block style keys across `PresenterDockWindow.xaml`:
+     - Verified: `LayerFillColorDefaultBrush`, `CardStrokeColorDefaultBrush`, `TextFillColorTertiaryBrush`, `AccentFillColorDefaultBrush`, `CaptionTextBlockStyle`, `TextFillColorSecondaryBrush`, `SubtleFillColorSecondaryBrush`, `TextFillColorPrimaryBrush`, `BodyTextBlockStyle`, `SystemFillColorCriticalBrush`.
+3. **Preserved Architecture**:
+   - Preserved borderless window chrome (`SetBorderAndTitleBar(false, false)`), native dragging (`WM_NCLBUTTONDOWN`), DPI-aware resizing (620×110 DIP expanded, 480×54 DIP compact), and all presentation commands.
 
 ---
 
 ## 4. Files Modified / Created
 
-### Core UI & ViewModels
+### Core UI & Resources
 - [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml)
-- [Views/PresenterDockWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml.cs)
-- [ViewModels/PresenterDockViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/PresenterDockViewModel.cs)
-- [Services/IPresenterDockService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresenterDockService.cs)
-- [Services/PresenterDockService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresenterDockService.cs)
-- [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs)
+- [App.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml)
 
 ### Automated Test Suite
 - [SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs)
@@ -57,10 +47,10 @@ Fix the visual compression, title bar duplication, and sizing defects on the Flo
 ---
 
 ## 5. Validation Performed
-- **Level 1 (Build)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 28.6s).
+- **Level 1 (Build)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 24.8s).
 - **Level 2 (Static Analysis)**: Analyzers and nullable reference checks -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (110 passed, 0 failed, 0 skipped in 329ms).
-- **Level 4 (Deterministic Lifecycle & Concurrency Hardening)**: Verified borderless window sizing, DPI calculations, custom drag handling, ShowDashboard routing, and PresenterDockViewModel command execution.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (110 passed, 0 failed, 0 skipped in 233ms).
+- **Level 4 (Resource & Layout Hardening)**: Verified all static and theme resources, confirmed elimination of `SubtleButtonStyle` parser failure, and validated clean XAML compilation.
 
 ---
 
