@@ -244,4 +244,71 @@ public class PresentationCoordinatorTests
 
         _mockOutputRenderer.Verify(r => r.RenderSharedBitmapAsync(It.IsAny<RefCountedSoftwareBitmap>(), It.IsAny<long>()), Times.Never);
     }
+
+    [Fact]
+    public async Task SwitchToNextSourceAsync_CyclesThroughQueuedSources()
+    {
+        var src1 = new WindowSource { Id = "win-1", Title = "Window 1", IsAvailable = true };
+        var src2 = new WindowSource { Id = "win-2", Title = "Window 2", IsAvailable = true };
+        var src3 = new WindowSource { Id = "win-3", Title = "Window 3", IsAvailable = true };
+        var sources = new List<CaptureSource> { src1, src2, src3 };
+
+        _mockStateService.SetupGet(s => s.SelectedSources).Returns(sources);
+        _mockStateService.SetupGet(s => s.ActiveSource).Returns(src1);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+        _mockCaptureCoordinator.SetupGet(c => c.State).Returns(CaptureState.Capturing);
+
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object);
+
+        await coordinator.SwitchToNextSourceAsync();
+        _mockCaptureCoordinator.Verify(c => c.SwitchPreviewSourceAsync(src2), Times.Once);
+    }
+
+    [Fact]
+    public async Task SwitchToPreviousSourceAsync_CyclesBackwardThroughQueuedSources()
+    {
+        var src1 = new WindowSource { Id = "win-1", Title = "Window 1", IsAvailable = true };
+        var src2 = new WindowSource { Id = "win-2", Title = "Window 2", IsAvailable = true };
+        var src3 = new WindowSource { Id = "win-3", Title = "Window 3", IsAvailable = true };
+        var sources = new List<CaptureSource> { src1, src2, src3 };
+
+        _mockStateService.SetupGet(s => s.SelectedSources).Returns(sources);
+        _mockStateService.SetupGet(s => s.ActiveSource).Returns(src1);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+        _mockCaptureCoordinator.SetupGet(c => c.State).Returns(CaptureState.Capturing);
+
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object);
+
+        await coordinator.SwitchToPreviousSourceAsync();
+        _mockCaptureCoordinator.Verify(c => c.SwitchPreviewSourceAsync(src3), Times.Once);
+    }
+
+    [Fact]
+    public async Task SwitchToSourceIndexAsync_SwitchesToTargetSlot()
+    {
+        var src1 = new WindowSource { Id = "win-1", Title = "Window 1", IsAvailable = true };
+        var src2 = new WindowSource { Id = "win-2", Title = "Window 2", IsAvailable = true };
+        var sources = new List<CaptureSource> { src1, src2 };
+
+        _mockStateService.SetupGet(s => s.SelectedSources).Returns(sources);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+        _mockCaptureCoordinator.SetupGet(c => c.State).Returns(CaptureState.Capturing);
+
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object);
+
+        await coordinator.SwitchToSourceIndexAsync(1);
+        _mockCaptureCoordinator.Verify(c => c.SwitchPreviewSourceAsync(src2), Times.Once);
+    }
 }

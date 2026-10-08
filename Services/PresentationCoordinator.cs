@@ -301,6 +301,71 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         }
     }
 
+    public async Task SwitchToNextSourceAsync()
+    {
+        var availableSources = _presentationStateService.SelectedSources.Where(s => s.IsAvailable).ToList();
+        if (availableSources.Count == 0)
+        {
+            return;
+        }
+
+        var current = CurrentPresentationSource ?? _presentationStateService.ActiveSource;
+        int currentIndex = current is not null ? availableSources.FindIndex(s => s.Id == current.Id) : -1;
+        int nextIndex = (currentIndex + 1) % availableSources.Count;
+        var nextSource = availableSources[nextIndex];
+
+        if (Status == PresentationStatus.Idle)
+        {
+            await StartPresentationAsync(nextSource).ConfigureAwait(false);
+        }
+        else
+        {
+            await SwitchPresentationSourceAsync(nextSource).ConfigureAwait(false);
+        }
+    }
+
+    public async Task SwitchToPreviousSourceAsync()
+    {
+        var availableSources = _presentationStateService.SelectedSources.Where(s => s.IsAvailable).ToList();
+        if (availableSources.Count == 0)
+        {
+            return;
+        }
+
+        var current = CurrentPresentationSource ?? _presentationStateService.ActiveSource;
+        int currentIndex = current is not null ? availableSources.FindIndex(s => s.Id == current.Id) : -1;
+        int prevIndex = (currentIndex - 1 + availableSources.Count) % availableSources.Count;
+        var prevSource = availableSources[prevIndex];
+
+        if (Status == PresentationStatus.Idle)
+        {
+            await StartPresentationAsync(prevSource).ConfigureAwait(false);
+        }
+        else
+        {
+            await SwitchPresentationSourceAsync(prevSource).ConfigureAwait(false);
+        }
+    }
+
+    public async Task SwitchToSourceIndexAsync(int index)
+    {
+        var availableSources = _presentationStateService.SelectedSources.Where(s => s.IsAvailable).ToList();
+        if (index < 0 || index >= availableSources.Count)
+        {
+            return;
+        }
+
+        var targetSource = availableSources[index];
+        if (Status == PresentationStatus.Idle)
+        {
+            await StartPresentationAsync(targetSource).ConfigureAwait(false);
+        }
+        else
+        {
+            await SwitchPresentationSourceAsync(targetSource).ConfigureAwait(false);
+        }
+    }
+
     private void OnCaptureFrameArrived(object? sender, FrameArrivedEventArgs e)
     {
         if (Status != PresentationStatus.Active)

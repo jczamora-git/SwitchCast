@@ -13,6 +13,7 @@ namespace SwitchCast.ViewModels;
 public partial class SettingsViewModel : ObservableObject
 {
     private readonly IApplicationSettingsService _settingsService;
+    private readonly IHotkeyService? _hotkeyService;
 
     [ObservableProperty]
     private int _selectedThemeIndex;
@@ -20,12 +21,34 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _rememberWindowDimensions;
 
-    public SettingsViewModel(IApplicationSettingsService settingsService)
-    {
-        _settingsService = settingsService;
+    [ObservableProperty]
+    private bool _enableGlobalHotkeys;
 
-        _selectedThemeIndex = (int)_settingsService.CurrentSettings.Theme;
-        _rememberWindowDimensions = _settingsService.CurrentSettings.RememberWindowDimensions;
+    [ObservableProperty]
+    private bool _autoOpenPresenterDock;
+
+    [ObservableProperty]
+    private bool _dockAlwaysOnTop;
+
+    [ObservableProperty]
+    private bool _startDockInCompactMode;
+
+    [ObservableProperty]
+    private IReadOnlyList<HotkeyBinding> _hotkeyBindings;
+
+    public SettingsViewModel(IApplicationSettingsService settingsService, IHotkeyService? hotkeyService = null)
+    {
+        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        _hotkeyService = hotkeyService;
+
+        var current = _settingsService.CurrentSettings;
+        _selectedThemeIndex = (int)current.Theme;
+        _rememberWindowDimensions = current.RememberWindowDimensions;
+        _enableGlobalHotkeys = current.EnableGlobalHotkeys;
+        _autoOpenPresenterDock = current.AutoOpenPresenterDock;
+        _dockAlwaysOnTop = current.DockAlwaysOnTop;
+        _startDockInCompactMode = current.StartDockInCompactMode;
+        _hotkeyBindings = current.HotkeyBindings.ToList();
     }
 
     public string AppName => "SwitchCast";
@@ -48,6 +71,63 @@ public partial class SettingsViewModel : ObservableObject
     async partial void OnRememberWindowDimensionsChanged(bool value)
     {
         _settingsService.CurrentSettings.RememberWindowDimensions = value;
+        await _settingsService.SaveSettingsAsync();
+    }
+
+    async partial void OnEnableGlobalHotkeysChanged(bool value)
+    {
+        _settingsService.CurrentSettings.EnableGlobalHotkeys = value;
+        _hotkeyService?.SetEnabled(value);
+        await _settingsService.SaveSettingsAsync();
+    }
+
+    async partial void OnAutoOpenPresenterDockChanged(bool value)
+    {
+        _settingsService.CurrentSettings.AutoOpenPresenterDock = value;
+        await _settingsService.SaveSettingsAsync();
+    }
+
+    async partial void OnDockAlwaysOnTopChanged(bool value)
+    {
+        _settingsService.CurrentSettings.DockAlwaysOnTop = value;
+        await _settingsService.SaveSettingsAsync();
+    }
+
+    async partial void OnStartDockInCompactModeChanged(bool value)
+    {
+        _settingsService.CurrentSettings.StartDockInCompactMode = value;
+        await _settingsService.SaveSettingsAsync();
+    }
+
+    [RelayCommand]
+    public async Task ResetHotkeysToDefaultAsync()
+    {
+        var defaultHotkeys = UserSettings.GetDefaultHotkeys();
+        _settingsService.CurrentSettings.HotkeyBindings = defaultHotkeys;
+        HotkeyBindings = defaultHotkeys.ToList();
+        _hotkeyService?.ReloadSettings();
+        await _settingsService.SaveSettingsAsync();
+    }
+
+    [RelayCommand]
+    public async Task ToggleHotkeyBindingAsync(HotkeyBinding? binding)
+    {
+        if (binding is null)
+        {
+            return;
+        }
+
+        binding.IsEnabled = !binding.IsEnabled;
+        if (binding.IsEnabled)
+        {
+            _hotkeyService?.RegisterHotkey(binding);
+        }
+        else
+        {
+            _hotkeyService?.UnregisterHotkey(binding.Action);
+        }
+
+        HotkeyBindings = _settingsService.CurrentSettings.HotkeyBindings.ToList();
         await _settingsService.SaveSettingsAsync();
     }
 }

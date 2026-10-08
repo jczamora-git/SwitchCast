@@ -4,6 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="using:SwitchCast.Models"
     xmlns:vm="using:SwitchCast.ViewModels"
     mc:Ignorable="d">
 
@@ -73,7 +74,127 @@
                 </Border>
             </StackPanel>
 
-            <!-- SECTION C: ABOUT & SYSTEM INFO -->
+            <!-- SECTION C: PRESENTER CONTROLS & GLOBAL SHORTCUTS (PHASE 5) -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="Presenter Controls &amp; Global Shortcuts" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" />
+
+                <Border Padding="20"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <StackPanel Spacing="18">
+                        <!-- Toggle 1: Global Hotkeys -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                <TextBlock Text="Enable Global Hotkeys" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                                <TextBlock Text="Allow switching capture sources and controlling live stream from anywhere in Windows."
+                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1"
+                                          IsOn="{x:Bind ViewModel.EnableGlobalHotkeys, Mode=TwoWay}"
+                                          OnContent="Enabled"
+                                          OffContent="Disabled"
+                                          VerticalAlignment="Center" />
+                        </Grid>
+
+                        <MenuFlyoutSeparator />
+
+                        <!-- Toggle 2: Auto-Open Floating Presenter Dock -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                <TextBlock Text="Auto-Open Floating Presenter Dock" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                                <TextBlock Text="Automatically show the compact floating presenter companion dock when starting live presentation."
+                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1"
+                                          IsOn="{x:Bind ViewModel.AutoOpenPresenterDock, Mode=TwoWay}"
+                                          OnContent="Enabled"
+                                          OffContent="Disabled"
+                                          VerticalAlignment="Center" />
+                        </Grid>
+
+                        <MenuFlyoutSeparator />
+
+                        <!-- Toggle 3: Dock Always on Top -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                <TextBlock Text="Keep Presenter Dock Always on Top" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                                <TextBlock Text="Pins the presenter dock above full-screen windows, presentations, and browser tabs."
+                                           Style="{ThemeResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1"
+                                          IsOn="{x:Bind ViewModel.DockAlwaysOnTop, Mode=TwoWay}"
+                                          OnContent="Enabled"
+                                          OffContent="Disabled"
+                                          VerticalAlignment="Center" />
+                        </Grid>
+
+                        <MenuFlyoutSeparator />
+
+                        <!-- Global Hotkeys Mapping List -->
+                        <StackPanel Spacing="10">
+                            <Grid>
+                                <TextBlock Text="Active Shortcut Map" Style="{ThemeResource BodyStrongTextBlockStyle}" VerticalAlignment="Center" />
+                                <Button Content="Reset Shortcuts to Defaults"
+                                        Command="{x:Bind ViewModel.ResetHotkeysToDefaultCommand}"
+                                        HorizontalAlignment="Right"
+                                        Style="{ThemeResource TextBlockButtonStyle}" />
+                            </Grid>
+
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.HotkeyBindings, Mode=OneWay}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:HotkeyBinding">
+                                        <Grid Padding="12,8" Margin="0,0,0,4"
+                                              Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                              CornerRadius="6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{x:Bind Name}" Style="{ThemeResource BodyStrongTextBlockStyle}" FontSize="13" />
+                                                <TextBlock Text="{x:Bind Description}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+
+                                            <Border Grid.Column="1"
+                                                    Padding="10,4"
+                                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="4"
+                                                    VerticalAlignment="Center">
+                                                <TextBlock Text="{x:Bind DisplayString}"
+                                                           FontFamily="Consolas, Segoe UI"
+                                                           FontWeight="SemiBold"
+                                                           FontSize="12" />
+                                            </Border>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- SECTION D: ABOUT & SYSTEM INFO -->
             <StackPanel Spacing="12">
                 <TextBlock Text="About SwitchCast" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" />
 

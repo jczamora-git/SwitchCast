@@ -7,6 +7,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Phase 5 — Global Hotkeys & Floating Presenter Dock] - 2026-10-08
+
+### Added (feat / test / docs)
+- **Native Win32 Global Hotkeys Engine**:
+  - Implemented [Models/HotkeyModels.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/HotkeyModels.cs), [Services/IHotkeyService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IHotkeyService.cs), and [Services/Win32HotkeyService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32HotkeyService.cs) registering system-wide hotkeys via Win32 `RegisterHotKey` / `UnregisterHotKey`.
+  - Hosted on a lightweight message-only window (`HWND_MESSAGE` = `-3`) with pinned `WndProc` delegate, capturing `WM_HOTKEY` (0x0312) messages without polling, hooks, or window focus dependencies.
+  - Actions supported: Next Source (`Ctrl+Shift+Right`), Previous Source (`Ctrl+Shift+Left`), Pause/Resume (`Ctrl+Shift+P`), Blackout (`Ctrl+Shift+B`), Stop Presenting (`Ctrl+Shift+S`), Toggle Presenter Dock (`Ctrl+Shift+D`), Focus Dashboard (`Ctrl+Shift+M`), and Direct Source Switching (`Ctrl+Shift+1..5`).
+- **Floating Presenter Companion Dock**:
+  - Implemented [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml) and [Views/PresenterDockWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml.cs) as a top-level native WinUI 3 Window with `OverlappedPresenter.IsAlwaysOnTop = true`, fixed compact size (440x88), custom title bar drag handle (`AppTitleBar`), and borderless styling.
+  - Built [ViewModels/PresenterDockViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/PresenterDockViewModel.cs) with status badge (Live/Paused/Blackout/Idle), direct switch flyout with live queued sources, next/previous buttons, pause toggle, blackout toggle, stop presenting, and show presentation output.
+- **Single-Instance Presenter Dock Window Service**:
+  - Implemented [Services/IPresenterDockService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresenterDockService.cs) and [Services/PresenterDockService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresenterDockService.cs) to manage opening, closing, and toggling dock visibility cleanly.
+- **Presenter Controls & Hotkey Configuration in Settings**:
+  - Added Section C in [Views/SettingsPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SettingsPage.xaml) and [ViewModels/SettingsViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SettingsViewModel.cs) for enabling global hotkeys, auto-opening dock on presentation start, keeping dock always-on-top, and displaying the active hotkey binding table.
+  - Added persistence properties to [Models/UserSettings.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/UserSettings.cs).
+- **Sequential Source Switching in Presentation Coordinator**:
+  - Added `SwitchToNextSourceAsync()`, `SwitchToPreviousSourceAsync()`, and `SwitchToSourceIndexAsync(int index)` to [IPresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresentationCoordinator.cs) and [PresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationCoordinator.cs), routing directly through the serialized Latest-Request-Wins pipeline.
+- **Automated Unit Test Suites**:
+  - Added [SwitchCast.Tests/Services/HotkeyServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/HotkeyServiceTests.cs) (hotkey lifecycle, binding models, event triggers).
+  - Added [SwitchCast.Tests/Services/PresenterDockServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresenterDockServiceTests.cs) (dock service lifecycle).
+  - Added [SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs) (presenter dock commands and state sync).
+  - Expanded [SwitchCast.Tests/Services/PresentationCoordinatorTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresentationCoordinatorTests.cs) for quick next/previous switching, expanding the total test suite to 109 tests (100% pass rate).
+
+---
+
 ## [Phase 4.7 — Rapid Source Switching Crash Fix & Concurrency Hardening] - 2026-10-08
 
 ### Fixed (fix / test / docs)

@@ -18,6 +18,8 @@ public partial class DashboardViewModel : ObservableObject
     private readonly INavigationService _navigationService;
     private readonly ICaptureCoordinator _captureCoordinator;
     private readonly IPresentationCoordinator _presentationCoordinator;
+    private readonly IPresenterDockService? _dockService;
+    private readonly IApplicationSettingsService? _settingsService;
 
     [ObservableProperty]
     private CaptureSource? _selectedPreviewSource;
@@ -29,16 +31,26 @@ public partial class DashboardViewModel : ObservableObject
         IPresentationStateService presentationStateService,
         INavigationService navigationService,
         ICaptureCoordinator captureCoordinator,
-        IPresentationCoordinator presentationCoordinator)
+        IPresentationCoordinator presentationCoordinator,
+        IPresenterDockService? dockService = null,
+        IApplicationSettingsService? settingsService = null)
     {
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
         _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
         _captureCoordinator = captureCoordinator ?? throw new ArgumentNullException(nameof(captureCoordinator));
         _presentationCoordinator = presentationCoordinator ?? throw new ArgumentNullException(nameof(presentationCoordinator));
+        _dockService = dockService;
+        _settingsService = settingsService;
 
         _presentationStateService.PropertyChanged += OnPresentationStatePropertyChanged;
         _captureCoordinator.PropertyChanged += OnCaptureCoordinatorPropertyChanged;
         _presentationCoordinator.PropertyChanged += OnPresentationCoordinatorPropertyChanged;
+
+        if (_dockService is not null)
+        {
+            _dockService.DockOpened += (s, e) => OnPropertyChanged(nameof(IsPresenterDockOpen));
+            _dockService.DockClosed += (s, e) => OnPropertyChanged(nameof(IsPresenterDockOpen));
+        }
 
         // Default selected sources if sources are already queued
         var defaultSource = _presentationStateService.SelectedSources.FirstOrDefault(s => s.IsAvailable);
@@ -93,6 +105,8 @@ public partial class DashboardViewModel : ObservableObject
 
     public bool IsOutputWindowOpen => _presentationCoordinator.IsOutputWindowOpen;
 
+    public bool IsPresenterDockOpen => _dockService?.IsDockOpen ?? false;
+
     public bool IsPresenting => _presentationCoordinator.IsLive;
 
     public bool IsPresentationPaused => _presentationCoordinator.IsPaused;
@@ -102,6 +116,8 @@ public partial class DashboardViewModel : ObservableObject
     public bool HasActivePresentation => IsPresenting || IsPresentationPaused || IsPresentationBlackout;
 
     public string PresentationOutputStatusText => IsOutputWindowOpen ? "Window Open" : "Window Closed";
+
+    public string PresenterDockStatusText => IsPresenterDockOpen ? "Dock Open" : "Dock Closed";
 
     public string PresentationButtonText => HasActivePresentation ? "Stop Presenting" : "Start Presenting";
 
@@ -124,6 +140,24 @@ public partial class DashboardViewModel : ObservableObject
     public Visibility HasSelectedSourcesVisibility => HasSelectedSources ? Visibility.Visible : Visibility.Collapsed;
 
     public Visibility NoSelectedSourcesVisibility => HasSelectedSources ? Visibility.Collapsed : Visibility.Visible;
+
+    /// <summary>
+    /// Opens or activates the floating presenter dock window.
+    /// </summary>
+    [RelayCommand]
+    public void ShowPresenterDock()
+    {
+        _dockService?.ShowDock();
+    }
+
+    /// <summary>
+    /// Toggles the floating presenter dock window open or closed.
+    /// </summary>
+    [RelayCommand]
+    public void TogglePresenterDock()
+    {
+        _dockService?.ToggleDock();
+    }
 
     /// <summary>
     /// Starts live capture preview on the selected source.
@@ -219,6 +253,11 @@ public partial class DashboardViewModel : ObservableObject
         try
         {
             await _presentationCoordinator.StartPresentationAsync(targetSource).ConfigureAwait(false);
+
+            if (_settingsService?.CurrentSettings.AutoOpenPresenterDock == true)
+            {
+                _dockService?.ShowDock();
+            }
         }
         catch
         {

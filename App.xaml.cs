@@ -46,11 +46,14 @@ public partial class App : Application
         services.AddSingleton<IPresentationWindowService, PresentationWindowService>();
         services.AddSingleton<IPresentationOutputRenderer, Direct3D11PresentationRenderer>();
         services.AddSingleton<IPresentationCoordinator, PresentationCoordinator>();
+        services.AddSingleton<IPresenterDockService, PresenterDockService>();
+        services.AddSingleton<IHotkeyService, Win32HotkeyService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();
         services.AddTransient<DashboardViewModel>();
         services.AddTransient<PresentationViewModel>();
+        services.AddTransient<PresenterDockViewModel>();
         services.AddTransient<SourcesViewModel>();
         services.AddTransient<SettingsViewModel>();
 
@@ -64,6 +67,63 @@ public partial class App : Application
         // Preload persistent user settings before initializing UI
         var settingsService = Services.GetRequiredService<IApplicationSettingsService>();
         await settingsService.LoadSettingsAsync();
+
+        // Initialize and wire up system-wide global hotkeys
+        var hotkeyService = Services.GetRequiredService<IHotkeyService>();
+        var presentationCoordinator = Services.GetRequiredService<IPresentationCoordinator>();
+        var presenterDockService = Services.GetRequiredService<IPresenterDockService>();
+
+        hotkeyService.HotkeyTriggered += (s, e) =>
+        {
+            switch (e.Action)
+            {
+                case Models.HotkeyAction.NextSource:
+                    _ = presentationCoordinator.SwitchToNextSourceAsync();
+                    break;
+                case Models.HotkeyAction.PreviousSource:
+                    _ = presentationCoordinator.SwitchToPreviousSourceAsync();
+                    break;
+                case Models.HotkeyAction.TogglePause:
+                    if (presentationCoordinator.IsPaused)
+                    {
+                        _ = presentationCoordinator.ResumePresentationAsync();
+                    }
+                    else
+                    {
+                        _ = presentationCoordinator.PausePresentationAsync();
+                    }
+                    break;
+                case Models.HotkeyAction.ToggleBlackout:
+                    _ = presentationCoordinator.ToggleBlackoutAsync();
+                    break;
+                case Models.HotkeyAction.StopPresentation:
+                    _ = presentationCoordinator.StopPresentationAsync();
+                    break;
+                case Models.HotkeyAction.TogglePresenterDock:
+                    presenterDockService.ToggleDock();
+                    break;
+                case Models.HotkeyAction.ShowDashboard:
+                    _mainWindow?.Activate();
+                    break;
+                case Models.HotkeyAction.SelectSource1:
+                    _ = presentationCoordinator.SwitchToSourceIndexAsync(0);
+                    break;
+                case Models.HotkeyAction.SelectSource2:
+                    _ = presentationCoordinator.SwitchToSourceIndexAsync(1);
+                    break;
+                case Models.HotkeyAction.SelectSource3:
+                    _ = presentationCoordinator.SwitchToSourceIndexAsync(2);
+                    break;
+                case Models.HotkeyAction.SelectSource4:
+                    _ = presentationCoordinator.SwitchToSourceIndexAsync(3);
+                    break;
+                case Models.HotkeyAction.SelectSource5:
+                    _ = presentationCoordinator.SwitchToSourceIndexAsync(4);
+                    break;
+            }
+        };
+
+        hotkeyService.Initialize();
 
         _mainWindow = new MainWindow();
         _mainWindow.Activate();

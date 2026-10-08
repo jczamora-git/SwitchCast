@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Phase 4.7 — Rapid Source Switching Crash Fix & Concurrency Hardening
-- **Overall Status**: **Completed (Ready for Phase 5)**
-- **Last Updated**: 2026-10-08T22:30:00+08:00 (UTC+8)
+- **Current Phase**: Phase 5 — Global Hotkeys & Floating Presenter Dock
+- **Overall Status**: **Completed (Ready for Phase 6)**
+- **Last Updated**: 2026-10-08T22:45:00+08:00 (UTC+8)
 
 ---
 
@@ -18,8 +18,8 @@ This is the authoritative progress, state, and environmental tracking document f
 ### Implemented & Verified
 - [x] **Strict AI Development Harness (Phase 0)**: Standardized rules ([AGENTS.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/AGENTS.md)), 6 domain skills, architecture specifications, coding standards, and [.editorconfig](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.editorconfig).
 - [x] **WinUI 3 Desktop Application Shell (Phase 1)**: Modern native Windows 11 Fluent interface targeting `net8.0-windows10.0.19041.0` with Windows App SDK 1.5, x64 architecture, and unpackaged execution support.
-- [x] **Dependency Injection & Architecture**: Full DI container configured via `Microsoft.Extensions.DependencyInjection` in [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs) registering all core services, discovery engines, capture pipelines, presentation coordinators, and ViewModels.
-- [x] **MVVM Pattern**: ViewModels and commands powered by `CommunityToolkit.Mvvm` ([MainViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/MainViewModel.cs), [DashboardViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/DashboardViewModel.cs), [PresentationViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/PresentationViewModel.cs), [SourcesViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SourcesViewModel.cs), [SettingsViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SettingsViewModel.cs), [SelectableSourceItem.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SelectableSourceItem.cs)).
+- [x] **Dependency Injection & Architecture**: Full DI container configured via `Microsoft.Extensions.DependencyInjection` in [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs) registering all core services, discovery engines, capture pipelines, presentation coordinators, dock services, hotkey services, and ViewModels.
+- [x] **MVVM Pattern**: ViewModels and commands powered by `CommunityToolkit.Mvvm` ([MainViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/MainViewModel.cs), [DashboardViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/DashboardViewModel.cs), [PresentationViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/PresentationViewModel.cs), [PresenterDockViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/PresenterDockViewModel.cs), [SourcesViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SourcesViewModel.cs), [SettingsViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SettingsViewModel.cs), [SelectableSourceItem.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SelectableSourceItem.cs)).
 - [x] **Centralized Application State & Selection Management**: [IPresentationStateService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresentationStateService.cs) & [PresentationStateService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationStateService.cs) managing session status (`Idle`, `Active`, `Paused`, `Blackout`), active capture source, queued sources list, multi-source toggle selection, and availability reconciliation.
 - [x] **Real Window Discovery Engine (Phase 2)**: [IWindowDiscoveryService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IWindowDiscoveryService.cs) & [Win32WindowDiscoveryService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowDiscoveryService.cs) enumerating active top-level application windows using `EnumWindows`, `IsWindowVisible`, `GetWindowTextW`, `DwmGetWindowAttribute` (`DWMWA_CLOAKED`), `WS_EX_TOOLWINDOW` filtering, process name resolution, and SwitchCast self-exclusion.
 - [x] **Real Monitor Discovery Engine (Phase 2)**: [IMonitorDiscoveryService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IMonitorDiscoveryService.cs) & [Win32MonitorDiscoveryService](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32MonitorDiscoveryService.cs) enumerating connected displays via `EnumDisplayMonitors` and `GetMonitorInfo`, calculating resolutions, virtual coordinates, and primary/secondary flags.
@@ -50,10 +50,17 @@ This is the authoritative progress, state, and environmental tracking document f
   - Unified frame distribution pipeline and output renderer [Direct3D11PresentationRenderer.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11PresentationRenderer.cs).
   - Presentation coordinator [PresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationCoordinator.cs) supporting Start Presenting, Stop Presenting, Freeze/Pause, Resume, Blackout, and on-the-fly source switching without closing or recreating the output window.
   - Dashboard presentation controls in [DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml) and [DashboardViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/DashboardViewModel.cs).
-- [x] **Automated Unit & Concurrency Test Suite**: 86 comprehensive unit & regression tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) verifying rapid source switching (Latest-Request-Wins), concurrent transitions, ref-counted bitmap lifecycles, presentation coordinator, presentation window states, capture transitions, win32 diagnostic capture, discovery orchestration, search filtering, selection sync, and reconciliation (100% pass rate).
+- [x] **Global Hotkeys & Floating Presenter Companion Dock (Phase 5)**:
+  - System-wide global hotkeys via native Win32 `RegisterHotKey` / `UnregisterHotKey` in [Win32HotkeyService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32HotkeyService.cs) hosted on a dedicated message-only window (`HWND_MESSAGE`).
+  - Hotkey actions for Next Source (`Ctrl+Shift+Right`), Previous Source (`Ctrl+Shift+Left`), Pause/Resume (`Ctrl+Shift+P`), Blackout (`Ctrl+Shift+B`), Stop Presenting (`Ctrl+Shift+S`), Toggle Presenter Dock (`Ctrl+Shift+D`), Focus Dashboard (`Ctrl+Shift+M`), and Direct Source Switching (`Ctrl+Shift+1..5`).
+  - Native WinUI 3 compact floating presenter dock [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml) with always-on-top mode (`OverlappedPresenter.IsAlwaysOnTop`), custom title bar drag handle, live status badge, quick switcher flyout, next/previous buttons, pause, blackout, stop, and show output actions.
+  - Single-instance dock window service [PresenterDockService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresenterDockService.cs) for opening, closing, and toggling dock visibility.
+  - Configurable presenter controls in Settings ([SettingsPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SettingsPage.xaml)) for global hotkey toggles, auto-open dock on start presenting, always-on-top preference, and active keybinding display table.
+  - Sequential source switching API on [IPresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresentationCoordinator.cs) (`SwitchToNextSourceAsync`, `SwitchToPreviousSourceAsync`, `SwitchToSourceIndexAsync`) routing directly through the serialized Latest-Request-Wins pipeline.
+- [x] **Automated Unit & Concurrency Test Suite**: 109 comprehensive unit & regression tests in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) verifying hotkey lifecycle, dock service lifecycle, dock ViewModel commands, rapid source switching (Latest-Request-Wins), concurrent transitions, ref-counted bitmap lifecycles, presentation coordinator, presentation window states, capture transitions, win32 diagnostic capture, discovery orchestration, search filtering, selection sync, and reconciliation (100% pass rate).
 
 ### Planned (Upcoming)
-- [ ] **Phase 5**: Switching System (Global hotkeys, instant source switching, shortcut customization).
+- [x] **Phase 5**: Switching System (Global hotkeys, instant source switching, shortcut customization).
 - [ ] **Phase 6**: Stability & Performance Optimization (Device loss recovery, leak audits, DPI adaptation).
 - [ ] **Phase 7**: Advanced Presenter Features (Live thumbnail previews, smooth transitions).
 - [ ] **Phase 8**: Packaging and Release (MSIX packaging, release readiness).
@@ -72,7 +79,7 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ## 4. ARCHITECTURE DECISION RECORDS
 
-- [ADR-0001: Technology Stack & Clean Architecture Core](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/decisions/ADR-0001-architecture.md) — Implemented in Phase 1, 2, 3, 4, 4.6, and 4.7.
+- [ADR-0001: Technology Stack & Clean Architecture Core](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/decisions/ADR-0001-architecture.md) — Implemented in Phase 1, 2, 3, 4, 4.6, 4.7, and 5.
 
 ---
 
@@ -90,12 +97,12 @@ This is the authoritative progress, state, and environmental tracking document f
 
 - **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 4.0s).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (86 passed, 0 failed, 0 skipped in 418ms).
-- **Level 4 (Deterministic Lifecycle & Concurrency Hardening)**: RefCountedSoftwareBitmap zero-leak memory lifecycle, Latest-Request-Wins transition serialization, safe Clear/Dispose teardown, and session generation validation verified.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (109 passed, 0 failed, 0 skipped in 380ms).
+- **Level 4 (Deterministic Lifecycle & Concurrency Hardening)**: Hotkey message-only window unregistration, Presenter Dock single-instance lifecycle, Latest-Request-Wins transition serialization, RefCountedSoftwareBitmap zero-leak memory lifecycle, and session generation validation verified.
 
 ---
 
 ## 7. NEXT RECOMMENDED TASK
 
-**Task**: **Phase 5 — Global Hotkeys & Presentation Switching Controls**
-- **Objective**: Implement native Win32 global hotkeys (`RegisterHotKey`) for instant one-key source switching, pause, and blackout shortcuts.
+**Task**: **Phase 6 — Stability & Performance Optimization**
+- **Objective**: Direct3D 11 device loss resilience, DPI dynamic scaling across multi-monitor setups, and extended presentation load tests.

@@ -24,4 +24,116 @@ public class UserSettings
     /// Whether to restore window dimensions on startup.
     /// </summary>
     public bool RememberWindowDimensions { get; set; } = true;
+
+    /// <summary>
+    /// Whether system-wide global hotkeys are enabled.
+    /// </summary>
+    public bool EnableGlobalHotkeys { get; set; } = true;
+
+    /// <summary>
+    /// Whether to automatically open the floating presenter dock when presentation starts.
+    /// </summary>
+    public bool AutoOpenPresenterDock { get; set; } = true;
+
+    /// <summary>
+    /// Whether the floating presenter dock stays always-on-top.
+    /// </summary>
+    public bool DockAlwaysOnTop { get; set; } = true;
+
+    /// <summary>
+    /// Whether the floating presenter dock starts in compact single-row mode.
+    /// </summary>
+    public bool StartDockInCompactMode { get; set; } = false;
+
+    /// <summary>
+    /// Configured global hotkey bindings.
+    /// </summary>
+    public List<HotkeyBinding> HotkeyBindings { get; set; } = GetDefaultHotkeys();
+
+    /// <summary>
+    /// Generates the standard default hotkey bindings.
+    /// </summary>
+    public static List<HotkeyBinding> GetDefaultHotkeys() => new()
+    {
+        new HotkeyBinding
+        {
+            Action = HotkeyAction.NextSource,
+            Modifiers = HotkeyModifiers.Control | HotkeyModifiers.Shift,
+            VirtualKey = 0x27, // VK_RIGHT
+            Name = "Next Presentation Source",
+            Description = "Switches presentation to the next queued source."
+        },
+        new HotkeyBinding
+        {
+            Action = HotkeyAction.PreviousSource,
+            Modifiers = HotkeyModifiers.Control | HotkeyModifiers.Shift,
+            VirtualKey = 0x25, // VK_LEFT
+            Name = "Previous Presentation Source",
+            Description = "Switches presentation to the previous queued source."
+        },
+        new HotkeyBinding
+        {
+            Action = HotkeyAction.TogglePause,
+            Modifiers = HotkeyModifiers.Control | HotkeyModifiers.Shift,
+            VirtualKey = 0x50, // 'P'
+            Name = "Toggle Pause / Freeze Frame",
+            Description = "Freezes the current frame or resumes live stream."
+        },
+        new HotkeyBinding
+        {
+            Action = HotkeyAction.ToggleBlackout,
+            Modifiers = HotkeyModifiers.Control | HotkeyModifiers.Shift,
+            VirtualKey = 0x42, // 'B'
+            Name = "Toggle Privacy Blackout",
+            Description = "Instantly blacks out presentation output for privacy."
+        },
+        new HotkeyBinding
+        {
+            Action = HotkeyAction.StopPresentation,
+            Modifiers = HotkeyModifiers.Control | HotkeyModifiers.Shift,
+            VirtualKey = 0x53, // 'S'
+            Name = "Stop Presenting",
+            Description = "Stops live presentation output."
+        },
+        new HotkeyBinding
+        {
+            Action = HotkeyAction.TogglePresenterDock,
+            Modifiers = HotkeyModifiers.Control | HotkeyModifiers.Shift,
+            VirtualKey = 0x44, // 'D'
+            Name = "Show / Hide Presenter Dock",
+            Description = "Toggles visibility of the compact floating dock."
+        },
+        new HotkeyBinding
+        {
+            Action = HotkeyAction.ShowDashboard,
+            Modifiers = HotkeyModifiers.Control | HotkeyModifiers.Shift,
+            VirtualKey = 0x4D, // 'M'
+            Name = "Show Control Dashboard",
+            Description = "Brings the main SwitchCast dashboard to the foreground."
+        },
+        new HotkeyBinding
+        {
+            Action = HotkeyAction.SelectSource1,
+            Modifiers = HotkeyModifiers.Control | HotkeyModifiers.Shift,
+            VirtualKey = 0x31, // '1'
+            Name = "Switch to Queued Source 1",
+            Description = "Directly switches to the first queued source."
+        },
+        new HotkeyBinding
+        {
+            Action = HotkeyAction.SelectSource2,
+            Modifiers = HotkeyModifiers.Control | HotkeyModifiers.Shift,
+            VirtualKey = 0x32, // '2'
+            Name = "Switch to Queued Source 2",
+            Description = "Directly switches to the second queued source."
+        },
+        new HotkeyBinding
+        {
+            Action = HotkeyAction.SelectSource3,
+            Modifiers = HotkeyModifiers.Control | HotkeyModifiers.Shift,
+            VirtualKey = 0x33, // '3'
+            Name = "Switch to Queued Source 3",
+            Description = "Directly switches to the third queued source."
+        }
+    };
 }

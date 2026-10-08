@@ -88,4 +88,19 @@ public interface IPresentationCoordinator : INotifyPropertyChanged, IDisposable
     /// Toggles presentation blackout mode.
     /// </summary>
     Task ToggleBlackoutAsync();
+
+    /// <summary>
+    /// Switches to the next available source in the queued sources list.
+    /// </summary>
+    Task SwitchToNextSourceAsync();
+
+    /// <summary>
+    /// Switches to the previous available source in the queued sources list.
+    /// </summary>
+    Task SwitchToPreviousSourceAsync();
+
+    /// <summary>
+    /// Switches to the source at the specified zero-based index in the queued sources list.
+    /// </summary>
+    Task SwitchToSourceIndexAsync(int index);
 }
