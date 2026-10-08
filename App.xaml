@@ -8,6 +8,44 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
 
+            <ResourceDictionary.ThemeDictionaries>
+                <!-- Dark Theme (Default) -->
+                <ResourceDictionary x:Key="Default">
+                    <SolidColorBrush x:Key="AppBackgroundBrush" Color="#101010" />
+                    <SolidColorBrush x:Key="AppSidebarBrush" Color="#141414" />
+                    <SolidColorBrush x:Key="AppSurfaceBrush" Color="#1A1A1A" />
+                    <SolidColorBrush x:Key="AppSurfaceElevatedBrush" Color="#222222" />
+                    <SolidColorBrush x:Key="AppHoverBrush" Color="#282828" />
+                    <SolidColorBrush x:Key="AppBorderBrush" Color="#2C2C2C" />
+                    <SolidColorBrush x:Key="AppSubtleDividerBrush" Color="#232323" />
+                    <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="#F3F3F3" />
+                    <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#9E9E9E" />
+                    <SolidColorBrush x:Key="AppTextTertiaryBrush" Color="#666666" />
+                    <SolidColorBrush x:Key="AppAccentBrush" Color="#FF7A59" />
+                    <SolidColorBrush x:Key="AppAccentHoverBrush" Color="#FF8E72" />
+                    <SolidColorBrush x:Key="AppBadgeBackgroundBrush" Color="#1E1E1E" />
+                    <SolidColorBrush x:Key="AppPreviewCanvasBrush" Color="#080808" />
+                </ResourceDictionary>
+
+                <!-- Light Theme -->
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="AppBackgroundBrush" Color="#F6F7F9" />
+                    <SolidColorBrush x:Key="AppSidebarBrush" Color="#ECEFF2" />
+                    <SolidColorBrush x:Key="AppSurfaceBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="AppSurfaceElevatedBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="AppHoverBrush" Color="#E5E8EB" />
+                    <SolidColorBrush x:Key="AppBorderBrush" Color="#DCE0E5" />
+                    <SolidColorBrush x:Key="AppSubtleDividerBrush" Color="#E8ECEF" />
+                    <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="#1A1A1A" />
+                    <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#636363" />
+                    <SolidColorBrush x:Key="AppTextTertiaryBrush" Color="#909090" />
+                    <SolidColorBrush x:Key="AppAccentBrush" Color="#E05A36" />
+                    <SolidColorBrush x:Key="AppAccentHoverBrush" Color="#C94E2C" />
+                    <SolidColorBrush x:Key="AppBadgeBackgroundBrush" Color="#F0F2F5" />
+                    <SolidColorBrush x:Key="AppPreviewCanvasBrush" Color="#EAEAEA" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+
             <!-- Subtle / Chromeless Button Style for Toolbars & Floating Palettes -->
             <Style x:Key="SubtleButtonStyle" TargetType="Button">
                 <Setter Property="Background" Value="Transparent" />
@@ -16,6 +54,37 @@
                 <Setter Property="Padding" Value="6,4" />
                 <Setter Property="HorizontalAlignment" Value="Center" />
                 <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="CornerRadius" Value="4" />
+            </Style>
+
+            <!-- Primary Coral CTA Button Style -->
+            <Style x:Key="PrimaryAccentButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="{ThemeResource AppAccentBrush}" />
+                <Setter Property="Foreground" Value="#FFFFFF" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="Padding" Value="16,8" />
+            </Style>
+
+            <!-- Destructive Red Action Button Style -->
+            <Style x:Key="DestructiveButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="#2D1515" />
+                <Setter Property="Foreground" Value="#FF6B6B" />
+                <Setter Property="BorderBrush" Value="#4DFF6B6B" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="Padding" Value="14,7" />
+            </Style>
+
+            <!-- Keyboard Shortcut Pill Style -->
+            <Style x:Key="KeyBadgeBorderStyle" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource AppBadgeBackgroundBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource AppBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="4" />
+                <Setter Property="Padding" Value="8,3" />
             </Style>
         </ResourceDictionary>
     </Application.Resources>

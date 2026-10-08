@@ -2,18 +2,22 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.UI.Xaml;
 using SwitchCast.Models;
 using SwitchCast.Services;
 
 namespace SwitchCast.ViewModels;
 
 /// <summary>
-/// ViewModel managing application theme configuration, preferences, and version metadata.
+/// ViewModel managing application theme configuration, preferences, presenter settings, shortcuts, and version metadata.
 /// </summary>
 public partial class SettingsViewModel : ObservableObject
 {
     private readonly IApplicationSettingsService _settingsService;
     private readonly IHotkeyService? _hotkeyService;
+
+    [ObservableProperty]
+    private int _selectedCategoryIndex = 0; // 0=General, 1=Appearance, 2=Window, 3=Presenter, 4=Shortcuts
 
     [ObservableProperty]
     private int _selectedThemeIndex;
@@ -35,6 +39,9 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private int _selectedSwitchModeIndex;
+
+    [ObservableProperty]
+    private string _shortcutSearchQuery = string.Empty;
 
     [ObservableProperty]
     private IReadOnlyList<HotkeyBinding> _hotkeyBindings;
@@ -65,6 +72,47 @@ public partial class SettingsViewModel : ObservableObject
 
     public string AppDescription =>
         "A lightweight, privacy-first presentation and screen-sharing management utility for Windows desktop.";
+
+    public Visibility GeneralCategoryVisibility => SelectedCategoryIndex == 0 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility AppearanceCategoryVisibility => SelectedCategoryIndex == 1 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility WindowCategoryVisibility => SelectedCategoryIndex == 2 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility PresenterCategoryVisibility => SelectedCategoryIndex == 3 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility ShortcutsCategoryVisibility => SelectedCategoryIndex == 4 ? Visibility.Visible : Visibility.Collapsed;
+
+    public IEnumerable<HotkeyBinding> FilteredHotkeyBindings
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(ShortcutSearchQuery))
+            {
+                return HotkeyBindings;
+            }
+
+            return HotkeyBindings.Where(b =>
+                b.Name.Contains(ShortcutSearchQuery, StringComparison.OrdinalIgnoreCase) ||
+                b.Description.Contains(ShortcutSearchQuery, StringComparison.OrdinalIgnoreCase) ||
+                b.DisplayString.Contains(ShortcutSearchQuery, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    partial void OnSelectedCategoryIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(GeneralCategoryVisibility));
+        OnPropertyChanged(nameof(AppearanceCategoryVisibility));
+        OnPropertyChanged(nameof(WindowCategoryVisibility));
+        OnPropertyChanged(nameof(PresenterCategoryVisibility));
+        OnPropertyChanged(nameof(ShortcutsCategoryVisibility));
+    }
+
+    partial void OnShortcutSearchQueryChanged(string value)
+    {
+        OnPropertyChanged(nameof(FilteredHotkeyBindings));
+    }
+
+    partial void OnHotkeyBindingsChanged(IReadOnlyList<HotkeyBinding> value)
+    {
+        OnPropertyChanged(nameof(FilteredHotkeyBindings));
+    }
 
     async partial void OnSelectedThemeIndexChanged(int value)
     {

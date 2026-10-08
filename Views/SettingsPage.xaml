@@ -9,242 +9,427 @@
     mc:Ignorable="d">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="24" Padding="32,24,32,32" MaxWidth="1000" HorizontalAlignment="Left">
+        <StackPanel Spacing="16" Padding="28,20,28,28" MaxWidth="1040" HorizontalAlignment="Left">
             
             <!-- Header -->
-            <StackPanel Spacing="6">
-                <TextBlock Text="Settings" Style="{ThemeResource TitleTextBlockStyle}" FontWeight="SemiBold" />
-                <TextBlock Text="Customize application theme, window behavior, and view system information."
-                           Style="{ThemeResource BodyTextBlockStyle}"
-                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <StackPanel Spacing="3">
+                <TextBlock Text="Settings"
+                           FontSize="22"
+                           FontWeight="SemiBold"
+                           Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                <TextBlock Text="Preferences, appearance, window options, and global presenter shortcuts."
+                           FontSize="12"
+                           Foreground="{ThemeResource AppTextSecondaryBrush}" />
             </StackPanel>
 
-            <!-- SECTION A: APPEARANCE -->
-            <StackPanel Spacing="12">
-                <TextBlock Text="Appearance &amp; Theme" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" />
+            <!-- Two-Pane Settings Layout -->
+            <Grid ColumnSpacing="16" Margin="0,4,0,0">
+                <Grid.ColumnDefinitions>
+                    <!-- Category Navigation Pane -->
+                    <ColumnDefinition Width="180" />
+                    <!-- Settings Content Pane -->
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-                <Border Padding="20"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                <!-- Category Sidebar -->
+                <Border Grid.Column="0"
+                        Background="{ThemeResource AppSurfaceBrush}"
+                        BorderBrush="{ThemeResource AppBorderBrush}"
                         BorderThickness="1"
-                        CornerRadius="8">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="App Theme" Style="{ThemeResource BodyStrongTextBlockStyle}" />
-                        <TextBlock Text="Select your preferred application color mode. Changes take effect immediately."
-                                   Style="{ThemeResource CaptionTextBlockStyle}"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        CornerRadius="8"
+                        Padding="6,8"
+                        VerticalAlignment="Top">
+                    <RadioButtons SelectedIndex="{x:Bind ViewModel.SelectedCategoryIndex, Mode=TwoWay}"
+                                  MaxColumns="1">
+                        <RadioButton Tag="0" Margin="0,0,0,2" Padding="8,6">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE946;" FontSize="13" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                <TextBlock Text="General" FontSize="12" />
+                            </StackPanel>
+                        </RadioButton>
 
-                        <RadioButtons SelectedIndex="{x:Bind ViewModel.SelectedThemeIndex, Mode=TwoWay}" Margin="0,8,0,0">
-                            <RadioButton Content="Use system setting (Default)" Tag="0" Margin="0,0,0,4" />
-                            <RadioButton Content="Light mode" Tag="1" Margin="0,0,0,4" />
-                            <RadioButton Content="Dark mode" Tag="2" />
-                        </RadioButtons>
-                    </StackPanel>
+                        <RadioButton Tag="1" Margin="0,0,0,2" Padding="8,6">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE790;" FontSize="13" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                <TextBlock Text="Appearance" FontSize="12" />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton Tag="2" Margin="0,0,0,2" Padding="8,6">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE78B;" FontSize="13" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                <TextBlock Text="Window" FontSize="12" />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton Tag="3" Margin="0,0,0,2" Padding="8,6">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE7F4;" FontSize="13" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                <TextBlock Text="Presenter" FontSize="12" />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton Tag="4" Margin="0,0,0,2" Padding="8,6">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE765;" FontSize="13" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                <TextBlock Text="Shortcuts" FontSize="12" />
+                            </StackPanel>
+                        </RadioButton>
+                    </RadioButtons>
                 </Border>
-            </StackPanel>
 
-            <!-- SECTION B: WINDOW PREFERENCES -->
-            <StackPanel Spacing="12">
-                <TextBlock Text="Window Preferences" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" />
+                <!-- Settings Content Panel -->
+                <StackPanel Grid.Column="1" Spacing="16">
+                    
+                    <!-- ========================================================= -->
+                    <!-- CATEGORY 0: GENERAL & SYSTEM INFO                         -->
+                    <!-- ========================================================= -->
+                    <Border Visibility="{x:Bind ViewModel.GeneralCategoryVisibility, Mode=OneWay}"
+                            Background="{ThemeResource AppSurfaceBrush}"
+                            BorderBrush="{ThemeResource AppBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="General &amp; System Information"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="{ThemeResource AppTextPrimaryBrush}" />
 
-                <Border Padding="20"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                            <!-- App Identity Strip -->
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                            <TextBlock Text="Remember Window Dimensions" Style="{ThemeResource BodyStrongTextBlockStyle}" />
-                            <TextBlock Text="Automatically restore the last window size and position upon starting SwitchCast."
-                                       Style="{ThemeResource CaptionTextBlockStyle}"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        </StackPanel>
+                                <Border Grid.Column="0"
+                                        Width="40"
+                                        Height="40"
+                                        Background="{ThemeResource AppAccentBrush}"
+                                        CornerRadius="6"
+                                        Margin="0,0,12,0">
+                                    <FontIcon Glyph="&#xE7F4;" FontSize="18" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
 
-                        <ToggleSwitch Grid.Column="1"
-                                      IsOn="{x:Bind ViewModel.RememberWindowDimensions, Mode=TwoWay}"
-                                      OnContent="Enabled"
-                                      OffContent="Disabled"
-                                      VerticalAlignment="Center" />
-                    </Grid>
-                </Border>
-            </StackPanel>
-
-            <!-- SECTION C: PRESENTER CONTROLS & GLOBAL SHORTCUTS (PHASE 5) -->
-            <StackPanel Spacing="12">
-                <TextBlock Text="Presenter Controls &amp; Global Shortcuts" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" />
-
-                <Border Padding="20"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8">
-                    <StackPanel Spacing="18">
-                        <!-- Toggle 1: Global Hotkeys -->
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                <TextBlock Text="Enable Global Hotkeys" Style="{ThemeResource BodyStrongTextBlockStyle}" />
-                                <TextBlock Text="Allow switching capture sources and controlling live stream from anywhere in Windows."
-                                           Style="{ThemeResource CaptionTextBlockStyle}"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            </StackPanel>
-                            <ToggleSwitch Grid.Column="1"
-                                          IsOn="{x:Bind ViewModel.EnableGlobalHotkeys, Mode=TwoWay}"
-                                          OnContent="Enabled"
-                                          OffContent="Disabled"
-                                          VerticalAlignment="Center" />
-                        </Grid>
-
-                        <MenuFlyoutSeparator />
-
-                        <!-- Toggle 2: Auto-Open Floating Presenter Dock -->
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                <TextBlock Text="Auto-Open Floating Presenter Dock" Style="{ThemeResource BodyStrongTextBlockStyle}" />
-                                <TextBlock Text="Automatically show the compact floating presenter companion dock when starting live presentation."
-                                           Style="{ThemeResource CaptionTextBlockStyle}"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            </StackPanel>
-                            <ToggleSwitch Grid.Column="1"
-                                          IsOn="{x:Bind ViewModel.AutoOpenPresenterDock, Mode=TwoWay}"
-                                          OnContent="Enabled"
-                                          OffContent="Disabled"
-                                          VerticalAlignment="Center" />
-                        </Grid>
-
-                        <MenuFlyoutSeparator />
-
-                        <!-- Toggle 3: Dock Always on Top -->
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                <TextBlock Text="Keep Presenter Dock Always on Top" Style="{ThemeResource BodyStrongTextBlockStyle}" />
-                                <TextBlock Text="Pins the presenter dock above full-screen windows, presentations, and browser tabs."
-                                           Style="{ThemeResource CaptionTextBlockStyle}"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            </StackPanel>
-                            <ToggleSwitch Grid.Column="1"
-                                          IsOn="{x:Bind ViewModel.DockAlwaysOnTop, Mode=TwoWay}"
-                                          OnContent="Enabled"
-                                          OffContent="Disabled"
-                                          VerticalAlignment="Center" />
-                        </Grid>
-
-                        <MenuFlyoutSeparator />
-
-                        <!-- Global Hotkeys Mapping List -->
-                        <StackPanel Spacing="10">
-                            <Grid>
-                                <TextBlock Text="Active Shortcut Map" Style="{ThemeResource BodyStrongTextBlockStyle}" VerticalAlignment="Center" />
-                                <Button Content="Reset Shortcuts to Defaults"
-                                        Command="{x:Bind ViewModel.ResetHotkeysToDefaultCommand}"
-                                        HorizontalAlignment="Right"
-                                        Style="{ThemeResource TextBlockButtonStyle}" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind ViewModel.AppName, Mode=OneWay}" FontSize="13" FontWeight="Bold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                        <Border Background="{ThemeResource AppBadgeBackgroundBrush}" BorderBrush="{ThemeResource AppBorderBrush}" BorderThickness="1" Padding="4,1" CornerRadius="4">
+                                            <TextBlock Text="{x:Bind ViewModel.AppVersion, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="{x:Bind ViewModel.AppDescription, Mode=OneWay}"
+                                               FontSize="11"
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                </StackPanel>
                             </Grid>
 
-                            <ItemsControl ItemsSource="{x:Bind ViewModel.HotkeyBindings, Mode=OneWay}">
+                            <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" Margin="0,4" />
+
+                            <!-- System Properties Table -->
+                            <Grid RowSpacing="8" ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="140" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Target Runtime" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{x:Bind ViewModel.TargetFramework, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Operating System" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{x:Bind ViewModel.PlatformDescription, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Privacy Architecture" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="100% Offline &amp; Local • Zero Telemetry • No Network Access" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ========================================================= -->
+                    <!-- CATEGORY 1: APPEARANCE & THEME                            -->
+                    <!-- ========================================================= -->
+                    <Border Visibility="{x:Bind ViewModel.AppearanceCategoryVisibility, Mode=OneWay}"
+                            Background="{ThemeResource AppSurfaceBrush}"
+                            BorderBrush="{ThemeResource AppBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="Appearance &amp; Theme"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="{ThemeResource AppTextPrimaryBrush}" />
+
+                            <!-- Row: App Theme -->
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="App Theme" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                    <TextBlock Text="Select color mode. Changes update title bars and surfaces immediately."
+                                               FontSize="11"
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                </StackPanel>
+
+                                <RadioButtons Grid.Column="1"
+                                              SelectedIndex="{x:Bind ViewModel.SelectedThemeIndex, Mode=TwoWay}"
+                                              MaxColumns="3"
+                                              VerticalAlignment="Center">
+                                    <RadioButton Content="System" Tag="0" FontSize="12" Margin="0,0,10,0" />
+                                    <RadioButton Content="Light" Tag="1" FontSize="12" Margin="0,0,10,0" />
+                                    <RadioButton Content="Dark" Tag="2" FontSize="12" />
+                                </RadioButtons>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ========================================================= -->
+                    <!-- CATEGORY 2: WINDOW PREFERENCES                            -->
+                    <!-- ========================================================= -->
+                    <Border Visibility="{x:Bind ViewModel.WindowCategoryVisibility, Mode=OneWay}"
+                            Background="{ThemeResource AppSurfaceBrush}"
+                            BorderBrush="{ThemeResource AppBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="Window Preferences"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="{ThemeResource AppTextPrimaryBrush}" />
+
+                            <!-- Row: Remember Dimensions -->
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Remember Window Dimensions" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                    <TextBlock Text="Automatically save and restore main window dimensions on startup."
+                                               FontSize="11"
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                </StackPanel>
+
+                                <ToggleSwitch Grid.Column="1"
+                                              IsOn="{x:Bind ViewModel.RememberWindowDimensions, Mode=TwoWay}"
+                                              OnContent="Enabled"
+                                              OffContent="Disabled"
+                                              VerticalAlignment="Center" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ========================================================= -->
+                    <!-- CATEGORY 3: PRESENTER CONTROLS                            -->
+                    <!-- ========================================================= -->
+                    <Border Visibility="{x:Bind ViewModel.PresenterCategoryVisibility, Mode=OneWay}"
+                            Background="{ThemeResource AppSurfaceBrush}"
+                            BorderBrush="{ThemeResource AppBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="20">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Presenter Controls &amp; Dock"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="{ThemeResource AppTextPrimaryBrush}" />
+
+                            <!-- Row 1: Enable Global Hotkeys -->
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Enable Global Hotkeys" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                    <TextBlock Text="Switch sources and control live stream from anywhere in Windows."
+                                               FontSize="11"
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                </StackPanel>
+
+                                <ToggleSwitch Grid.Column="1"
+                                              IsOn="{x:Bind ViewModel.EnableGlobalHotkeys, Mode=TwoWay}"
+                                              OnContent="Enabled"
+                                              OffContent="Disabled"
+                                              VerticalAlignment="Center" />
+                            </Grid>
+
+                            <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                            <!-- Row 2: Auto-Open Floating Presenter Dock -->
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Auto-Open Presenter Dock" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                    <TextBlock Text="Automatically display the floating dock when starting a live presentation."
+                                               FontSize="11"
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                </StackPanel>
+
+                                <ToggleSwitch Grid.Column="1"
+                                              IsOn="{x:Bind ViewModel.AutoOpenPresenterDock, Mode=TwoWay}"
+                                              OnContent="Enabled"
+                                              OffContent="Disabled"
+                                              VerticalAlignment="Center" />
+                            </Grid>
+
+                            <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                            <!-- Row 3: Keep Presenter Dock Always on Top -->
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Dock Always on Top" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                    <TextBlock Text="Keep the presenter dock pinned above full-screen windows and browser tabs."
+                                               FontSize="11"
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                </StackPanel>
+
+                                <ToggleSwitch Grid.Column="1"
+                                              IsOn="{x:Bind ViewModel.DockAlwaysOnTop, Mode=TwoWay}"
+                                              OnContent="Enabled"
+                                              OffContent="Disabled"
+                                              VerticalAlignment="Center" />
+                            </Grid>
+
+                            <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                            <!-- Row 4: Start Dock in Compact Mode -->
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Start Dock in Compact Mode" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                    <TextBlock Text="Open the floating presenter dock in the ultra-slim single-row format."
+                                               FontSize="11"
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                </StackPanel>
+
+                                <ToggleSwitch Grid.Column="1"
+                                              IsOn="{x:Bind ViewModel.StartDockInCompactMode, Mode=TwoWay}"
+                                              OnContent="Enabled"
+                                              OffContent="Disabled"
+                                              VerticalAlignment="Center" />
+                            </Grid>
+
+                            <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                            <!-- Row 5: Default Source Switching Mode -->
+                            <StackPanel Spacing="6" Margin="0,2">
+                                <TextBlock Text="Source Switching Mode" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                <TextBlock Text="Configure window focus and output switching behavior during presentation."
+                                           FontSize="11"
+                                           Foreground="{ThemeResource AppTextSecondaryBrush}" />
+
+                                <RadioButtons SelectedIndex="{x:Bind ViewModel.SelectedSwitchModeIndex, Mode=TwoWay}" Margin="0,4,0,0">
+                                    <RadioButton Content="Active + Live (A+L) — Focus application and switch live output stream" Tag="0" FontSize="11" Margin="0,0,0,2" />
+                                    <RadioButton Content="Active Only (A) — Focus application window without altering output stream" Tag="1" FontSize="11" Margin="0,0,0,2" />
+                                    <RadioButton Content="Live Only (L) — Switch live output stream without activating application window" Tag="2" FontSize="11" />
+                                </RadioButtons>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ========================================================= -->
+                    <!-- CATEGORY 4: KEYBOARD SHORTCUTS                            -->
+                    <!-- ========================================================= -->
+                    <Border Visibility="{x:Bind ViewModel.ShortcutsCategoryVisibility, Mode=OneWay}"
+                            Background="{ThemeResource AppSurfaceBrush}"
+                            BorderBrush="{ThemeResource AppBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="20">
+                        <StackPanel Spacing="14">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Keyboard Shortcuts"
+                                               FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                    <TextBlock Text="System-wide global hotkeys active during presentations."
+                                               FontSize="11"
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                </StackPanel>
+
+                                <Button Grid.Column="1"
+                                        Content="Reset to Defaults"
+                                        Command="{x:Bind ViewModel.ResetHotkeysToDefaultCommand}"
+                                        Style="{ThemeResource TextBlockButtonStyle}"
+                                        FontSize="12"
+                                        VerticalAlignment="Center" />
+                            </Grid>
+
+                            <!-- Shortcut Filter Search -->
+                            <TextBox Text="{x:Bind ViewModel.ShortcutSearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     PlaceholderText="Filter shortcuts..."
+                                     FontSize="12" />
+
+                            <!-- Shortcuts List -->
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.FilteredHotkeyBindings, Mode=OneWay}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="models:HotkeyBinding">
-                                        <Grid Padding="12,8" Margin="0,0,0,4"
-                                              Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                        <Grid Padding="10,8"
+                                              Margin="0,0,0,4"
+                                              Background="{ThemeResource AppSurfaceElevatedBrush}"
+                                              BorderBrush="{ThemeResource AppBorderBrush}"
+                                              BorderThickness="1"
                                               CornerRadius="6">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
 
-                                            <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
-                                                <TextBlock Text="{x:Bind Name}" Style="{ThemeResource BodyStrongTextBlockStyle}" FontSize="13" />
-                                                <TextBlock Text="{x:Bind Description}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{x:Bind Name}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                                <TextBlock Text="{x:Bind Description}" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
                                             </StackPanel>
 
                                             <Border Grid.Column="1"
-                                                    Padding="10,4"
-                                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                                    BorderThickness="1"
-                                                    CornerRadius="4"
+                                                    Style="{StaticResource KeyBadgeBorderStyle}"
                                                     VerticalAlignment="Center">
                                                 <TextBlock Text="{x:Bind DisplayString}"
                                                            FontFamily="Consolas, Segoe UI"
                                                            FontWeight="SemiBold"
-                                                           FontSize="12" />
+                                                           FontSize="11"
+                                                           Foreground="{ThemeResource AppTextPrimaryBrush}" />
                                             </Border>
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </StackPanel>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
+                    </Border>
 
-            <!-- SECTION D: ABOUT & SYSTEM INFO -->
-            <StackPanel Spacing="12">
-                <TextBlock Text="About SwitchCast" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" />
-
-                <Border Padding="24"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8">
-                    <StackPanel Spacing="16">
-                        <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-                            <Border Width="48" Height="48"
-                                    Background="{ThemeResource AccentFillColorDefaultBrush}"
-                                    CornerRadius="8">
-                                <FontIcon Glyph="&#xE7F4;" FontSize="24" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <StackPanel Spacing="2" VerticalAlignment="Center">
-                                <TextBlock Text="{x:Bind ViewModel.AppName, Mode=OneWay}" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="Bold" />
-                                <TextBlock Text="{x:Bind ViewModel.AppVersion, Mode=OneWay}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            </StackPanel>
-                        </StackPanel>
-
-                        <TextBlock Text="{x:Bind ViewModel.AppDescription, Mode=OneWay}"
-                                   Style="{ThemeResource BodyTextBlockStyle}"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-
-                        <MenuFlyoutSeparator Margin="0,4" />
-
-                        <Grid ColumnSpacing="24" RowSpacing="10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="160" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Target Framework" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontWeight="SemiBold" />
-                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{x:Bind ViewModel.TargetFramework, Mode=OneWay}" Style="{ThemeResource CaptionTextBlockStyle}" />
-
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Operating System" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontWeight="SemiBold" />
-                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{x:Bind ViewModel.PlatformDescription, Mode=OneWay}" Style="{ThemeResource CaptionTextBlockStyle}" />
-
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Privacy Architecture" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontWeight="SemiBold" />
-                            <TextBlock Grid.Row="2" Grid.Column="1" Text="100% Offline &amp; Local • Zero Telemetry • No Network Access" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemFillColorSuccessBrush}" FontWeight="SemiBold" />
-                        </Grid>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
+                </StackPanel>
+            </Grid>
 
         </StackPanel>
     </ScrollViewer>

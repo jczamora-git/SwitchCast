@@ -7,6 +7,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Main Application UI/UX Refinement] - 2026-10-09
+
+### Added (feat / UI / test / docs)
+- **Modern Windows Desktop Shell & Custom Integrated Title Bar**:
+  - Implemented custom integrated application top title bar in [MainWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/MainWindow.xaml) and [MainWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/MainWindow.xaml.cs) using `ExtendsContentIntoTitleBar = true` and `SetTitleBar(AppTitleBar)`.
+  - Configured native caption buttons via `AppWindow.TitleBar` with transparent backgrounds and dynamic theme-synchronized foreground and hover colors.
+  - Retained standard Windows behavior: window dragging, double-click to maximize/restore, minimize, maximize, close, and Windows 11 Snap Layouts.
+- **Centralized Fluent Design System Tokens (`App.xaml`)**:
+  - Added dark (`#101010` - `#141414`) and light theme dictionaries in [App.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml) providing semantic brushes: `AppBackgroundBrush`, `AppSidebarBrush`, `AppSurfaceBrush`, `AppSurfaceElevatedBrush`, `AppHoverBrush`, `AppBorderBrush`, `AppSubtleDividerBrush`, `AppAccentBrush` (coral `#FF7A59`), `AppBadgeBackgroundBrush`, and `AppPreviewCanvasBrush`.
+  - Reusable styles for `SubtleButtonStyle`, `PrimaryAccentButtonStyle`, `DestructiveButtonStyle`, and `KeyBadgeBorderStyle`.
+- **Workflow-First Presenter Dashboard**:
+  - Redesigned [Views/DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml) with compact top status summary strip (Live/Paused/Blackout/Standby status, active source, queued count, output window status).
+  - Enlarged focal 16:9 aspect ratio preview canvas with overlay controls, live status badge, and clear empty/ready states.
+  - Prominent primary action bar with coral "Start Presenting" / red "Stop Presenting", target source picker, and pause/blackout controls.
+  - Lightweight queued sources mini-strip.
+- **Compact Desktop Source Picker**:
+  - Redesigned [Views/SourcesPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SourcesPage.xaml) with unified filter toolbar (category selector for Windows vs Displays + instant search text box).
+  - Compact ~52px list rows with single-line truncated titles, process metadata, and queue checkboxes.
+- **Two-Pane Categorized Settings (OpenCode Inspired)**:
+  - Redesigned [Views/SettingsPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SettingsPage.xaml) into a two-pane layout with category navigation panel (`General`, `Appearance`, `Window`, `Presenter Controls`, `Keyboard Shortcuts`).
+  - Added compact setting rows with right-aligned toggles and subtle horizontal dividers.
+  - Implemented searchable keyboard shortcuts table with key badge pills and "Reset to Defaults" action.
+  - Updated [ViewModels/SettingsViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SettingsViewModel.cs) with category navigation and search filtering.
+- **Automated Unit Tests**:
+  - Added tests in [SwitchCast.Tests/ViewModels/SettingsViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/SettingsViewModelTests.cs) for category navigation visibility and shortcut filtering, bringing total passing tests to 124 (100% pass rate).
+
+---
+
 ## [Phase 5.3 — Minimal Presenter Dock & Three-Mode Source Switching] - 2026-10-09
 
 ### Added (feat / UI / test / docs)
