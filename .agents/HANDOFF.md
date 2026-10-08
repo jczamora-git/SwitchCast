@@ -3,85 +3,69 @@
 ---
 
 ## Task Details
-- **Task**: Desktop UX Hotfix (Presenter Actions Bring-to-Front, Centered Startup & Dynamic Application Icons)
-- **Date**: 2026-10-09T03:00:00+08:00 (UTC+8)
+- **Task**: Presentation Output Custom Title Bar UI Hotfix
+- **Date**: 2026-10-09T03:30:00+08:00 (UTC+8)
 - **Status**: Completed
 
 ---
 
 ## 1. Objective
-Implement three targeted desktop usability hotfixes in SwitchCast:
-1. **Presenter Actions Bring-to-Front**: Ensure selecting *Control Dashboard* or *Presentation Output* from the Floating Presenter Dock's Presenter Actions menu reliably restores minimized windows (`ShowWindowAsync(SW_RESTORE)`), brings the target window to the foreground (`SetForegroundWindow`), and prevents dock/popup focus handoff races without recreating existing instances.
-2. **Centered MainWindow Startup**: Center `MainWindow` on the target monitor work area on cold launch / first launch with DPI awareness (`GetDpiForWindow`, `MonitorFromWindow`, `GetMonitorInfo`), while respecting saved user window dimensions/coordinates and recovering gracefully from disconnected monitors.
-3. **Dynamic Windows Application Icons**: Replace generic orange monitor icons on the Sources page with real local application/window icons extracted via Win32 Shell APIs (`SendMessageTimeout` with `WM_GETICON`, `GetClassLongPtr` with `GCLP_HICONSM`/`GCLP_HICON`, `SHGetFileInfo` / process executable icon fallback), managed via a dedicated `IWindowIconService` with caching and safe native `HICON` lifetime management.
+Modernize the existing SwitchCast Presentation Output window ([PresentationWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml)) by replacing its visually inconsistent white Windows native caption title bar with a minimal, theme-aware custom integrated title bar matching the visual language of `MainWindow`, while preserving full presentation canvas geometry, aspect ratios, native caption buttons, and window identity.
 
 ---
 
 ## 2. Architecture & Solutions Applied
 
-1. **Presenter Actions Bring-to-Front & Focus Handoff**:
-   - **Root Cause**: `PresenterDockMenuWindow` was owned by `PresenterDockWindow` (`GWLP_HWNDPARENT`), causing Windows to automatically return focus to the floating dock whenever the menu closed, overriding the target window activation. Furthermore, `MainWindow` and `PresentationWindow` were using bare `Window.Activate()` calls without `ShowWindowAsync(SW_RESTORE)`.
-   - **Solution**:
-     - Detached `GWLP_HWNDPARENT = IntPtr.Zero` in `PresenterDockMenuWindow.CloseMenu()` prior to window closure.
-     - Enhanced `ActivateMainWindow()` in `App.xaml.cs` to invoke `IWindowActivationService.ActivateWindow(mw.WindowHandle)`.
-     - Injected `IWindowActivationService` into `PresentationWindowService` to restore and activate existing `PresentationWindow` instances.
-     - Never recreates existing `MainWindow` or `PresentationWindow` instances; preserves capture and presentation state.
+1. **Custom Integrated Title Bar Layout**:
+   - **Root Layout**: Split root container into a 2-row `Grid` (`Row 0: Height="38"` for `AppTitleBar`, `Row 1: Height="*"` for presentation canvas).
+   - **Header Styling**: Compact 20x20 app logo icon badge (`AppAccentBrush` `#FF7A59`), `"Presentation Output"` semibold title text (`AppTextPrimaryBrush`), and a subtle paused badge pill (`AppBadgeBackgroundBrush` with caution foreground `#FFA500`) bound to `ViewModel.PausedIndicatorVisibility`.
+   - **Subtle Bottom Divider**: `BorderBrush="{ThemeResource AppSubtleDividerBrush}"`, `BorderThickness="0,0,0,1"`.
+   - **Drag Area**: Passed `AppTitleBar` to `SetTitleBar(AppTitleBar)` with `ExtendsContentIntoTitleBar = true`.
 
-2. **Centered Startup Placement & Saved Dimensions/Coordinates**:
-   - Implemented DPI-aware calculation in `MainWindow.xaml.cs` using `GetDpiForWindow`, `MonitorFromWindow`, and `GetMonitorInfo`.
-   - Centering math: `centerX = workArea.Left + (workArea.Width - windowWidth) / 2`, `centerY = workArea.Top + (workArea.Height - windowHeight) / 2`.
-   - Added `WindowPositionX`, `WindowPositionY`, and `RememberWindowPosition` in `UserSettings` and `ApplicationSettingsService`.
-   - On shutdown, saves physical positions and DIP dimensions; on startup, checks `MonitorFromPoint` to validate saved coordinates within connected monitor work areas, clamping to visible work area or defaulting to center if monitor was disconnected.
+2. **Native Caption Buttons & Theme Fidelity**:
+   - Styled native caption buttons dynamically via `_appWindow.TitleBar` using `AppWindowTitleBar.IsCustomizationSupported()`.
+   - `ButtonBackgroundColor` and `ButtonInactiveBackgroundColor` set to `Colors.Transparent`.
+   - Dark Mode: Near-white foreground (`#F0F0F0`), subtle white hover tint (`#23FFFFFF`), white pressed tint (`#37FFFFFF`), gray inactive (`#808080`).
+   - Light Mode: Dark gray foreground (`#1E1E1E`), subtle dark hover tint (`#19000000`), dark pressed tint (`#2D000000`), muted inactive (`#A0A0A0`).
+   - Subscribed `PresentationWindow` to `IApplicationSettingsService.ThemeChanged` with safe unsubscription in `Closed` event.
 
-3. **Dynamic Application Icon Engine & Safe Native Lifetime**:
-   - Implemented `IWindowIconService` and `Win32WindowIconService`.
-   - Extraction sequence:
-     1. Window icon: `SendMessageTimeout` with `WM_GETICON` (`ICON_SMALL2` -> `ICON_SMALL` -> `ICON_BIG`) with 200ms timeout.
-     2. Class icon: `GetClassLongPtr` (`GCLP_HICONSM` -> `GCLP_HICON`).
-     3. Shell icon: `SHGetFileInfo` on `ProcessPath`.
-   - Safe handle lifetime: `DestroyIcon` is strictly called on owned shell handles, never on borrowed window/class handles.
-   - GDI 32-bit DIB section rendering via `DrawIconEx` with alpha-channel verification, converting to `SoftwareBitmapSource`.
-   - Thread-safe caching in `ConcurrentDictionary<string, ImageSource>`.
-   - Sources page template updated with true-color 20x20 `<Image>` and theme-adaptive `<FontIcon>` fallback.
+3. **Presentation Canvas & Frame Geometry Preservation**:
+   - Moved all three authoritative presentation layers into `Grid.Row="1"` with a solid `#000000` background:
+     1. Standby Screen ("SwitchCast Ready to Present").
+     2. Live Presentation Canvas (`Image` with `Stretch="Uniform"` and live/paused indicators).
+     3. Blackout Overlay (solid 100% opaque black surface).
+   - Preserved `_appWindow.Title = "SwitchCast Presentation Output"` ensuring external video conferencing tools (Zoom, Microsoft Teams, Google Meet) continue detecting and capturing the shareable window cleanly.
+   - Preserved absence of `WDA_EXCLUDEFROMCAPTURE` so audience-facing output remains capturable.
+
+4. **Multi-Monitor DPI Awareness & Window Lifecycle**:
+   - DPI-aware default sizing (`1280 * scale` by `720 * scale` using Win32 `GetDpiForWindow`).
+   - Standard window chrome behavior intact: minimize, maximize, restore, double-click to maximize/restore, window resizing, and Windows 11 Snap Layouts.
+   - Closing `PresentationWindow` only closes the output presentation without terminating `MainWindow` or stopping the SwitchCast process.
 
 ---
 
-## 3. Files Modified / Created
-
-### New Files
-- [Services/IWindowIconService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IWindowIconService.cs)
-- [Services/Win32WindowIconService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Win32WindowIconService.cs)
-- [SwitchCast.Tests/Services/WindowIconServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/WindowIconServiceTests.cs)
-- [SwitchCast.Tests/Services/MainWindowPositioningMathTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/MainWindowPositioningMathTests.cs)
-- [SwitchCast.Tests/Services/PresenterDockActionsActivationTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresenterDockActionsActivationTests.cs)
-- [SwitchCast.Tests/ViewModels/SourcesViewModelIconTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/SourcesViewModelIconTests.cs)
+## 3. Files Modified
 
 ### Modified Files
-- [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs)
-- [MainWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/MainWindow.xaml.cs)
-- [Models/UserSettings.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/UserSettings.cs)
-- [Services/IApplicationSettingsService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IApplicationSettingsService.cs)
-- [Services/ApplicationSettingsService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/ApplicationSettingsService.cs)
-- [Services/PresentationWindowService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationWindowService.cs)
-- [ViewModels/SelectableSourceItem.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SelectableSourceItem.cs)
-- [ViewModels/SourcesViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SourcesViewModel.cs)
-- [Views/PresenterDockMenuWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml.cs)
-- [Views/SourcesPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SourcesPage.xaml)
-- [SwitchCast.Tests/Services/ApplicationSettingsServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/ApplicationSettingsServiceTests.cs)
-- [SwitchCast.Tests/Stubs/XamlStubs.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Stubs/XamlStubs.cs)
-- [SwitchCast.Tests/SwitchCast.Tests.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/SwitchCast.Tests.csproj)
+- [Views/PresentationWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml)
+- [Views/PresentationWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml.cs)
+- [SwitchCast.Tests/ViewModels/PresentationViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/PresentationViewModelTests.cs)
+- [.agents/PROJECT_STATE.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/PROJECT_STATE.md)
+- [.agents/HANDOFF.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/HANDOFF.md)
+- [.agents/CHANGELOG.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/CHANGELOG.md)
 
 ---
 
 ## 4. Validation Performed
-- **Level 1 (Build)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 3.00s).
+- **Level 1 (Build)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 4.06s).
 - **Level 2 (Static Analysis)**: Analyzers and nullable reference checks -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (152 passed, 0 failed, 0 skipped in 690ms).
-- **Level 4 (Presenter Actions, Startup Centering & Dynamic Icons)**: Window focus handoff, restoration of minimized windows, DPI work-area centering, and native Win32 icon extraction verified.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (154 passed, 0 failed, 0 skipped in 650ms).
+- **Level 4 (Presentation Window Chrome & Theme Integration)**: Custom integrated title bar, DPI-scaled sizing, native caption button styling in Dark and Light themes, drag handling, and presentation canvas layer preservation verified.
 
 ---
 
 ## 5. Next Steps
 - **Next Task**: **Phase 6 — Stability & Performance Optimization**
 - Implement Direct3D 11 device loss resilience, dynamic multi-monitor DPI scaling adaptation, and extended load verification.
+
 

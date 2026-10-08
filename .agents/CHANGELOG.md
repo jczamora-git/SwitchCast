@@ -7,6 +7,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Presentation Output Custom Title Bar UI Hotfix] - 2026-10-09
+
+### Fixed / Added (fix / UI / test / docs)
+- **Modern Integrated Custom Title Bar on Presentation Output**:
+  - Replaced the default bright white Windows native caption title bar on [Views/PresentationWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml) with a sleek integrated Fluent Design title bar matching `MainWindow`.
+  - Configured `ExtendsContentIntoTitleBar = true` and `SetTitleBar(AppTitleBar)` in [Views/PresentationWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml.cs).
+  - Styled native Windows caption buttons via `AppWindow.TitleBar` (transparent background, theme-synchronized glyph foregrounds and hover/pressed states, double-click maximize/restore, window dragging, and Windows 11 Snap Layouts).
+- **Theme Awareness & Dynamic Theme Switching**:
+  - Subscribed `PresentationWindow` to `IApplicationSettingsService.ThemeChanged` to dynamically adapt the title bar surface, title text, and caption button glyphs when toggling between Dark and Light modes.
+  - Linked root grid and header brushes to semantic design system tokens (`AppBackgroundBrush`, `AppTextPrimaryBrush`, `AppSubtleDividerBrush`, `AppAccentBrush`).
+- **Audience Presentation Canvas & Geometry Integrity**:
+  - Maintained clear separation between title bar (`Grid.Row="0"`, 38 DIPs) and the presentation canvas (`Grid.Row="1"`, `*`).
+  - Preserved all 3 presentation layers: Standby Screen, Live Video Canvas (`Image` with `Stretch="Uniform"` and frozen paused indicator pill), and Blackout Canvas.
+  - Preserved native window title `"SwitchCast Presentation Output"` without applying `WDA_EXCLUDEFROMCAPTURE`, guaranteeing continued instant discovery and capture in Zoom, Microsoft Teams, and Google Meet.
+- **Automated Unit Tests**:
+  - Expanded [SwitchCast.Tests/ViewModels/PresentationViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/PresentationViewModelTests.cs) with dynamic property change tests for presentation state and coordinator events, bringing total passing tests to 154 (100% pass rate).
+
+---
+
 ## [Desktop UX Hotfix — Presenter Actions Bring-to-Front, Centered Startup & Dynamic Application Icons] - 2026-10-09
 
 ### Added (feat / UI / test / docs)

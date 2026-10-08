@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Desktop UX Hotfix (Presenter Actions Bring-to-Front, Centered Startup, Dynamic Application Icons)
+- **Current Phase**: Presentation Output Custom Title Bar UI Hotfix (Consistent Fluent Design Window Chrome)
 - **Overall Status**: **Completed (Ready for Phase 6)**
-- **Last Updated**: 2026-10-09T03:00:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-09T03:30:00+08:00 (UTC+8)
 
 ---
 
@@ -17,6 +17,11 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ### Implemented & Verified
 - [x] **Strict AI Development Harness (Phase 0)**: Standardized rules ([AGENTS.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/AGENTS.md)), 6 domain skills, architecture specifications, coding standards, and [.editorconfig](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.editorconfig).
+- [x] **Custom Integrated Presentation Output Title Bar (UI Consistency Hotfix)**:
+  - Replaced the default bright white Windows native caption bar on [PresentationWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml) with a custom integrated, theme-aware title bar (`ExtendsContentIntoTitleBar = true`, `SetTitleBar(AppTitleBar)`).
+  - Native caption buttons configured via `AppWindow.TitleBar` (transparent backgrounds, light glyphs in dark mode, dark glyphs in light mode, double-click maximize/restore, window dragging, Windows 11 Snap Layouts).
+  - Preserved audience-focused presentation canvas geometry in Row 1 (`Stretch="Uniform"`, standby screen, live capture surface, paused pill, blackout overlay) without aspect ratio distortion or `WDA_EXCLUDEFROMCAPTURE`.
+  - Dynamic theme listener wired to `IApplicationSettingsService.ThemeChanged` and DPI-aware scaling (`GetDpiForWindow`).
 - [x] **WinUI 3 Desktop Application Shell (Phase 1 & UI Refinement)**:
   - Custom integrated application top title bar (`ExtendsContentIntoTitleBar = true`, `SetTitleBar(AppTitleBar)`), replacing the disconnected white title bar with a seamless, theme-aware header.
   - Native caption buttons styled dynamically via `AppWindow.TitleBar` (transparent backgrounds, theme-adaptive foreground and hover states, double-click to maximize, Windows 11 Snap Layouts).
@@ -116,10 +121,10 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ## 6. VERIFICATION RECORD
 
-- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 3.00s).
+- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors in 4.06s).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (152 passed, 0 failed, 0 skipped in 690ms).
-- **Level 4 (Presenter Actions, Startup Centering & Dynamic Icons)**: Window focus handoff, restoration of minimized windows, DPI work-area centering, and native Win32 icon extraction verified.
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (154 passed, 0 failed, 0 skipped in 650ms).
+- **Level 4 (Presentation Window Chrome & Theme Integration)**: Custom integrated title bar, DPI-scaled sizing, native caption button styling in Dark and Light themes, drag handling, and presentation canvas layer preservation verified.
 
 ---
 
@@ -127,4 +132,5 @@ This is the authoritative progress, state, and environmental tracking document f
 
 **Task**: **Phase 6 — Stability & Performance Optimization**
 - **Objective**: Direct3D 11 device loss resilience, DPI dynamic scaling across multi-monitor setups, and extended presentation load tests.
+
 

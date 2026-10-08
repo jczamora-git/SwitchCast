@@ -86,4 +86,37 @@ public class PresentationViewModelTests
         Assert.Equal(Visibility.Collapsed, vm.StandbyVisibility);
         Assert.Equal(Visibility.Collapsed, vm.LiveContentVisibility);
     }
+
+    [Fact]
+    public void StateService_PropertyChanged_RefreshesViewModelProperties()
+    {
+        var vm = new PresentationViewModel(_mockStateService.Object, _mockPresentationCoordinator.Object);
+
+        // Update mock state and fire event
+        var source = new WindowSource { Id = "win-2", Title = "Browser Tab", IsAvailable = true };
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+        _mockStateService.SetupGet(s => s.ActiveSource).Returns(source);
+
+        _mockStateService.Raise(s => s.PropertyChanged += null, new System.ComponentModel.PropertyChangedEventArgs(nameof(IPresentationStateService.Status)));
+
+        Assert.Equal(Visibility.Visible, vm.LiveContentVisibility);
+        Assert.Equal(Visibility.Collapsed, vm.StandbyVisibility);
+        Assert.Equal("Browser Tab", vm.ActiveSourceTitle);
+    }
+
+    [Fact]
+    public void Coordinator_PropertyChanged_RefreshesVisibilityAndImage()
+    {
+        var vm = new PresentationViewModel(_mockStateService.Object, _mockPresentationCoordinator.Object);
+
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Paused);
+        _mockStateService.SetupGet(s => s.ActiveSource).Returns(new WindowSource { Id = "win-1", Title = "Slide Deck" });
+        _mockPresentationCoordinator.SetupGet(p => p.Status).Returns(PresentationStatus.Paused);
+        _mockPresentationCoordinator.SetupGet(p => p.IsPaused).Returns(true);
+
+        _mockPresentationCoordinator.Raise(p => p.PropertyChanged += null, new System.ComponentModel.PropertyChangedEventArgs(nameof(IPresentationCoordinator.IsPaused)));
+
+        Assert.Equal(Visibility.Visible, vm.PausedIndicatorVisibility);
+    }
 }
+

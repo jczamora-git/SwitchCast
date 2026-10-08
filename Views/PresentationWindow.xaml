@@ -8,77 +8,120 @@
     mc:Ignorable="d"
     Title="SwitchCast Presentation Output">
 
-    <Grid Background="#000000">
-        <!-- LAYER 1: Standby Screen -->
-        <Grid Visibility="{x:Bind ViewModel.StandbyVisibility, Mode=OneWay}"
-              Background="#0D0D0D"
-              HorizontalAlignment="Stretch"
-              VerticalAlignment="Stretch">
-            <StackPanel HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Spacing="14">
-                <Border Width="64"
-                        Height="64"
-                        Background="#1A1A1A"
-                        BorderBrush="#33FFFFFF"
-                        BorderThickness="1"
-                        CornerRadius="32"
-                        HorizontalAlignment="Center">
-                    <FontIcon Glyph="&#xE768;" FontSize="28" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+    <Grid x:Name="RootGrid" Background="{ThemeResource AppBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <!-- Custom Integrated Title Bar -->
+            <RowDefinition Height="38" />
+            <!-- Presentation Output Canvas Area -->
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Custom Integrated Title Bar (Draggable window header) -->
+        <Grid x:Name="AppTitleBar"
+              Grid.Row="0"
+              Background="{ThemeResource AppBackgroundBrush}"
+              BorderBrush="{ThemeResource AppSubtleDividerBrush}"
+              BorderThickness="0,0,0,1"
+              Padding="14,0,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- App Logo & Title Brand -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Border Width="20" Height="20" Background="{ThemeResource AppAccentBrush}" CornerRadius="4">
+                    <FontIcon Glyph="&#xE7F4;" FontSize="11" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
-                <TextBlock Text="SwitchCast"
-                           Style="{ThemeResource TitleTextBlockStyle}"
-                           FontSize="28"
-                           FontWeight="Bold"
-                           HorizontalAlignment="Center"
-                           Foreground="#FFFFFF" />
-                <TextBlock Text="Ready to Present"
-                           Style="{ThemeResource SubtitleTextBlockStyle}"
-                           FontSize="18"
-                           FontWeight="SemiBold"
-                           HorizontalAlignment="Center"
-                           Foreground="#CCCCCC" />
-                <TextBlock Text="Your presentation will appear here."
-                           Style="{ThemeResource BodyTextBlockStyle}"
-                           Foreground="#888888"
-                           HorizontalAlignment="Center" />
+                <TextBlock Text="Presentation Output" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
+
+                <!-- Subtle Status Indicator (Paused) -->
+                <Border Visibility="{x:Bind ViewModel.PausedIndicatorVisibility, Mode=OneWay}"
+                        Background="{ThemeResource AppBadgeBackgroundBrush}"
+                        BorderBrush="{ThemeResource AppBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="6,1"
+                        Margin="4,0,0,0"
+                        VerticalAlignment="Center">
+                    <TextBlock Text="PAUSED" FontSize="10" FontWeight="SemiBold" Foreground="#FFA500" />
+                </Border>
             </StackPanel>
         </Grid>
 
-        <!-- LAYER 2: Live Presentation Video Canvas -->
-        <Grid Visibility="{x:Bind ViewModel.LiveContentVisibility, Mode=OneWay}"
-              Background="#000000"
-              HorizontalAlignment="Stretch"
-              VerticalAlignment="Stretch">
-            <Image Source="{x:Bind ViewModel.PresentationImageSource, Mode=OneWay}"
-                   Stretch="Uniform"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center" />
-
-            <!-- Paused Indicator Pill -->
-            <Border Visibility="{x:Bind ViewModel.PausedIndicatorVisibility, Mode=OneWay}"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Top"
-                    Margin="24"
-                    Background="#D91A1A1A"
-                    BorderBrush="#4DFFFFFF"
-                    BorderThickness="1"
-                    CornerRadius="16"
-                    Padding="14,6">
-                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <FontIcon Glyph="&#xE769;" FontSize="14" Foreground="#FFA500" />
-                    <TextBlock Text="PAUSED — Content Frozen"
-                               Style="{ThemeResource CaptionTextBlockStyle}"
-                               Foreground="#FFFFFF"
-                               FontWeight="SemiBold" />
+        <!-- Presentation Content Canvas (Row 1) -->
+        <Grid Grid.Row="1" Background="#000000">
+            <!-- LAYER 1: Standby Screen -->
+            <Grid Visibility="{x:Bind ViewModel.StandbyVisibility, Mode=OneWay}"
+                  Background="#0D0D0D"
+                  HorizontalAlignment="Stretch"
+                  VerticalAlignment="Stretch">
+                <StackPanel HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="14">
+                    <Border Width="64"
+                            Height="64"
+                            Background="#1A1A1A"
+                            BorderBrush="#33FFFFFF"
+                            BorderThickness="1"
+                            CornerRadius="32"
+                            HorizontalAlignment="Center">
+                        <FontIcon Glyph="&#xE768;" FontSize="28" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="SwitchCast"
+                               Style="{ThemeResource TitleTextBlockStyle}"
+                               FontSize="28"
+                               FontWeight="Bold"
+                               HorizontalAlignment="Center"
+                               Foreground="#FFFFFF" />
+                    <TextBlock Text="Ready to Present"
+                               Style="{ThemeResource SubtitleTextBlockStyle}"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center"
+                               Foreground="#CCCCCC" />
+                    <TextBlock Text="Your presentation will appear here."
+                               Style="{ThemeResource BodyTextBlockStyle}"
+                               Foreground="#888888"
+                               HorizontalAlignment="Center" />
                 </StackPanel>
-            </Border>
-        </Grid>
+            </Grid>
 
-        <!-- LAYER 3: Blackout Overlay (Solid 100% Opaque Black Canvas) -->
-        <Grid Visibility="{x:Bind ViewModel.BlackoutVisibility, Mode=OneWay}"
-              Background="#000000"
-              HorizontalAlignment="Stretch"
-              VerticalAlignment="Stretch" />
+            <!-- LAYER 2: Live Presentation Video Canvas -->
+            <Grid Visibility="{x:Bind ViewModel.LiveContentVisibility, Mode=OneWay}"
+                  Background="#000000"
+                  HorizontalAlignment="Stretch"
+                  VerticalAlignment="Stretch">
+                <Image Source="{x:Bind ViewModel.PresentationImageSource, Mode=OneWay}"
+                       Stretch="Uniform"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center" />
+
+                <!-- Paused Indicator Pill -->
+                <Border Visibility="{x:Bind ViewModel.PausedIndicatorVisibility, Mode=OneWay}"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Margin="24"
+                        Background="#D91A1A1A"
+                        BorderBrush="#4DFFFFFF"
+                        BorderThickness="1"
+                        CornerRadius="16"
+                        Padding="14,6">
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE769;" FontSize="14" Foreground="#FFA500" />
+                        <TextBlock Text="PAUSED — Content Frozen"
+                                   Style="{ThemeResource CaptionTextBlockStyle}"
+                                   Foreground="#FFFFFF"
+                                   FontWeight="SemiBold" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- LAYER 3: Blackout Overlay (Solid 100% Opaque Black Canvas) -->
+            <Grid Visibility="{x:Bind ViewModel.BlackoutVisibility, Mode=OneWay}"
+                  Background="#000000"
+                  HorizontalAlignment="Stretch"
+                  VerticalAlignment="Stretch" />
+        </Grid>
     </Grid>
 </Window>
