@@ -30,14 +30,10 @@ public partial class App : Application
     /// </summary>
     public void ActivateMainWindow()
     {
-        if (_mainWindow is MainWindow mw && mw.WindowHandle != IntPtr.Zero)
+        var activationService = Services.GetService<IWindowActivationService>();
+        if (activationService is not null && activationService.ActivateMainWindow())
         {
-            var activationService = Services.GetService<IWindowActivationService>();
-            if (activationService is not null)
-            {
-                activationService.ActivateWindow(mw.WindowHandle);
-                return;
-            }
+            return;
         }
 
         _mainWindow?.Activate();

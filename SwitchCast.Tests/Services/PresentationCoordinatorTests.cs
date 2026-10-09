@@ -119,14 +119,18 @@ public class PresentationCoordinatorTests
     }
 
     [Fact]
-    public async Task StopPresentationAsync_ClearsRendererAndResetsStatus()
+    public async Task StopPresentationAsync_ClearsRenderer_ResetsStatus_ClosesOutputWindow_AndActivatesMainWindow()
     {
+        var mockNav = new Mock<INavigationService>();
+
         using var coordinator = new PresentationCoordinator(
             _mockStateService.Object,
             _mockWindowService.Object,
             _mockCaptureCoordinator.Object,
             _mockOutputRenderer.Object,
-            _mockWindowActivationService.Object);
+            _mockWindowActivationService.Object,
+            mediaPresentationService: null,
+            navigationService: mockNav.Object);
 
         await coordinator.StopPresentationAsync();
 
@@ -134,6 +138,34 @@ public class PresentationCoordinatorTests
         _mockStateService.Verify(s => s.SetActiveSource(null), Times.Once);
         _mockStateService.Verify(s => s.SetStatus(PresentationStatus.Idle), Times.Once);
         _mockCaptureCoordinator.Verify(c => c.StopPreviewAsync(), Times.Once);
+        _mockWindowService.Verify(w => w.ClosePresentationWindow(), Times.Once);
+        _mockWindowActivationService.Verify(w => w.ActivateMainWindow(), Times.Once);
+        mockNav.Verify(n => n.NavigateToDashboard(null), Times.Once);
+    }
+
+    [Fact]
+    public async Task StopPresentationAsync_WhenShuttingDown_SuppressesMainWindowActivation()
+    {
+        var mockNav = new Mock<INavigationService>();
+
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object,
+            mediaPresentationService: null,
+            navigationService: mockNav.Object);
+
+        await coordinator.StopPresentationAsync(isShuttingDown: true);
+
+        _mockOutputRenderer.Verify(r => r.Clear(), Times.Once);
+        _mockStateService.Verify(s => s.SetActiveSource(null), Times.Once);
+        _mockStateService.Verify(s => s.SetStatus(PresentationStatus.Idle), Times.Once);
+        _mockCaptureCoordinator.Verify(c => c.StopPreviewAsync(), Times.Once);
+        _mockWindowService.Verify(w => w.ClosePresentationWindow(), Times.Once);
+        _mockWindowActivationService.Verify(w => w.ActivateMainWindow(), Times.Never);
+        mockNav.Verify(n => n.NavigateToDashboard(null), Times.Never);
     }
 
     [Fact]

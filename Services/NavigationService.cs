@@ -51,12 +51,32 @@ public class NavigationService : INavigationService
             return false;
         }
 
+        if (_frame.DispatcherQueue is not null && !_frame.DispatcherQueue.HasThreadAccess)
+        {
+            return _frame.DispatcherQueue.TryEnqueue(() => _frame.Navigate(pageType, parameter));
+        }
+
         return _frame.Navigate(pageType, parameter);
     }
 
     public bool NavigateTo<T>(object? parameter = null) where T : class
     {
         return NavigateTo(typeof(T), parameter);
+    }
+
+    public bool NavigateToDashboard(object? parameter = null)
+    {
+        var dashboardType = Type.GetType("SwitchCast.Views.DashboardPage, SwitchCast") ??
+                            AppDomain.CurrentDomain.GetAssemblies()
+                                .Select(a => a.GetType("SwitchCast.Views.DashboardPage"))
+                                .FirstOrDefault(t => t is not null);
+
+        if (dashboardType is not null)
+        {
+            return NavigateTo(dashboardType, parameter);
+        }
+
+        return false;
     }
 
     public bool GoBack()

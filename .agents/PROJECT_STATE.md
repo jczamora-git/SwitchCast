@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Phase 6 — Direct Media Sources & Settings UI Refinement
-- **Overall Status**: **Completed (Phase 6 Feature Complete & Tested)**
-- **Last Updated**: 2026-10-09T14:35:00+08:00 (UTC+8)
+- **Current Phase**: Floating Dock Dragging & Stop Presentation Workflow (Usability Enhancement)
+- **Overall Status**: **Completed & Tested**
+- **Last Updated**: 2026-10-09T14:50:00+08:00 (UTC+8)
 
 ---
 
@@ -17,6 +17,14 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ### Implemented & Verified
 - [x] **Strict AI Development Harness (Phase 0)**: Standardized rules ([AGENTS.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/AGENTS.md)), 6 domain skills, architecture specifications, coding standards, and [.editorconfig](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.editorconfig).
+- [x] **Floating Presenter Dock Dragging Refinement**:
+  - Removed the dedicated visible drag handle icon (`\uE76F`) and its layout column/spacing from both Expanded (7 columns) and Compact (6 columns) dock modes.
+  - Implemented native Windows window dragging (`ReleaseCapture` + `WM_NCLBUTTONDOWN` / `HTCAPTION`) from all non-interactive toolbar surfaces (card border, status badge pill, status dot, and padding).
+  - Implemented visual tree hit-testing (`IsInteractiveControl`) that strictly protects all interactive controls (`ButtonBase`, `ComboBox`, `TextBox`, `Slider`, `ToggleSwitch`, `ListViewItem`, `MenuFlyoutItem`) from dragging triggers, preserving normal button clicks, hovers, and flyout interactions.
+- [x] **Unified Stop Presenting Workflow & Automatic Dashboard Activation**:
+  - Unified Stop Presenting across Control Dashboard, Floating Presenter Dock, Presenter Dock Menu, and Global Hotkey (`Ctrl+Shift+S`).
+  - Authoritative Stop sequence in `PresentationCoordinator.StopPresentationAsync()` safely terminates active capture or media playback, sets presentation status to `Idle`, closes the `PresentationWindow` (it no longer remains visible on Standby), restores `MainWindow` if minimized, brings the Control Dashboard to the foreground via `IWindowActivationService.ActivateMainWindow()`, and navigates to `DashboardPage`.
+  - Suppressed MainWindow activation during application exit confirmation (`ApplicationLifecycleService.ExecuteShutdownAsync` calls `StopPresentationAsync(isShuttingDown: true)`).
 - [x] **Windows 11 Settings-Style Theme Selector & Appearance Layout (Phase 6)**:
   - Replaced cramped theme radio buttons with a compact Windows Settings-style `ComboBox` right-aligned with 140 DIP width.
   - Corrected Grid column geometry to give flexible Star width to setting title and description, preventing narrow vertical word wrapping.
@@ -44,7 +52,7 @@ This is the authoritative progress, state, and environmental tracking document f
 - [x] **Global Hotkeys & Floating Companion Dock**:
   - System-wide hotkeys and floating presenter toolbar supporting 3 switching modes (`A+L`, `A`, `L`).
 - [x] **Automated Unit & Regression Test Suite**:
-  - **209 comprehensive automated unit and regression tests** in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) with 100% pass rate.
+  - **223 comprehensive automated unit and regression tests** in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) with 100% pass rate.
 
 ### Planned (Upcoming)
 - [ ] **Phase 7**: Advanced Presenter Features (Live thumbnail previews, smooth transitions).
@@ -79,7 +87,7 @@ This is the authoritative progress, state, and environmental tracking document f
 
 - **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (209 passed, 0 failed, 0 skipped in 6s).
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (223 passed, 0 failed, 0 skipped in 7s).
 
 ---
 

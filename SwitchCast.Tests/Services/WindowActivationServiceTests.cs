@@ -52,4 +52,21 @@ public class WindowActivationServiceTests
         var result = service.ActivateWindow(IntPtr.Zero);
         Assert.False(result);
     }
+
+    [Fact]
+    public void ActivateMainWindow_UnregisteredHandle_ReturnsFalse()
+    {
+        var service = new Win32WindowActivationService();
+        var result = service.ActivateMainWindow();
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void ActivateMainWindow_ZeroHandleRegistered_ReturnsFalse()
+    {
+        var service = new Win32WindowActivationService();
+        service.RegisterMainWindowHandle(IntPtr.Zero);
+        var result = service.ActivateMainWindow();
+        Assert.False(result);
+    }
 }

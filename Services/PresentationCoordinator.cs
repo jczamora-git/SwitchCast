@@ -19,6 +19,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     private readonly IPresentationOutputRenderer _outputRenderer;
     private readonly IWindowActivationService _windowActivationService;
     private readonly IMediaPresentationService _mediaPresentationService;
+    private readonly INavigationService? _navigationService;
     private readonly SemaphoreSlim _transitionSemaphore = new(1, 1);
 
     private CaptureSource? _targetRequestedPresentationSource;
@@ -34,7 +35,8 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         ICaptureCoordinator captureCoordinator,
         IPresentationOutputRenderer outputRenderer,
         IWindowActivationService windowActivationService,
-        IMediaPresentationService? mediaPresentationService = null)
+        IMediaPresentationService? mediaPresentationService = null,
+        INavigationService? navigationService = null)
     {
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
         _presentationWindowService = presentationWindowService ?? throw new ArgumentNullException(nameof(presentationWindowService));
@@ -42,6 +44,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         _outputRenderer = outputRenderer ?? throw new ArgumentNullException(nameof(outputRenderer));
         _windowActivationService = windowActivationService ?? throw new ArgumentNullException(nameof(windowActivationService));
         _mediaPresentationService = mediaPresentationService ?? new MediaPresentationService();
+        _navigationService = navigationService;
 
         _presentationStateService.PropertyChanged += (s, e) =>
         {
@@ -237,12 +240,12 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         }
     }
 
-    public async Task StopPresentationAsync()
+    public async Task StopPresentationAsync(bool isShuttingDown = false)
     {
         long sequence = Interlocked.Increment(ref _presentationSequenceNumber);
         Volatile.Write(ref _targetRequestedPresentationSource, null);
 
-        Debug.WriteLine($"[PresentationCoordinator] StopPresentation requested seq={sequence}");
+        Debug.WriteLine($"[PresentationCoordinator] StopPresentation requested seq={sequence} isShuttingDown={isShuttingDown}");
 
         await _transitionSemaphore.WaitAsync().ConfigureAwait(false);
         try
@@ -256,6 +259,17 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             _presentationStateService.SetStatus(PresentationStatus.Idle);
             LastErrorMessage = null;
             await _captureCoordinator.StopPreviewAsync().ConfigureAwait(false);
+
+            // Close the presentation output window on stop
+            _presentationWindowService.ClosePresentationWindow();
+
+            if (!isShuttingDown)
+            {
+                // Bring Main Control Dashboard to front and navigate to Dashboard page
+                _windowActivationService.ActivateMainWindow();
+                _navigationService?.NavigateToDashboard();
+            }
+
             Debug.WriteLine($"[PresentationCoordinator] StopPresentation completed seq={sequence}");
         }
         finally

@@ -21,4 +21,16 @@ public interface IWindowActivationService
     /// <param name="source">Capture source to activate.</param>
     /// <returns>True if the window was activated; otherwise, false.</returns>
     bool ActivateSource(CaptureSource? source);
+
+    /// <summary>
+    /// Registers the main application window handle for centralized foreground activation.
+    /// </summary>
+    /// <param name="hWnd">Native window handle of MainWindow.</param>
+    void RegisterMainWindowHandle(IntPtr hWnd);
+
+    /// <summary>
+    /// Attempts to bring the main application window to the foreground, restoring if minimized.
+    /// </summary>
+    /// <returns>True if MainWindow was activated; otherwise, false.</returns>
+    bool ActivateMainWindow();
 }

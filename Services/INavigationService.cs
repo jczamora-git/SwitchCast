@@ -36,6 +36,11 @@ public interface INavigationService
     bool NavigateTo<T>(object? parameter = null) where T : class;
 
     /// <summary>
+    /// Navigates to the primary Control Dashboard view.
+    /// </summary>
+    bool NavigateToDashboard(object? parameter = null);
+
+    /// <summary>
     /// Navigates back one step in the navigation stack.
     /// </summary>
     bool GoBack();

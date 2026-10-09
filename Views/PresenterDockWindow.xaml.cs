@@ -4,7 +4,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using SwitchCast.ViewModels;
 using Windows.Graphics;
 using WinRT.Interop;
@@ -138,13 +141,59 @@ public sealed partial class PresenterDockWindow : Window
         }
     }
 
-    private void OnDragRegionPointerPressed(object sender, PointerRoutedEventArgs e)
+    private void OnDockSurfacePointerPressed(object sender, PointerRoutedEventArgs e)
     {
+        if (e.Handled)
+        {
+            return;
+        }
+
+        var ptr = e.GetCurrentPoint(null);
+        if (!ptr.Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        if (IsInteractiveControl(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+
         CloseActiveMenu();
 
         // Hand off dragging directly to the Windows window manager
         ReleaseCapture();
         SendMessage(WindowHandle, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
+        e.Handled = true;
+    }
+
+    private static bool IsInteractiveControl(DependencyObject? element)
+    {
+        while (element is not null)
+        {
+            if (element is ButtonBase ||
+                element is ComboBox ||
+                element is TextBox ||
+                element is RichEditBox ||
+                element is PasswordBox ||
+                element is Slider ||
+                element is ToggleSwitch ||
+                element is ListViewItem ||
+                element is GridViewItem ||
+                element is MenuFlyoutItem ||
+                element is MenuFlyoutSubItem ||
+                element is FlyoutPresenter ||
+                element is MenuFlyoutPresenter ||
+                element is ScrollBar ||
+                element is Thumb)
+            {
+                return true;
+            }
+
+            element = VisualTreeHelper.GetParent(element);
+        }
+
+        return false;
     }
 
     private void OnSourceSelectorClicked(object sender, RoutedEventArgs e)

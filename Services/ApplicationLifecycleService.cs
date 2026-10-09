@@ -64,7 +64,7 @@ public sealed class ApplicationLifecycleService : IApplicationLifecycleService
         // 1. Stop active presentation safely
         try
         {
-            await _presentationCoordinator.StopPresentationAsync().ConfigureAwait(false);
+            await _presentationCoordinator.StopPresentationAsync(isShuttingDown: true).ConfigureAwait(false);
             Debug.WriteLine("[ApplicationLifecycleService] Active presentation stopped successfully.");
         }
         catch (Exception ex)

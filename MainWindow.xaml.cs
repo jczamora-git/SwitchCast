@@ -57,6 +57,9 @@ public sealed partial class MainWindow : Window
         var windowId = Win32Interop.GetWindowIdFromWindow(WindowHandle);
         _appWindow = AppWindow.GetFromWindowId(windowId);
 
+        var activationService = App.Current.Services.GetService<IWindowActivationService>();
+        activationService?.RegisterMainWindowHandle(WindowHandle);
+
         if (_appWindow is not null)
         {
             _appWindow.Title = _viewModel.WindowTitle;

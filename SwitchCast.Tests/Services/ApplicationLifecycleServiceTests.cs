@@ -78,7 +78,7 @@ public class ApplicationLifecycleServiceTests
         Assert.True(service.IsShuttingDown);
 
         // Verify presentation and capture stopped
-        _mockPresentationCoordinator.Verify(c => c.StopPresentationAsync(), Times.Once);
+        _mockPresentationCoordinator.Verify(c => c.StopPresentationAsync(true), Times.Once);
         _mockCaptureCoordinator.Verify(c => c.StopPreviewAsync(), Times.Once);
 
         // Verify secondary windows closed
@@ -100,7 +100,7 @@ public class ApplicationLifecycleServiceTests
         await service.ExecuteShutdownAsync();
         await service.ExecuteShutdownAsync();
 
-        _mockPresentationCoordinator.Verify(c => c.StopPresentationAsync(), Times.Once);
+        _mockPresentationCoordinator.Verify(c => c.StopPresentationAsync(true), Times.Once);
         _mockCaptureCoordinator.Verify(c => c.StopPreviewAsync(), Times.Once);
         _mockPresentationWindowService.Verify(w => w.ClosePresentationWindow(), Times.Once);
         _mockPresenterDockService.Verify(d => d.CloseDock(), Times.Once);
@@ -111,7 +111,7 @@ public class ApplicationLifecycleServiceTests
     [Fact]
     public async Task ExecuteShutdownAsync_ResilientToServiceExceptions()
     {
-        _mockPresentationCoordinator.Setup(c => c.StopPresentationAsync()).ThrowsAsync(new InvalidOperationException("Simulated error"));
+        _mockPresentationCoordinator.Setup(c => c.StopPresentationAsync(It.IsAny<bool>())).ThrowsAsync(new InvalidOperationException("Simulated error"));
         _mockCaptureCoordinator.Setup(c => c.StopPreviewAsync()).ThrowsAsync(new Exception("Capture stop error"));
 
         var service = CreateService();

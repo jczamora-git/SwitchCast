@@ -7,6 +7,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Floating Presenter Dock Dragging & Stop Presentation Workflow] - 2026-10-09
+
+### Added / Improved (feat / UI / test / docs)
+- **Floating Presenter Dock Dragging Refinement**:
+  - Removed dedicated drag handle icon (`\uE76F`) and its layout column/spacing from both Expanded (7 columns) and Compact (6 columns) dock modes in [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml).
+  - Implemented native Windows non-client window dragging (`ReleaseCapture` + `WM_NCLBUTTONDOWN` / `HTCAPTION`) from non-interactive toolbar surfaces (card border, status badge pill, status dot, and padding).
+  - Implemented visual tree hit-testing (`IsInteractiveControl`) that strictly protects all interactive controls (`ButtonBase`, `ComboBox`, `TextBox`, `Slider`, `ToggleSwitch`, `ListViewItem`, `MenuFlyoutItem`) from dragging triggers, preserving normal button clicks, hovers, and flyout interactions.
+- **Unified Stop Presenting Workflow & Automatic Dashboard Activation**:
+  - Unified Stop Presenting across Control Dashboard, Floating Presenter Dock, Presenter Dock Menu, and Global Hotkey (`Ctrl+Shift+S`).
+  - Authoritative Stop sequence in `PresentationCoordinator.StopPresentationAsync()` safely terminates active capture or media playback, sets presentation status to `Idle`, closes the `PresentationWindow` (it no longer remains visible on Standby), restores `MainWindow` if minimized, brings the Control Dashboard to the foreground via `IWindowActivationService.ActivateMainWindow()`, and navigates to `DashboardPage`.
+  - Suppressed MainWindow activation during application exit confirmation (`ApplicationLifecycleService.ExecuteShutdownAsync` calls `StopPresentationAsync(isShuttingDown: true)`).
+- **Automated Unit & Regression Tests**:
+  - Added [SwitchCast.Tests/Services/StopPresentationWorkflowTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/StopPresentationWorkflowTests.cs) covering all Stop triggers, source types (Window, Monitor, Image, Video), paused/blackout states, idempotency, and application shutdown suppression.
+  - Expanded test suite to **223 automated unit tests** (100% pass rate).
+
+---
+
 ## [Phase 6 — Direct Media Sources & Settings UI Refinement] - 2026-10-09
 
 ### Added / Improved (feat / UI / test / docs)

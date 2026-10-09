@@ -13,6 +13,23 @@ public sealed class Win32WindowActivationService : IWindowActivationService
     private const int SW_RESTORE = 9;
     private const int SW_SHOW = 5;
 
+    private IntPtr _mainWindowHandle = IntPtr.Zero;
+
+    public void RegisterMainWindowHandle(IntPtr hWnd)
+    {
+        _mainWindowHandle = hWnd;
+    }
+
+    public bool ActivateMainWindow()
+    {
+        if (_mainWindowHandle != IntPtr.Zero && IsWindow(_mainWindowHandle))
+        {
+            return ActivateWindow(_mainWindowHandle);
+        }
+
+        return false;
+    }
+
     public bool ActivateSource(CaptureSource? source)
     {
         if (source is not WindowSource windowSource || windowSource.WindowHandle == IntPtr.Zero)

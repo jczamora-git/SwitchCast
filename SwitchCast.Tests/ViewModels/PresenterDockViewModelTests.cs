@@ -195,7 +195,7 @@ public class PresenterDockViewModelTests
 
         await vm.StopPresentationCommand.ExecuteAsync(null);
 
-        _mockCoordinator.Verify(c => c.StopPresentationAsync(), Times.Once);
+        _mockCoordinator.Verify(c => c.StopPresentationAsync(false), Times.Once);
     }
 
     [Fact]

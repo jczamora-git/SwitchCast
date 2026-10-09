@@ -110,9 +110,10 @@ public interface IPresentationCoordinator : INotifyPropertyChanged, IDisposable
     Task StartPresentationAsync(CaptureSource? source = null);
 
     /// <summary>
-    /// Stops presenting to the presentation output window.
+    /// Stops presenting to the presentation output window, closing the output window and bringing the Control Dashboard forward unless shutting down.
     /// </summary>
-    Task StopPresentationAsync();
+    /// <param name="isShuttingDown">Whether this stop request is part of application shutdown.</param>
+    Task StopPresentationAsync(bool isShuttingDown = false);
 
     /// <summary>
     /// Switches the active presentation source without closing or recreating the output window.
