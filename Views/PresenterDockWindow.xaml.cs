@@ -30,10 +30,12 @@ public sealed partial class PresenterDockWindow : Window
     private InputNonClientPointerSource? _nonClientPointerSource;
     private PresenterDockMenuWindow? _activeMenuWindow;
     private long _lastMenuClosedTicks;
+    private readonly SubclassProc _subclassProc;
 
     public PresenterDockWindow()
     {
         InitializeComponent();
+        _subclassProc = DockSubclassProc;
         ViewModel = App.Current.Services.GetRequiredService<PresenterDockViewModel>();
         ViewModel.SetDispatcherQueue(DispatcherQueue);
 
@@ -78,6 +80,22 @@ public sealed partial class PresenterDockWindow : Window
                 presenter.IsMaximizable = false;
                 presenter.SetBorderAndTitleBar(hasBorder: false, hasTitleBar: false);
             }
+
+            // Strip maximize and sizing border Win32 styles so Windows shell features never maximize the dock
+            var style = GetWindowLongPtr(WindowHandle, GWL_STYLE);
+            SetWindowLongPtr(WindowHandle, GWL_STYLE, (IntPtr)(style.ToInt64() & ~WS_MAXIMIZEBOX & ~WS_THICKFRAME));
+
+            // Remove SC_MAXIMIZE and SC_SIZE from system menu
+            var hMenu = GetSystemMenu(WindowHandle, false);
+            if (hMenu != IntPtr.Zero)
+            {
+                DeleteMenu(hMenu, SC_MAXIMIZE, MF_BYCOMMAND);
+                DeleteMenu(hMenu, SC_SIZE, MF_BYCOMMAND);
+            }
+
+            // Install native window subclass to safely intercept and block WM_NCLBUTTONDBLCLK on caption
+            SetWindowSubclass(WindowHandle, _subclassProc, new UIntPtr(1001), IntPtr.Zero);
+            _appWindow.Changed += OnAppWindowChanged;
 
             ApplyWindowSizingAndPosition(ViewModel.IsActiveSourceVideo, initialCenter: true);
 
@@ -342,11 +360,113 @@ public sealed partial class PresenterDockWindow : Window
         }
     }
 
+    private void OnAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
+    {
+        if (args.DidPresenterChange || args.DidSizeChange)
+        {
+            if (sender.Presenter is OverlappedPresenter presenter && presenter.State == OverlappedPresenterState.Maximized)
+            {
+                presenter.Restore();
+                ApplyWindowSizingAndPosition(ViewModel.IsActiveSourceVideo, initialCenter: false);
+            }
+        }
+    }
+
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
         CloseActiveMenu();
+        if (_appWindow is not null)
+        {
+            _appWindow.Changed -= OnAppWindowChanged;
+        }
+        if (WindowHandle != IntPtr.Zero)
+        {
+            RemoveWindowSubclass(WindowHandle, _subclassProc, new UIntPtr(1001));
+        }
         ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
         ViewModel.Dispose();
+    }
+
+    private IntPtr DockSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, IntPtr dwRefData)
+    {
+        const uint WM_NCLBUTTONDBLCLK = 0x00A3;
+        const uint WM_SYSCOMMAND = 0x0112;
+        const uint WM_GETMINMAXINFO = 0x0024;
+        const int HTCAPTION = 2;
+
+        switch (uMsg)
+        {
+            case WM_NCLBUTTONDBLCLK:
+                if ((int)wParam == HTCAPTION)
+                {
+                    // Block caption double-click from maximizing or resizing the floating dock
+                    return IntPtr.Zero;
+                }
+                break;
+
+            case WM_SYSCOMMAND:
+                uint cmd = (uint)(wParam.ToInt64() & 0xFFF0);
+                if (cmd == SC_MAXIMIZE)
+                {
+                    // Block maximize system command
+                    return IntPtr.Zero;
+                }
+                break;
+
+            case WM_GETMINMAXINFO:
+                var result = DefSubclassProc(hWnd, uMsg, wParam, lParam);
+                if (lParam != IntPtr.Zero)
+                {
+                    try
+                    {
+                        var mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
+                        uint dpi = GetDpiForWindow(hWnd);
+                        if (dpi == 0) dpi = 96;
+                        double scale = dpi / 96.0;
+                        double widthDip = 680.0;
+                        double heightDip = ViewModel.IsActiveSourceVideo ? 86.0 : 52.0;
+                        int pixelWidth = (int)Math.Round(widthDip * scale);
+                        int pixelHeight = (int)Math.Round(heightDip * scale);
+
+                        mmi.ptMaxTrackSize.X = pixelWidth;
+                        mmi.ptMaxTrackSize.Y = pixelHeight;
+                        mmi.ptMaxSize.X = pixelWidth;
+                        mmi.ptMaxSize.Y = pixelHeight;
+                        Marshal.StructureToPtr(mmi, lParam, false);
+                    }
+                    catch
+                    {
+                        // Ignore marshaling errors
+                    }
+                }
+                return result;
+        }
+
+        return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+    }
+
+    private const int GWL_STYLE = -16;
+    private const long WS_MAXIMIZEBOX = 0x00010000L;
+    private const long WS_THICKFRAME = 0x00040000L;
+    private const uint SC_MAXIMIZE = 0xF030;
+    private const uint SC_SIZE = 0xF000;
+    private const uint MF_BYCOMMAND = 0x00000000;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MINMAXINFO
+    {
+        public POINT ptReserved;
+        public POINT ptMaxSize;
+        public POINT ptMaxPosition;
+        public POINT ptMinTrackSize;
+        public POINT ptMaxTrackSize;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -366,6 +486,29 @@ public sealed partial class PresenterDockWindow : Window
         public RECT rcWork;
         public int dwFlags;
     }
+
+    [DllImport("comctl32.dll", SetLastError = true)]
+    private static extern bool SetWindowSubclass(IntPtr hWnd, SubclassProc pfnSubclass, UIntPtr uIdSubclass, IntPtr dwRefData);
+
+    [DllImport("comctl32.dll", SetLastError = true)]
+    private static extern bool RemoveWindowSubclass(IntPtr hWnd, SubclassProc pfnSubclass, UIntPtr uIdSubclass);
+
+    [DllImport("comctl32.dll", SetLastError = true)]
+    private static extern IntPtr DefSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
+
+    private delegate IntPtr SubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, IntPtr dwRefData);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+    private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+    private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetSystemMenu(IntPtr hWnd, bool bRevert);
+
+    [DllImport("user32.dll")]
+    private static extern bool DeleteMenu(IntPtr hMenu, uint uPosition, uint uFlags);
 
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr hWnd);
