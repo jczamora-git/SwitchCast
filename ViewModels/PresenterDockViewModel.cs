@@ -37,6 +37,10 @@ public partial class PresenterDockViewModel : ObservableObject
 
         _presentationStateService.PropertyChanged += OnStatePropertyChanged;
         _presentationCoordinator.PropertyChanged += OnCoordinatorPropertyChanged;
+        _presentationWindowService.DisplayModeChanged += OnWindowDisplayModeChanged;
+        _presentationWindowService.WindowOpened += (s, e) => NotifyFullscreenProperties();
+        _presentationWindowService.WindowClosed += (s, e) => NotifyFullscreenProperties();
+
         if (_presentationCoordinator.MediaPresentationService is not null)
         {
             _presentationCoordinator.MediaPresentationService.MediaStateChanged += (s, e) =>
@@ -157,6 +161,26 @@ public partial class PresenterDockViewModel : ObservableObject
     public bool HasSelectedSources => _presentationStateService.SelectedSourceCount > 0;
 
     public bool CanSwitchSources => _presentationStateService.SelectedSources.Count(s => s.IsAvailable) > 1;
+
+    public bool IsOutputWindowOpen => _presentationWindowService.IsWindowOpen;
+
+    public bool IsFullscreen => _presentationWindowService.DisplayMode == PresentationDisplayMode.Fullscreen;
+
+    public bool CanToggleFullscreen => IsOutputWindowOpen;
+
+    public string FullscreenButtonGlyph => IsFullscreen ? "\uE73F" : "\uE740"; // Exit Fullscreen (contract) / Enter Fullscreen (expand)
+
+    public string FullscreenButtonTooltip => IsFullscreen ? "Exit Fullscreen Presentation" : "Enter Fullscreen Presentation";
+
+    [RelayCommand]
+    public void ToggleFullscreen()
+    {
+        if (IsOutputWindowOpen)
+        {
+            _presentationWindowService.ToggleDisplayMode();
+            NotifyFullscreenProperties();
+        }
+    }
 
     public string PauseButtonText => IsPaused ? "Resume" : "Pause";
 
@@ -290,6 +314,20 @@ public partial class PresenterDockViewModel : ObservableObject
         NotifyAllProperties();
     }
 
+    private void OnWindowDisplayModeChanged(object? sender, PresentationDisplayMode mode)
+    {
+        NotifyFullscreenProperties();
+    }
+
+    private void NotifyFullscreenProperties()
+    {
+        OnPropertyChanged(nameof(IsOutputWindowOpen));
+        OnPropertyChanged(nameof(IsFullscreen));
+        OnPropertyChanged(nameof(CanToggleFullscreen));
+        OnPropertyChanged(nameof(FullscreenButtonGlyph));
+        OnPropertyChanged(nameof(FullscreenButtonTooltip));
+    }
+
     private void NotifyModeProperties()
     {
         OnPropertyChanged(nameof(SwitchMode));
@@ -329,6 +367,7 @@ public partial class PresenterDockViewModel : ObservableObject
         OnPropertyChanged(nameof(MediaVolumePercentText));
         OnPropertyChanged(nameof(MediaMuteButtonGlyph));
         OnPropertyChanged(nameof(MediaMuteButtonTooltip));
+        NotifyFullscreenProperties();
         NotifyModeProperties();
     }
 }

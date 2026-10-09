@@ -8,10 +8,10 @@
     mc:Ignorable="d"
     Title="SwitchCast Presentation Output">
 
-    <Grid x:Name="RootGrid" Background="{ThemeResource AppBackgroundBrush}">
+    <Grid x:Name="RootGrid" Background="{ThemeResource AppBackgroundBrush}" KeyDown="OnRootGridKeyDown">
         <Grid.RowDefinitions>
             <!-- Custom Integrated Title Bar -->
-            <RowDefinition Height="38" />
+            <RowDefinition x:Name="TitleBarRow" Height="38" />
             <!-- Presentation Output Canvas Area -->
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>

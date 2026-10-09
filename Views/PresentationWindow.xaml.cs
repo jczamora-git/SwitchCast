@@ -52,6 +52,10 @@ public sealed partial class PresentationWindow : Window
         ApplyTheme(_settingsService.CurrentSettings.Theme);
     }
 
+    public PresentationDisplayMode DisplayMode { get; private set; } = PresentationDisplayMode.Windowed;
+
+    public event EventHandler<PresentationDisplayMode>? DisplayModeChanged;
+
     public PresentationViewModel ViewModel { get; }
 
     public IntPtr WindowHandle { get; private set; }
@@ -200,6 +204,63 @@ public sealed partial class PresentationWindow : Window
             titleBar.ButtonPressedBackgroundColor = Windows.UI.Color.FromArgb(45, 0, 0, 0);
             titleBar.ButtonPressedForegroundColor = Colors.Black;
             titleBar.ButtonInactiveForegroundColor = Windows.UI.Color.FromArgb(255, 160, 160, 160);
+        }
+    }
+
+    /// <summary>
+    /// Switches the Presentation Output window between Windowed and Fullscreen display mode.
+    /// Preserves the same HWND, session state, and underlying capture/media stream.
+    /// </summary>
+    public void SetDisplayMode(PresentationDisplayMode mode)
+    {
+        if (DisplayMode == mode || _appWindow is null)
+        {
+            return;
+        }
+
+        DisplayMode = mode;
+
+        if (mode == PresentationDisplayMode.Fullscreen)
+        {
+            // 1. Hide the custom XAML title bar completely
+            AppTitleBar.Visibility = Visibility.Collapsed;
+            TitleBarRow.Height = new GridLength(0);
+
+            // 2. Clear title bar interop and switch to FullScreen presenter
+            SetTitleBar(null);
+            _appWindow.SetPresenter(AppWindowPresenterKind.FullScreen);
+        }
+        else
+        {
+            // 1. Restore Default Overlapped presenter
+            _appWindow.SetPresenter(AppWindowPresenterKind.Default);
+
+            // 2. Restore custom integrated title bar
+            TitleBarRow.Height = new GridLength(38);
+            AppTitleBar.Visibility = Visibility.Visible;
+            SetTitleBar(AppTitleBar);
+            UpdateTitleBarColors(_settingsService.CurrentSettings.Theme);
+        }
+
+        DisplayModeChanged?.Invoke(this, mode);
+    }
+
+    /// <summary>
+    /// Toggles the current display mode of the presentation output window.
+    /// </summary>
+    public void ToggleDisplayMode()
+    {
+        SetDisplayMode(DisplayMode == PresentationDisplayMode.Fullscreen
+            ? PresentationDisplayMode.Windowed
+            : PresentationDisplayMode.Fullscreen);
+    }
+
+    private void OnRootGridKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+    {
+        if (e.Key == Windows.System.VirtualKey.Escape && DisplayMode == PresentationDisplayMode.Fullscreen)
+        {
+            SetDisplayMode(PresentationDisplayMode.Windowed);
+            e.Handled = true;
         }
     }
 

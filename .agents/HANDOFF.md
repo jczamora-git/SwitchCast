@@ -3,42 +3,44 @@
 ---
 
 ## Task Details
-- **Task**: Phase 6.2: Media Audio Playback
-- **Date**: 2026-10-09T16:20:00+08:00 (UTC+8)
+- **Task**: Phase 6.3: Fullscreen Presentation Output
+- **Date**: 2026-10-09T17:48:00+08:00 (UTC+8)
 - **Status**: Completed & Verified
 
 ---
 
 ## 1. Objectives Implemented
 
-1. **Root Cause Confirmed & Resolved**:
-   - In `MediaPresentationService`, `MediaPlayer` was initialized with `IsMuted = true` and lacked volume/mute API integration.
-   - Initialized `MediaPlayer` with `IsMuted = false` (or user preference) and connected to default Windows audio endpoint.
+1. **Native AppWindow Fullscreen Mode**:
+   - Integrated `AppWindow.SetPresenter(AppWindowPresenterKind.FullScreen)` and `AppWindowPresenterKind.Default` in [Views/PresentationWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml.cs).
+   - Removed window borders, title bar caption, and taskbar overlay in fullscreen without destroying or recreating the window instance.
 
-2. **Authoritative Audio Controls & Synchronization**:
-   - Extended `IMediaPresentationService` and `MediaPresentationService` with `Volume`, `IsMuted`, `SetVolume(double)`, `SetMuted(bool)`, and `ToggleMute()`.
-   - Connected `UserSettings.MediaVolume` (default 1.0) and `UserSettings.IsMediaMuted` (default false) with automatic async persistence via `IApplicationSettingsService`.
+2. **Stable HWND Preservation & Zero Session Recreation**:
+   - Transitioning between `Windowed` and `Fullscreen` preserves the exact same `PresentationWindow` HWND, DirectX 11 capture pipeline, active video/audio stream, and presentation state.
+   - Screen sharing targets in Google Meet, Zoom, and Microsoft Teams remain undisturbed.
 
-3. **Dashboard & Floating Presenter Dock UI Integration**:
-   - **Dashboard Video Controls Bar**: Added mute toggle button (`\uE74F` / `\uE767`), volume slider (0..100), and percentage text indicator.
-   - **Floating Presenter Dock Toolbar**: Added compact mute/unmute button directly on the dock toolbar (visible only when video source is On Air) without increasing dock dimensions.
-   - **Presenter Dock Menu**: Added compact volume slider and mute toggle in `PresenterDockMenuWindow` More Options menu panel.
+3. **Responsive Presentation Viewport & Custom Title Bar Collapsing**:
+   - Custom XAML title bar (`AppTitleBar`) is completely collapsed in fullscreen (`TitleBarRow.Height = 0` / `AppTitleBar.Visibility = Collapsed` / `SetTitleBar(null)`).
+   - Presentation content (Screen Capture, Direct Image, Video `MediaPlayerElement`, Standby canvas, Blackout overlay) fills 100% of the active display with aspect ratio preserved (`Stretch="Uniform"`).
+   - Restoring windowed mode returns title bar height to 38px with full window dragging and caption controls restored.
 
-4. **Audio Lifecycle, Blackout Privacy & Source Switching Safety**:
-   - Video Play: Plays synchronized audio.
-   - Video Pause: Suspends video and audio simultaneously.
-   - Video Resume: Resumes video and audio together.
-   - Video Restart: Resets playback position to 00:00 for both video and audio.
-   - Presentation Blackout: Suspends video and suppresses audio immediately; un-blackout restores previous state.
-   - Stop Presenting: Safely unloads and disposes media player, terminates audio, closes presentation output, and brings Dashboard to front.
-   - Mixed-Source Transitions: Switching between `Video -> Image`, `Video -> Window`, and `Video -> Video` terminates previous audio playback immediately with zero overlapping audio streams.
+4. **Floating Presenter Dock Control Surface**:
+   - Added fullscreen icon toggle (`\uE740` Enter / `\uE73F` Exit) in Expanded dock mode in [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml).
+   - Added fullscreen toggle item in `PresenterDockMenuWindow` More Options popup.
+   - Dynamic glyph and tooltip bound to `PresenterDockViewModel.FullscreenButtonGlyph` and `FullscreenButtonTooltip`.
+   - Button is enabled only when the Presentation Output window is open.
 
-5. **Meeting Audio Compatibility Guidance**:
-   - Documented that local playback and conferencing meeting transmission are separate. Google Meet users should select "Also share system audio" when presenting the Presentation Output window.
+5. **Multi-Monitor Handling & Coordinate Restoration**:
+   - Fullscreen is initiated on whichever monitor currently contains the Presentation Output window.
+   - Restores the previous normal window size, coordinates, and monitor placement when exiting fullscreen.
 
-6. **Comprehensive Automated Testing**:
-   - Added `MediaAudioPlaybackTests.cs` covering volume adjustment, clamping, mute toggling, settings persistence, lifecycle suspension/restoration, and mixed-source transitions.
-   - **246 tests passing with 100% success rate**.
+6. **Keyboard Recovery & Lifecycle Integration**:
+   - Added `Escape` key handler in `PresentationWindow` when focused to exit fullscreen safely.
+   - Stop Presenting and window closing safely reset display mode state to Windowed.
+
+7. **Comprehensive Automated Testing**:
+   - Added [SwitchCast.Tests/Services/PresentationFullscreenTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresentationFullscreenTests.cs) verifying display mode state synchronization, command execution, and window open/close lifecycle.
+   - **247 automated tests passing with 100% success rate**.
 
 ---
 

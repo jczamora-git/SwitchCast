@@ -274,6 +274,19 @@
                             <TextBlock Text="Presentation Output" FontSize="11" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
+
+                    <!-- Toggle Fullscreen Output (Visible when output is open) -->
+                    <Button Click="OnToggleFullscreenClicked"
+                            IsEnabled="{x:Bind ViewModel.CanToggleFullscreen, Mode=OneWay}"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Padding="8,5">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="{x:Bind ViewModel.FullscreenButtonGlyph, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" VerticalAlignment="Center" />
+                            <TextBlock Text="{x:Bind ViewModel.FullscreenButtonTooltip, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </Grid>
         </Border>

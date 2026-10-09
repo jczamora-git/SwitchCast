@@ -134,8 +134,8 @@ public sealed partial class PresenterDockMenuWindow : Window
                 VideoAudioPanel.Visibility = _viewModel.IsActiveSourceVideo ? Visibility.Visible : Visibility.Collapsed;
                 AudioDivider.Visibility = _viewModel.IsActiveSourceVideo ? Visibility.Visible : Visibility.Collapsed;
 
-                desiredWidthDip = 220.0;
-                double baseHeight = _viewModel.IsPresenting ? 135.0 : 92.0;
+                desiredWidthDip = 225.0;
+                double baseHeight = _viewModel.IsPresenting ? 170.0 : 125.0;
                 if (_viewModel.IsActiveSourceVideo)
                 {
                     baseHeight += 58.0;
@@ -256,6 +256,12 @@ public sealed partial class PresenterDockMenuWindow : Window
     private void OnToggleMuteClicked(object sender, RoutedEventArgs e)
     {
         _viewModel.ToggleMediaMuteCommand.Execute(null);
+    }
+
+    private void OnToggleFullscreenClicked(object sender, RoutedEventArgs e)
+    {
+        CloseMenu();
+        _viewModel.ToggleFullscreenCommand.Execute(null);
     }
 
     private void OnWindowActivated(object sender, WindowActivatedEventArgs args)

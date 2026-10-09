@@ -179,6 +179,14 @@
                                 ToolTipService.ToolTip="Stop Live Presentation (Ctrl+Shift+S)">
                             <FontIcon Glyph="&#xE71A;" FontSize="11" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
                         </Button>
+
+                        <!-- Fullscreen Toggle (Presentation Output) -->
+                        <Button Command="{x:Bind ViewModel.ToggleFullscreenCommand}"
+                                IsEnabled="{x:Bind ViewModel.CanToggleFullscreen, Mode=OneWay}"
+                                Style="{StaticResource DockIconButtonStyle}"
+                                ToolTipService.ToolTip="{x:Bind ViewModel.FullscreenButtonTooltip, Mode=OneWay}">
+                            <FontIcon Glyph="{x:Bind ViewModel.FullscreenButtonGlyph, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                        </Button>
                     </StackPanel>
 
                     <!-- More Actions (Opens External Dropdown Menu) -->

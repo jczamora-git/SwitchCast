@@ -7,15 +7,34 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Phase 6.2: Media Audio Playback
+- **Current Phase**: Phase 6.3: Fullscreen Presentation Output
 - **Overall Status**: **Completed & Tested**
-- **Last Updated**: 2026-10-09T16:20:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-09T17:48:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Fullscreen Presentation Output (Phase 6.3)**:
+  - **Native AppWindow Fullscreen Presenter**:
+    - Leverages supported Windows App SDK `AppWindow.SetPresenter(AppWindowPresenterKind.FullScreen)` for true borderless fullscreen on the active monitor without custom window recreation hacks.
+    - Transitions smoothly between `PresentationDisplayMode.Windowed` and `PresentationDisplayMode.Fullscreen`.
+  - **Same HWND Preservation & Share Continuity**:
+    - Preserves the EXACT same `PresentationWindow` instance, native Win32 HWND, active capture/media session, and playback state across all fullscreen and windowed mode transitions.
+    - Zero window recreation, zero capture session recreation, and zero audio stream interruption.
+  - **Custom Title Bar & Viewport Geometry**:
+    - Completely collapses and hides custom XAML title bar (`TitleBarRow.Height = 0` / `AppTitleBar.Visibility = Collapsed` / `SetTitleBar(null)`) in fullscreen mode so audience content fills 100% of the viewport with aspect-ratio preservation.
+    - Restores custom title bar height (38px) and default window presenter upon exiting fullscreen.
+  - **Floating Presenter Dock Control Surface**:
+    - Added dedicated fullscreen icon toggle (`\uE740` Enter / `\uE73F` Exit) in Expanded dock mode and inside `PresenterDockMenuWindow` More Options popup.
+    - Dynamic tooltip and state synchronization linked directly to `IPresentationWindowService.DisplayMode`.
+    - Auto-disables toggle button when `PresentationWindow` is closed.
+  - **Fallback Escape Key Recovery**:
+    - Safe `Escape` key handler in `PresentationWindow` to exit fullscreen when output window has keyboard focus, without interfering with system-wide hotkeys.
+  - **Lifecycle Integration & Multi-Monitor**:
+    - Restores previous normal window size, coordinates, and monitor placement when exiting fullscreen.
+    - Stop Presenting and window close events safely reset display mode state to Windowed.
 - [x] **Media Audio Playback & Synchronization (Phase 6.2)**:
   - **Audible Video Playback**: Fixed silent video playback by removing hardcoded `IsMuted = true` and wiring native `Windows.Media.Playback.MediaPlayer` audio channels to default Windows audio endpoints.
   - **Single Authoritative Playback Session**: Synchronized single-session media playback governed by `MediaPresentationService` where audio and video seek, pause, resume, and loop as a single atomic stream.
@@ -93,7 +112,7 @@ This is the authoritative progress, state, and environmental tracking document f
 
 - **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (246 passed, 0 failed, 0 skipped).
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (247 passed, 0 failed, 0 skipped).
 
 ---
 

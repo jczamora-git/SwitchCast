@@ -7,6 +7,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Phase 6.3: Fullscreen Presentation Output] - 2026-10-09
+
+### Added / Improved (feat / UI / test / docs)
+- **Native AppWindow Fullscreen Presenter**:
+  - Implemented `AppWindowPresenterKind.FullScreen` and `AppWindowPresenterKind.Default` in [Views/PresentationWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml.cs).
+  - Strongly typed `PresentationDisplayMode` enum (`Windowed`, `Fullscreen`) in [Models/PresentationDisplayMode.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/PresentationDisplayMode.cs).
+  - Integrated `DisplayMode`, `DisplayModeChanged`, `SetDisplayMode()`, and `ToggleDisplayMode()` in `IPresentationWindowService` and `PresentationWindowService`.
+- **Custom Title Bar Collapsing & 100% Viewport Geometry**:
+  - Dynamic collapsing of custom title bar (`TitleBarRow.Height = new GridLength(0)`, `AppTitleBar.Visibility = Visibility.Collapsed`, `SetTitleBar(null)`) in fullscreen mode.
+  - Audience-facing presentation canvas (Capture frames, Static Images, Video `MediaPlayerElement`, Standby, Blackout) expands to occupy full monitor bounds with uniform aspect ratio preserved.
+- **Floating Presenter Dock Fullscreen Controller**:
+  - Added minimalist Fullscreen icon button (`\uE740` Enter / `\uE73F` Exit) in Expanded dock mode in [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml).
+  - Added Fullscreen toggle action in `PresenterDockMenuWindow` More Options popup.
+  - Authoritative ViewModel command `ToggleFullscreenCommand` synchronized with `IPresentationWindowService.DisplayModeChanged`.
+  - Button dynamically enables/disables based on `IsOutputWindowOpen`.
+- **Keyboard Recovery & Multi-Monitor Preservation**:
+  - Added `Escape` key shortcut when `PresentationWindow` is focused to safely exit fullscreen without affecting global hotkeys.
+  - Native multi-monitor positioning preserved when toggling fullscreen on secondary displays.
+- **Continuous Capture & Media Continuity**:
+  - Preserves the EXACT same Win32 HWND, capture session, and media playback stream across transitions.
+- **Automated Unit & Regression Tests**:
+  - Added [SwitchCast.Tests/Services/PresentationFullscreenTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresentationFullscreenTests.cs) verifying display mode state machine, command execution, and open/close synchronization.
+  - Test suite expanded to **247 automated unit tests** (100% pass rate).
+
+---
+
 ## [Phase 6.2: Media Audio Playback] - 2026-10-09
 
 ### Added / Fixed / Improved (feat / fix / audio / UI / test / docs)
