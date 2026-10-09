@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Runtime Bug Fix — Floating Dock Playback Slider Cross-Thread Update (COMException 0x8001010E Permanent Hotfix)
-- **Overall Status**: **Completed & Tested**
-- **Last Updated**: 2026-10-09T20:45:00+08:00 (UTC+8)
+- **Current Phase**: Official Release — SwitchCast v1.2.0 (Windows x64)
+- **Overall Status**: **Released & Verified**
+- **Last Updated**: 2026-10-10T00:10:00+08:00 (UTC+8)
 
 ---
 

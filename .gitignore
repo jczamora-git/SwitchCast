@@ -15,10 +15,9 @@ Generated Files/
 BundleArtifacts/
 Package.StoreAssociation.xml
 _pkginfo.txt
-publish/
-releases/
+/publish/
+/releases/
 *.zip
-docs/
 
 ## OS generated files
 .DS_Store

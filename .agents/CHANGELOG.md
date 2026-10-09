@@ -7,6 +7,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.2.0] - 2026-10-10
+
+### Added
+- **Local Media Presentation Integration**: Import PNG, JPG, BMP, GIF images and MP4, MKV, MOV, WMV, AVI videos directly into the unified presentation queue.
+- **Local Video Audio Playback & Synchronization**: Integrated audio output for video sources with volume slider (0–100%) and instant mute toggle controls.
+- **Dock-Controlled Fullscreen Presentation Mode**: Native borderless fullscreen toggle (`AppWindowPresenterKind.FullScreen`) for `PresentationWindow` with title-bar auto-collapsing and aspect-ratio preservation.
+- **Adaptive Video Transport Controls**: Added timeline scrubber, Play/Pause, Restart, Forward 10s, and Backward 10s controls to the Floating Presenter Dock when a video source is on-air.
+
+### Improved
+- **Floating Presenter Dock Caption Dragging**: Replaced custom pointer routing with genuine Windows App SDK `InputNonClientPointerSource` non-client regions for smooth, natural title-bar dragging without sticky click-to-move anomalies.
+- **Dashboard Empty-State UX**: Replaced blank selector box with styled empty-state dropdown matching the Floating Dock, plus direct `+ Add Source` navigation button.
+- **Preview Workspace Layout**: Fixed text clipping in empty workspace panel with automatic wrapping.
+
+### Fixed
+- **Floating Dock Playback Timeline Cross-Thread COMException (0x8001010E)**: Permanently resolved `RPC_E_WRONG_THREAD` crashes during video playback by eliminating background thread-pool timers, replacing them with a single UI-owned `Microsoft.UI.Dispatching.DispatcherQueueTimer`, and eliminating unsafe off-thread execution fallbacks.
+
+---
+
 ## [Floating Dock Playback Slider Cross-Thread COMException Permanent Hotfix] - 2026-10-09
 
 ### Fixed (fix / threading / winui / test / docs)

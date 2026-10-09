@@ -3,9 +3,9 @@
 ---
 
 ## Task Details
-- **Task**: Permanent Hotfix — Presenter Dock Playback Progress Cross-Thread COMException (0x8001010E)
-- **Date**: 2026-10-09T20:45:00+08:00 (UTC+8)
-- **Status**: Completed & Verified
+- **Task**: Official Release — SwitchCast v1.2.0 (Windows x64)
+- **Date**: 2026-10-10T00:10:00+08:00 (UTC+8)
+- **Status**: Completed, Packaged & Verified
 
 ---
 

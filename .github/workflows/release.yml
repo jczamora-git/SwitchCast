@@ -1,0 +1,49 @@
+name: Build & Release SwitchCast
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Run Unit Tests
+        run: dotnet test SwitchCast.Tests/SwitchCast.Tests.csproj -c Release
+
+      - name: Publish Standalone Application
+        run: dotnet publish SwitchCast.csproj -c Release -r win-x64 -p:Platform=x64 --self-contained true -o ./publish
+
+      - name: Package Release Distribution Archive
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path ./releases -Force
+          $tagName = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { "v1.2.0" }
+          $zipName = "SwitchCast-$tagName-win-x64.zip"
+          $shaName = "SwitchCast-$tagName-win-x64.sha256"
+          Compress-Archive -Path ./publish/* -DestinationPath "./releases/$zipName" -Force
+          $hash = (Get-FileHash -Path "./releases/$zipName" -Algorithm SHA256).Hash
+          Set-Content -Path "./releases/$shaName" -Value "$hash  $zipName"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: SwitchCast ${{ github.ref_name }}
+          body_path: docs/releases/v1.2.0.md
+          files: |
+            releases/SwitchCast-*-win-x64.zip
+            releases/SwitchCast-*-win-x64.sha256
