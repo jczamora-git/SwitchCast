@@ -56,6 +56,16 @@ public interface IMediaPresentationService : INotifyPropertyChanged, IDisposable
     TimeSpan Duration { get; }
 
     /// <summary>
+    /// Gets or sets the normalized media audio playback volume (0.0 to 1.0).
+    /// </summary>
+    double Volume { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether media audio playback is currently muted.
+    /// </summary>
+    bool IsMuted { get; set; }
+
+    /// <summary>
     /// Last error message encountered during media decoding or playback.
     /// </summary>
     string? LastErrorMessage { get; }
@@ -109,4 +119,19 @@ public interface IMediaPresentationService : INotifyPropertyChanged, IDisposable
     /// Seeks playback to the specified position.
     /// </summary>
     void Seek(TimeSpan position);
+
+    /// <summary>
+    /// Sets the media playback volume in range [0.0, 1.0].
+    /// </summary>
+    void SetVolume(double volume);
+
+    /// <summary>
+    /// Sets whether media playback is muted.
+    /// </summary>
+    void SetMuted(bool isMuted);
+
+    /// <summary>
+    /// Toggles the muted state of media playback.
+    /// </summary>
+    void ToggleMute();
 }

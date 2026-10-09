@@ -131,8 +131,16 @@ public sealed partial class PresenterDockMenuWindow : Window
                 MoreMenuPanel.Visibility = Visibility.Visible;
                 StopPresentationButton.Visibility = _viewModel.IsPresenting ? Visibility.Visible : Visibility.Collapsed;
                 StopDivider.Visibility = _viewModel.IsPresenting ? Visibility.Visible : Visibility.Collapsed;
-                desiredWidthDip = 210.0;
-                desiredHeightDip = _viewModel.IsPresenting ? 135.0 : 92.0;
+                VideoAudioPanel.Visibility = _viewModel.IsActiveSourceVideo ? Visibility.Visible : Visibility.Collapsed;
+                AudioDivider.Visibility = _viewModel.IsActiveSourceVideo ? Visibility.Visible : Visibility.Collapsed;
+
+                desiredWidthDip = 220.0;
+                double baseHeight = _viewModel.IsPresenting ? 135.0 : 92.0;
+                if (_viewModel.IsActiveSourceVideo)
+                {
+                    baseHeight += 58.0;
+                }
+                desiredHeightDip = baseHeight;
                 break;
         }
 
@@ -243,6 +251,11 @@ public sealed partial class PresenterDockMenuWindow : Window
     {
         CloseMenu();
         _viewModel.ShowOutputWindowCommand.Execute(null);
+    }
+
+    private void OnToggleMuteClicked(object sender, RoutedEventArgs e)
+    {
+        _viewModel.ToggleMediaMuteCommand.Execute(null);
     }
 
     private void OnWindowActivated(object sender, WindowActivatedEventArgs args)

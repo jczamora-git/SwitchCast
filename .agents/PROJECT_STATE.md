@@ -7,15 +7,32 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Phase 6.1: Complete Media Presentation Integration
+- **Current Phase**: Phase 6.2: Media Audio Playback
 - **Overall Status**: **Completed & Tested**
-- **Last Updated**: 2026-10-09T15:20:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-09T16:20:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Media Audio Playback & Synchronization (Phase 6.2)**:
+  - **Audible Video Playback**: Fixed silent video playback by removing hardcoded `IsMuted = true` and wiring native `Windows.Media.Playback.MediaPlayer` audio channels to default Windows audio endpoints.
+  - **Single Authoritative Playback Session**: Synchronized single-session media playback governed by `MediaPresentationService` where audio and video seek, pause, resume, and loop as a single atomic stream.
+  - **Mute & Volume Controls**:
+    - Normalized volume range `[0.0, 1.0]` internally with 0%..100% display and two-way slider bindings.
+    - Dashboard Video Controls Bar: Integrated speaker mute toggle button (`\uE74F` / `\uE767`), volume slider, and percentage text indicator.
+    - Floating Presenter Dock: Compact mute button (`\uE74F` / `\uE767`) directly on the single-row dock toolbar (shown only when video is on air) and full volume slider + mute toggle inside the `PresenterDockMenuWindow` More Options popup without expanding dock dimensions.
+  - **Playback Lifecycle & Privacy Integration**:
+    - Video Play: Plays audio in accordance with volume and mute settings.
+    - Video Pause: Pauses audio and video in sync.
+    - Video Resume: Resumes audio and video together.
+    - Video Restart: Resets playback position to 00:00 for both audio and video.
+    - Presentation Blackout: Suspends video rendering and suppresses audio immediately. Restoring blackout resumes prior playback.
+    - Stop Presenting: Safely stops and disposes active media player, unloads resources, closes Presentation Output, and foregrounds Control Dashboard.
+    - Source Switching Safety: Instant audio termination when switching between `Video -> Image`, `Video -> Window`, and `Video -> Video` (no dual audio streams or orphaned background audio).
+  - **Settings Persistence**: Persists `MediaVolume` and `IsMediaMuted` across application restarts using `IApplicationSettingsService`.
+  - **Meeting Audio Guidance**: Documented separation between local playback and conferencing meeting transmission (e.g., Google Meet "Also share system audio").
 - [x] **Complete Media Presentation Integration (Phase 6.1)**:
   - Full end-to-end presentation pipeline verified across all 4 source types (`WindowSource`, `MonitorSource`, `ImageMediaSource`, `VideoMediaSource`).
   - **Unified Presentation Queue**: Single authoritative queue managed by `IPresentationStateService` containing both desktop capture sources and file-backed media sources with stable type-safe identities.
@@ -51,7 +68,7 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ## 3. INVESTIGATION & KNOWN ISSUES
 
-1. **Phase 6 Audio Policy**: Audio routing from video files to meeting participants is out of scope for Phase 6. Video playback is muted by default.
+1. **Conferencing Audio Transmission**: Local media audio playback is distinct from meeting audio sharing. In applications like Google Meet, presenters must enable "Also share system audio" when selecting the SwitchCast Presentation Output window.
 2. **Minimized Window OS Policy**: As per standard Windows Graphics Capture design, minimized application windows do not produce new Direct3D frames until restored.
 
 ---
@@ -76,7 +93,7 @@ This is the authoritative progress, state, and environmental tracking document f
 
 - **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (239 passed, 0 failed, 0 skipped).
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (246 passed, 0 failed, 0 skipped).
 
 ---
 

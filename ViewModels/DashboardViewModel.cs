@@ -139,6 +139,37 @@ public partial class DashboardViewModel : ObservableObject
 
     public Visibility VideoControlsVisibility => (HasActivePresentation && IsActiveSourceVideo) ? Visibility.Visible : Visibility.Collapsed;
 
+    public double MediaVolume
+    {
+        get => _presentationCoordinator.MediaPresentationService.Volume * 100.0;
+        set
+        {
+            var normalized = Math.Clamp(value / 100.0, 0.0, 1.0);
+            _presentationCoordinator.MediaPresentationService.SetVolume(normalized);
+            OnPropertyChanged(nameof(MediaVolume));
+            OnPropertyChanged(nameof(MediaVolumePercentText));
+            OnPropertyChanged(nameof(MediaMuteButtonGlyph));
+            OnPropertyChanged(nameof(MediaMuteButtonTooltip));
+        }
+    }
+
+    public bool IsMediaMuted => _presentationCoordinator.MediaPresentationService.IsMuted;
+
+    public string MediaVolumePercentText => $"{Math.Round(MediaVolume)}%";
+
+    public string MediaMuteButtonGlyph => (IsMediaMuted || MediaVolume == 0) ? "\uE74F" : "\uE767";
+
+    public string MediaMuteButtonTooltip => IsMediaMuted ? "Unmute media audio" : "Mute media audio";
+
+    [RelayCommand]
+    public void ToggleMediaMute()
+    {
+        _presentationCoordinator.MediaPresentationService.ToggleMute();
+        OnPropertyChanged(nameof(IsMediaMuted));
+        OnPropertyChanged(nameof(MediaMuteButtonGlyph));
+        OnPropertyChanged(nameof(MediaMuteButtonTooltip));
+    }
+
     public string VideoPositionText
     {
         get
@@ -487,6 +518,11 @@ public partial class DashboardViewModel : ObservableObject
         OnPropertyChanged(nameof(VideoLoopButtonText));
         OnPropertyChanged(nameof(VideoPositionText));
         OnPropertyChanged(nameof(VideoControlsVisibility));
+        OnPropertyChanged(nameof(MediaVolume));
+        OnPropertyChanged(nameof(IsMediaMuted));
+        OnPropertyChanged(nameof(MediaVolumePercentText));
+        OnPropertyChanged(nameof(MediaMuteButtonGlyph));
+        OnPropertyChanged(nameof(MediaMuteButtonTooltip));
     }
 
     private void OnPresentationStatePropertyChanged(object? sender, PropertyChangedEventArgs e)

@@ -3,26 +3,42 @@
 ---
 
 ## Task Details
-- **Task**: Phase 6.1: Complete Media Presentation Integration
-- **Date**: 2026-10-09T15:20:00+08:00 (UTC+8)
-- **Status**: Completed
+- **Task**: Phase 6.2: Media Audio Playback
+- **Date**: 2026-10-09T16:20:00+08:00 (UTC+8)
+- **Status**: Completed & Verified
 
 ---
 
 ## 1. Objectives Implemented
 
-1. **End-to-End Media Pipeline Integration**:
-   - Audited and verified full pipeline: `Media Import` -> `Media Library` -> `Presentation Queue` -> `Dashboard Source Picker / Floating Dock / Hotkeys` -> `PresentationCoordinator` -> `MediaPresentationService` -> `PresentationWindow`.
-   - Single unified presentation queue across all 4 source types (`WindowSource`, `MonitorSource`, `ImageMediaSource`, `VideoMediaSource`).
-   - Dynamic glyph and category binding in Floating Presenter Dock button (`ActiveSourceGlyph`) and menu dropdown (`PresenterDockMenuWindow.xaml`).
-   - Mixed-source queue navigation (`NextSource`, `PreviousSource`, `SelectSource1..5`) validated across 4-source cycles (`Window -> Image -> Video -> Monitor`).
-   - Video playback controls (Play, Pause, Resume, Restart, Loop toggle, timecode position) connected to on-air state in Control Dashboard.
-   - Three Switching Modes (`Active + Live`, `Live Only`, `Active Only`) verified for media sources (graceful skip of native HWND activation without error).
-   - Fail-closed error handling and resource cleanup on source transitions and window close.
+1. **Root Cause Confirmed & Resolved**:
+   - In `MediaPresentationService`, `MediaPlayer` was initialized with `IsMuted = true` and lacked volume/mute API integration.
+   - Initialized `MediaPlayer` with `IsMuted = false` (or user preference) and connected to default Windows audio endpoint.
 
-2. **Automated Test Suite Expansion**:
-   - Added comprehensive tests for 4-source mixed navigation, previous navigation, direct index switching, and switching modes.
-   - 239 automated unit and regression tests passing with 100% success rate.
+2. **Authoritative Audio Controls & Synchronization**:
+   - Extended `IMediaPresentationService` and `MediaPresentationService` with `Volume`, `IsMuted`, `SetVolume(double)`, `SetMuted(bool)`, and `ToggleMute()`.
+   - Connected `UserSettings.MediaVolume` (default 1.0) and `UserSettings.IsMediaMuted` (default false) with automatic async persistence via `IApplicationSettingsService`.
+
+3. **Dashboard & Floating Presenter Dock UI Integration**:
+   - **Dashboard Video Controls Bar**: Added mute toggle button (`\uE74F` / `\uE767`), volume slider (0..100), and percentage text indicator.
+   - **Floating Presenter Dock Toolbar**: Added compact mute/unmute button directly on the dock toolbar (visible only when video source is On Air) without increasing dock dimensions.
+   - **Presenter Dock Menu**: Added compact volume slider and mute toggle in `PresenterDockMenuWindow` More Options menu panel.
+
+4. **Audio Lifecycle, Blackout Privacy & Source Switching Safety**:
+   - Video Play: Plays synchronized audio.
+   - Video Pause: Suspends video and audio simultaneously.
+   - Video Resume: Resumes video and audio together.
+   - Video Restart: Resets playback position to 00:00 for both video and audio.
+   - Presentation Blackout: Suspends video and suppresses audio immediately; un-blackout restores previous state.
+   - Stop Presenting: Safely unloads and disposes media player, terminates audio, closes presentation output, and brings Dashboard to front.
+   - Mixed-Source Transitions: Switching between `Video -> Image`, `Video -> Window`, and `Video -> Video` terminates previous audio playback immediately with zero overlapping audio streams.
+
+5. **Meeting Audio Compatibility Guidance**:
+   - Documented that local playback and conferencing meeting transmission are separate. Google Meet users should select "Also share system audio" when presenting the Presentation Output window.
+
+6. **Comprehensive Automated Testing**:
+   - Added `MediaAudioPlaybackTests.cs` covering volume adjustment, clamping, mute toggling, settings persistence, lifecycle suspension/restoration, and mixed-source transitions.
+   - **246 tests passing with 100% success rate**.
 
 ---
 

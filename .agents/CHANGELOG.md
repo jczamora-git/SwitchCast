@@ -7,6 +7,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Phase 6.2: Media Audio Playback] - 2026-10-09
+
+### Added / Fixed / Improved (feat / fix / audio / UI / test / docs)
+- **Local Media Audio Playback**:
+  - Resolved silent video playback by removing hardcoded `IsMuted = true` in `MediaPresentationService`.
+  - Initialized `Windows.Media.Playback.MediaPlayer` with unmuted audio playback connected to the default Windows audio output device.
+- **Authoritative Media Audio Controller**:
+  - Implemented `Volume`, `IsMuted`, `SetVolume(double volume)`, `SetMuted(bool isMuted)`, and `ToggleMute()` on `IMediaPresentationService` and `MediaPresentationService`.
+  - Added `MediaVolume` and `IsMediaMuted` properties to `UserSettings` with asynchronous local persistence through `IApplicationSettingsService`.
+- **Dashboard Audio Controls**:
+  - Added Mute/Unmute button (`\uE74F` / `\uE767`), volume slider (0..100%), and percentage readout in the Video Playback Controls bar in [Views/DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml).
+- **Floating Presenter Dock Audio Integration**:
+  - Added compact mute/unmute button directly on the dock toolbar in [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml) (visible conditionally when a video source is On Air).
+  - Added video audio volume slider and mute toggle in [Views/PresenterDockMenuWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml) More Options popup without altering single-row dock dimensions.
+- **Audio Lifecycle, Blackout Privacy & Source Switching Safety**:
+  - Synchronized video pause/resume with audio pause/resume.
+  - Blackout suppresses video frames and mutes audio immediately; ending blackout resumes prior audio state.
+  - Stop presenting stops video/audio and disposes active media player.
+  - Multi-source switching (`Video -> Image`, `Video -> Window`, `Video -> Video`) terminates previous audio playback immediately to prevent dual audio streams or orphaned background playback.
+- **Automated Unit & Regression Tests**:
+  - Added [SwitchCast.Tests/Services/MediaAudioPlaybackTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/MediaAudioPlaybackTests.cs) verifying audio initialization, volume clamping, mute toggling, ViewModel synchronization, lifecycle pause/resume/blackout/stop, and source transitions.
+  - Test suite expanded to **246 automated tests** with 100% pass rate.
+
+---
+
 ## [Phase 6.1: Complete Media Presentation Integration] - 2026-10-09
 
 ### Added / Improved (feat / fix / test / docs)

@@ -148,6 +148,14 @@
 
                     <!-- Live Action Controls -->
                     <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                        <!-- Video Mute / Unmute (Visible when active source is a video) -->
+                        <Button Command="{x:Bind ViewModel.ToggleMediaMuteCommand}"
+                                Visibility="{x:Bind views:PresenterDockWindow.BoolToVis(ViewModel.IsActiveSourceVideo), Mode=OneWay}"
+                                Style="{StaticResource DockIconButtonStyle}"
+                                ToolTipService.ToolTip="{x:Bind ViewModel.MediaMuteButtonTooltip, Mode=OneWay}">
+                            <FontIcon Glyph="{x:Bind ViewModel.MediaMuteButtonGlyph, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                        </Button>
+
                         <!-- Pause / Resume -->
                         <Button Command="{x:Bind ViewModel.TogglePauseCommand}"
                                 IsEnabled="{x:Bind ViewModel.IsPresenting, Mode=OneWay}"
@@ -283,8 +291,16 @@
                         </StackPanel>
                     </Button>
 
-                    <!-- Compact Actions (Pause, Blackout) -->
+                    <!-- Compact Actions (Mute, Pause, Blackout) -->
                     <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                        <!-- Video Mute / Unmute (Compact) -->
+                        <Button Command="{x:Bind ViewModel.ToggleMediaMuteCommand}"
+                                Visibility="{x:Bind views:PresenterDockWindow.BoolToVis(ViewModel.IsActiveSourceVideo), Mode=OneWay}"
+                                Style="{StaticResource DockIconButtonStyle}"
+                                ToolTipService.ToolTip="{x:Bind ViewModel.MediaMuteButtonTooltip, Mode=OneWay}">
+                            <FontIcon Glyph="{x:Bind ViewModel.MediaMuteButtonGlyph, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                        </Button>
+
                         <!-- Pause -->
                         <Button Command="{x:Bind ViewModel.TogglePauseCommand}"
                                 IsEnabled="{x:Bind ViewModel.IsPresenting, Mode=OneWay}"

@@ -206,6 +206,51 @@
 
                     <Rectangle x:Name="StopDivider" Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" Margin="0,1" />
 
+                    <!-- Video Audio Controls (Visible when active source is video) -->
+                    <StackPanel x:Name="VideoAudioPanel" Spacing="4" Padding="6,4">
+                        <Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <FontIcon Glyph="{x:Bind ViewModel.MediaMuteButtonGlyph, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" VerticalAlignment="Center" />
+                                <TextBlock Text="Media Audio" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="{x:Bind ViewModel.MediaVolumePercentText, Mode=OneWay}"
+                                       FontSize="10"
+                                       FontFamily="Consolas"
+                                       Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+
+                        <Grid ColumnSpacing="6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Slider Grid.Column="0"
+                                    Value="{x:Bind ViewModel.MediaVolume, Mode=TwoWay}"
+                                    Minimum="0"
+                                    Maximum="100"
+                                    StepFrequency="1"
+                                    SmallChange="5"
+                                    LargeChange="10"
+                                    Margin="0"
+                                    Padding="0"
+                                    VerticalAlignment="Center" />
+
+                            <Button Grid.Column="1"
+                                    Click="OnToggleMuteClicked"
+                                    Style="{StaticResource SubtleButtonStyle}"
+                                    Padding="6,4"
+                                    ToolTipService.ToolTip="{x:Bind ViewModel.MediaMuteButtonTooltip, Mode=OneWay}"
+                                    VerticalAlignment="Center">
+                                <FontIcon Glyph="{x:Bind ViewModel.MediaMuteButtonGlyph, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" />
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+
+                    <Rectangle x:Name="AudioDivider" Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" Margin="0,1" />
+
                     <!-- Control Dashboard -->
                     <Button Click="OnShowDashboardClicked"
                             Style="{StaticResource SubtleButtonStyle}"

@@ -37,6 +37,18 @@ public partial class PresenterDockViewModel : ObservableObject
 
         _presentationStateService.PropertyChanged += OnStatePropertyChanged;
         _presentationCoordinator.PropertyChanged += OnCoordinatorPropertyChanged;
+        if (_presentationCoordinator.MediaPresentationService is not null)
+        {
+            _presentationCoordinator.MediaPresentationService.MediaStateChanged += (s, e) =>
+            {
+                OnPropertyChanged(nameof(IsActiveSourceVideo));
+                OnPropertyChanged(nameof(IsMediaMuted));
+                OnPropertyChanged(nameof(MediaVolume));
+                OnPropertyChanged(nameof(MediaVolumePercentText));
+                OnPropertyChanged(nameof(MediaMuteButtonGlyph));
+                OnPropertyChanged(nameof(MediaMuteButtonTooltip));
+            };
+        }
     }
 
     public PresentationStatus Status => _presentationStateService.Status;
@@ -106,6 +118,39 @@ public partial class PresenterDockViewModel : ObservableObject
     public bool IsBlackout => _presentationCoordinator.IsBlackout;
 
     public bool IsPresenting => IsLive || IsPaused || IsBlackout;
+
+    public bool IsActiveSourceVideo => _presentationCoordinator.IsActiveSourceVideo;
+
+    public bool IsMediaMuted => _presentationCoordinator.MediaPresentationService.IsMuted;
+
+    public double MediaVolume
+    {
+        get => _presentationCoordinator.MediaPresentationService.Volume * 100.0;
+        set
+        {
+            var normalized = Math.Clamp(value / 100.0, 0.0, 1.0);
+            _presentationCoordinator.MediaPresentationService.SetVolume(normalized);
+            OnPropertyChanged(nameof(MediaVolume));
+            OnPropertyChanged(nameof(MediaVolumePercentText));
+            OnPropertyChanged(nameof(MediaMuteButtonGlyph));
+            OnPropertyChanged(nameof(MediaMuteButtonTooltip));
+        }
+    }
+
+    public string MediaVolumePercentText => $"{Math.Round(MediaVolume)}%";
+
+    public string MediaMuteButtonGlyph => (IsMediaMuted || MediaVolume == 0) ? "\uE74F" : "\uE767";
+
+    public string MediaMuteButtonTooltip => IsMediaMuted ? "Unmute Video Audio" : "Mute Video Audio";
+
+    [RelayCommand]
+    public void ToggleMediaMute()
+    {
+        _presentationCoordinator.MediaPresentationService.ToggleMute();
+        OnPropertyChanged(nameof(IsMediaMuted));
+        OnPropertyChanged(nameof(MediaMuteButtonGlyph));
+        OnPropertyChanged(nameof(MediaMuteButtonTooltip));
+    }
 
     public IReadOnlyList<CaptureSource> SelectedSources => _presentationStateService.SelectedSources;
 
@@ -278,6 +323,12 @@ public partial class PresenterDockViewModel : ObservableObject
         OnPropertyChanged(nameof(BlackoutButtonGlyph));
         OnPropertyChanged(nameof(CompactModeGlyph));
         OnPropertyChanged(nameof(CompactModeTooltip));
+        OnPropertyChanged(nameof(IsActiveSourceVideo));
+        OnPropertyChanged(nameof(IsMediaMuted));
+        OnPropertyChanged(nameof(MediaVolume));
+        OnPropertyChanged(nameof(MediaVolumePercentText));
+        OnPropertyChanged(nameof(MediaMuteButtonGlyph));
+        OnPropertyChanged(nameof(MediaMuteButtonTooltip));
         NotifyModeProperties();
     }
 }

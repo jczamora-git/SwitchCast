@@ -267,7 +267,7 @@
                                    VerticalAlignment="Center" />
                     </StackPanel>
 
-                    <!-- Playback Controls -->
+                    <!-- Playback & Audio Controls -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <Button Command="{x:Bind ViewModel.ToggleVideoPlaybackCommand}"
                                 Style="{StaticResource PrimaryAccentButtonStyle}"
@@ -298,6 +298,38 @@
                                 <TextBlock Text="{x:Bind ViewModel.VideoLoopButtonText, Mode=OneWay}" FontSize="12" />
                             </StackPanel>
                         </Button>
+
+                        <!-- Audio Divider -->
+                        <Rectangle Width="1" Height="18" Fill="{ThemeResource AppSubtleDividerBrush}" Margin="2,0" VerticalAlignment="Center" />
+
+                        <!-- Audio Mute / Unmute Button -->
+                        <Button Command="{x:Bind ViewModel.ToggleMediaMuteCommand}"
+                                Padding="8,5"
+                                ToolTipService.ToolTip="{x:Bind ViewModel.MediaMuteButtonTooltip, Mode=OneWay}"
+                                VerticalAlignment="Center">
+                            <FontIcon Glyph="{x:Bind ViewModel.MediaMuteButtonGlyph, Mode=OneWay}" FontSize="13" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                        </Button>
+
+                        <!-- Audio Volume Slider & Percentage -->
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <Slider Value="{x:Bind ViewModel.MediaVolume, Mode=TwoWay}"
+                                    Minimum="0"
+                                    Maximum="100"
+                                    StepFrequency="1"
+                                    SmallChange="5"
+                                    LargeChange="10"
+                                    Width="90"
+                                    Margin="0"
+                                    Padding="0"
+                                    VerticalAlignment="Center"
+                                    ToolTipService.ToolTip="Media Playback Volume" />
+                            <TextBlock Text="{x:Bind ViewModel.MediaVolumePercentText, Mode=OneWay}"
+                                       FontSize="11"
+                                       FontFamily="Consolas"
+                                       Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                       Width="34"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
                     </StackPanel>
                 </Grid>
             </Border>

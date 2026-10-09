@@ -66,6 +66,16 @@ public class UserSettings
     public PresenterSwitchMode SwitchMode { get; set; } = PresenterSwitchMode.LiveOnly;
 
     /// <summary>
+    /// Default normalized media audio playback volume (0.0 to 1.0).
+    /// </summary>
+    public double MediaVolume { get; set; } = 1.0;
+
+    /// <summary>
+    /// Whether media audio playback is muted by default.
+    /// </summary>
+    public bool IsMediaMuted { get; set; } = false;
+
+    /// <summary>
     /// Configured global hotkey bindings.
     /// </summary>
     public List<HotkeyBinding> HotkeyBindings { get; set; } = GetDefaultHotkeys();

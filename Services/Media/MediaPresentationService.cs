@@ -15,6 +15,7 @@ namespace SwitchCast.Services.Media;
 public sealed partial class MediaPresentationService : ObservableObject, IMediaPresentationService
 {
     private readonly DispatcherQueue? _dispatcherQueue;
+    private readonly IApplicationSettingsService? _settingsService;
     private MediaPlayer? _player;
     private MediaSource? _currentMediaSource;
 
@@ -37,6 +38,12 @@ public sealed partial class MediaPresentationService : ObservableObject, IMediaP
     private bool _isLooping;
 
     [ObservableProperty]
+    private double _volume = 1.0;
+
+    [ObservableProperty]
+    private bool _isMuted = false;
+
+    [ObservableProperty]
     private TimeSpan _position = TimeSpan.Zero;
 
     [ObservableProperty]
@@ -47,9 +54,17 @@ public sealed partial class MediaPresentationService : ObservableObject, IMediaP
 
     public event EventHandler? MediaStateChanged;
 
-    public MediaPresentationService()
+    public MediaPresentationService(IApplicationSettingsService? settingsService = null)
     {
+        _settingsService = settingsService;
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+
+        if (_settingsService is not null)
+        {
+            _volume = Math.Clamp(_settingsService.CurrentSettings.MediaVolume, 0.0, 1.0);
+            _isMuted = _settingsService.CurrentSettings.IsMediaMuted;
+        }
+
         InitializePlayer();
     }
 
@@ -66,7 +81,8 @@ public sealed partial class MediaPresentationService : ObservableObject, IMediaP
         {
             _player = new MediaPlayer
             {
-                IsMuted = true, // Audio Policy: Muted by default
+                IsMuted = IsMuted,
+                Volume = Math.Clamp(Volume, 0.0, 1.0),
                 AutoPlay = true,
                 IsLoopingEnabled = false
             };
@@ -314,6 +330,48 @@ public sealed partial class MediaPresentationService : ObservableObject, IMediaP
         {
             Debug.WriteLine($"[MediaPresentationService] Seek error: {ex.Message}");
         }
+    }
+
+    public void SetVolume(double volume)
+    {
+        var clampedVolume = Math.Clamp(volume, 0.0, 1.0);
+        Volume = clampedVolume;
+
+        if (_player is not null)
+        {
+            _player.Volume = clampedVolume;
+        }
+
+        if (_settingsService is not null)
+        {
+            _settingsService.CurrentSettings.MediaVolume = clampedVolume;
+            _ = _settingsService.SaveSettingsAsync();
+        }
+
+        MediaStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void SetMuted(bool isMuted)
+    {
+        IsMuted = isMuted;
+
+        if (_player is not null)
+        {
+            _player.IsMuted = isMuted;
+        }
+
+        if (_settingsService is not null)
+        {
+            _settingsService.CurrentSettings.IsMediaMuted = isMuted;
+            _ = _settingsService.SaveSettingsAsync();
+        }
+
+        MediaStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void ToggleMute()
+    {
+        SetMuted(!IsMuted);
     }
 
     private void OnPlayerMediaOpened(MediaPlayer sender, object args)
