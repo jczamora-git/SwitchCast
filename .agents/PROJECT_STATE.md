@@ -7,62 +7,41 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Floating Presenter Dock Native Dragging Hotfix (Desktop UX Refinement)
+- **Current Phase**: Phase 6.1: Complete Media Presentation Integration
 - **Overall Status**: **Completed & Tested**
-- **Last Updated**: 2026-10-09T15:10:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-09T15:20:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Complete Media Presentation Integration (Phase 6.1)**:
+  - Full end-to-end presentation pipeline verified across all 4 source types (`WindowSource`, `MonitorSource`, `ImageMediaSource`, `VideoMediaSource`).
+  - **Unified Presentation Queue**: Single authoritative queue managed by `IPresentationStateService` containing both desktop capture sources and file-backed media sources with stable type-safe identities.
+  - **Dashboard Source Picker & Controls**: Target source picker dropdown, queued sources strip, and video playback controls bar (Play/Pause, Restart, Loop toggle, mm:ss timecode) dynamically displayed when video is on air.
+  - **Floating Presenter Dock & Popups**: Seamless integration in both Expanded and Compact dock modes. Source button dynamically binds to `ActiveSourceGlyph` (`\uEB9F` for Image, `\uE714` for Video, `\uE7F4` for Window, `\uE790` for Monitor) and `ActiveSourceTitle`. `PresenterDockMenuWindow` ListView displays correct category labels and glyphs.
+  - **Global Hotkey Navigation**: `NextSource` (`Ctrl+Shift+Right`), `PreviousSource` (`Ctrl+Shift+Left`), and direct index hotkeys (`Ctrl+Shift+1..5`) cycle through mixed queues (Window -> Image -> Video -> Monitor) with zero crashes or race conditions.
+  - **Presentation Coordinator Routing**: `PresentationCoordinator` routes media files cleanly to `MediaPresentationService` without sending file paths to `Windows.Graphics.Capture`.
+  - **Presentation Output Window (Single Stable HWND)**: Mutually exclusive visual layers in `PresentationWindow` (Screen Capture `Image`, Direct Static `Image` with `Uniform` centering, `MediaPlayerElement` bound to `MediaPlayer`, Standby canvas, and topmost Blackout overlay).
+  - **Three Switching Modes with Media**:
+    - `Active + Live`: Takes media live immediately. Window activation gracefully skips file-backed sources without errors or focusing unrelated windows.
+    - `Live Only`: Takes media live without changing application window focus.
+    - `Active Only`: Updates selected queue cursor only without changing On-Air presentation output.
+  - **Transition & Resource Safety**: Stop/unload of obsolete video players and capture sessions during rapid source switching. Stable Presentation HWND preserved across all transitions.
+  - **Fail-Closed & Media Error Handling**: Non-existent, corrupted, or unsupported media files cleanly set error state on presenter dashboard/dock without crashing or interrupting presentation output.
 - [x] **Floating Presenter Dock Native Dragging Hotfix**:
   - Implemented routed pointer event handlers (`AddHandler` with `handledEventsToo: true`) on `DockCardBorder` in [Views/PresenterDockWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml.cs).
-  - Instant native dragging (`ReleaseCapture` + `WM_NCLBUTTONDOWN` / `HTCAPTION`) when pressing on non-interactive surfaces (background, padding, status badge, status dot, dividers).
-  - Smooth click-versus-drag detection on interactive controls (buttons, dropdown triggers, action icons) using physical pixel movement threshold (5px / `DragThresholdSquared = 25`).
-  - Normal clicks execute intended actions (opening menus, switching sources, pause, blackout, stop) without moving the window.
-  - Intentional hold-and-drag gestures across the dock toolbar seamlessly initiate native Windows OS dragging without firing button clicks upon release.
-  - Zero modification to `MainWindow` or `PresentationWindow` title-bar implementations.
+  - Instant native dragging (`ReleaseCapture` + `WM_NCLBUTTONDOWN` / `HTCAPTION`) when pressing on non-interactive surfaces.
+  - Smooth click-versus-drag detection on interactive controls using physical pixel movement threshold (5px / `DragThresholdSquared = 25`).
 - [x] **Global Text Truncation & Dropdown Width Constraints**:
-  - Fixed horizontal expansion and clipping on Dashboard source selectors (`ComboBox` in Primary Control Bar, Live Preview switcher, and Ready-to-Preview switcher).
-  - Provided custom `ComboBox.ItemTemplate` with bounded max-widths, `TextTrimming="CharacterEllipsis"`, `TextWrapping="NoWrap"`, and `ToolTipService.ToolTip="{x:Bind Title}"`.
-  - Fixed Status Strip Active Source by replacing unbounded horizontal `StackPanel` with a 2-column `Grid` (`ColumnDefinitions="Auto, *"`) ensuring clean responsive ellipsis when window titles are long.
-  - Constrained `SourcesPage` source list rows with responsive star columns, `TextWrapping="NoWrap"`, single-line ellipsis, and tooltips on both Title and Subtitle, preventing long names from pushing Queue checkboxes off-screen.
-  - Constrained Floating Presenter Dock active source buttons with `MaxWidth="135"` (Expanded) and `MaxWidth="85"` (Compact) on the `TextBlock` inside horizontal button toolbars, with full tooltip strings.
-  - Added tooltips and single-line trimming on `PresenterDockMenuWindow` ListView items.
-  - Preserved 100% of underlying full window titles, HWNDs, process IDs, and source queue identifiers in models and ViewModels.
+  - Fixed horizontal expansion and clipping on Dashboard source selectors, Status Strip Active Source, Sources Page list rows, and Floating Presenter Dock active source buttons.
 - [x] **Unified Stop Presenting Workflow & Automatic Dashboard Activation**:
-  - Unified Stop Presenting across Control Dashboard, Floating Presenter Dock, Presenter Dock Menu, and Global Hotkey (`Ctrl+Shift+S`).
-  - Authoritative Stop sequence in `PresentationCoordinator.StopPresentationAsync()` safely terminates active capture or media playback, sets presentation status to `Idle`, closes the `PresentationWindow` (it no longer remains visible on Standby), restores `MainWindow` if minimized, brings the Control Dashboard to the foreground via `IWindowActivationService.ActivateMainWindow()`, and navigates to `DashboardPage`.
-  - Suppressed MainWindow activation during application exit confirmation (`ApplicationLifecycleService.ExecuteShutdownAsync` calls `StopPresentationAsync(isShuttingDown: true)`).
+  - Authoritative Stop sequence in `PresentationCoordinator.StopPresentationAsync()` safely terminates active capture/media, sets status to `Idle`, closes `PresentationWindow`, restores `MainWindow`, and brings Control Dashboard to foreground.
 - [x] **Windows 11 Settings-Style Theme Selector & Appearance Layout (Phase 6)**:
-  - Replaced cramped theme radio buttons with a compact Windows Settings-style `ComboBox` right-aligned with 140 DIP width.
-  - Corrected Grid column geometry to give flexible Star width to setting title and description, preventing narrow vertical word wrapping.
-  - Real-time immediate theme application (`System`, `Light`, `Dark`) and local persistence via `IApplicationSettingsService`.
-- [x] **Direct Local Image & Video Presentation Sources (Phase 6)**:
-  - Added first-class `ImageMediaSource` and `VideoMediaSource` domain models with dimension, duration, and file size formatting.
-  - Native WinUI 3 desktop file picker (`Win32MediaPickerService`) supporting PNG, JPG, JPEG, BMP, GIF, WEBP, MP4, M4V, WMV, MOV, AVI, MKV.
-  - Media metadata discovery engine (`MediaDiscoveryService`) with async Windows imaging and video property extraction.
-  - Dedicated media presentation engine (`MediaPresentationService`) managing `BitmapImage` decoding and native `Windows.Media.Playback.MediaPlayer`.
-  - Mutually exclusive presentation layers in `PresentationWindow` (Screen Capture, Direct Image, `MediaPlayerElement`, Standby, and topmost Blackout).
-  - Essential video controls in Control Dashboard (Play/Pause, Restart, Loop toggle, timecode position, and playback progress).
-  - Preserved existing stable presentation HWND across mixed source transitions (Window -> Image -> Video -> Monitor).
-  - Preserved Blackout and Pause privacy rules: pausing video on Pause/Blackout and preventing audio/video rendering during blackout.
-  - Video playback is muted by default (zero audio routing / virtual drivers as per Phase 6 scope).
-- [x] **Sources Page Media Category & Queue Persistence (Phase 6)**:
-  - 3-category tab selector: `Application Windows`, `Displays & Monitors`, `Media Files`.
-  - "Add Media" file picker import, compact media source items, remove action, and persistence in `UserSettings.ImportedMediaPaths`.
-- [x] **Dynamic Native Application Icons Pipeline**:
-  - WinUI 3 `SoftwareBitmapSource` thread affinity marshalled to UI thread via `DispatcherQueue`.
-  - Multi-tier native icon extraction (`WM_GETICON`, `GetClassLongPtr`, `ExtractIconExW`, `SHGetFileInfoW`) with safe `DestroyIcon` lifecycle.
-  - Dual-tier thread-safe caching (`_rawPixelCache` and `_iconSourceCache`).
-- [x] **Dedicated Presentation Output Window & Centering**:
-  - 16:9 shareable presentation output window with DPI-aware initial centering helper.
-  - Integrated custom Fluent title bar with theme synchronization.
-- [x] **Global Hotkeys & Floating Companion Dock**:
-  - System-wide hotkeys and floating presenter toolbar supporting 3 switching modes (`A+L`, `A`, `L`).
+  - Compact Windows Settings-style theme `ComboBox` with immediate theme application and persistence.
 - [x] **Automated Unit & Regression Test Suite**:
-  - **234 comprehensive automated unit and regression tests** in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) with 100% pass rate.
+  - **239 comprehensive automated unit and regression tests** in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) with 100% pass rate.
 
 ### Planned (Upcoming)
 - [ ] **Phase 7**: Advanced Presenter Features (Live thumbnail previews, smooth transitions).
@@ -97,7 +76,7 @@ This is the authoritative progress, state, and environmental tracking document f
 
 - **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (234 passed, 0 failed, 0 skipped).
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (239 passed, 0 failed, 0 skipped).
 
 ---
 

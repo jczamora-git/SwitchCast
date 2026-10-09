@@ -7,6 +7,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Phase 6.1: Complete Media Presentation Integration] - 2026-10-09
+
+### Added / Improved (feat / fix / test / docs)
+- **Unified Media Presentation Queue & Navigation**:
+  - Validated and streamlined authoritative single presentation queue across all 4 source types: `WindowSource`, `MonitorSource`, `ImageMediaSource`, and `VideoMediaSource`.
+  - Dynamic source icon glyph (`ActiveSourceGlyph`) on Floating Presenter Dock button (`\uEB9F` for Image, `\uE714` for Video, `\uE7F4` for Window, `\uE790` for Display).
+  - Proper category labels and glyph bindings on `PresenterDockMenuWindow` ListView items.
+  - Multi-source cycling verified across `NextSource` (`Ctrl+Shift+Right`), `PreviousSource` (`Ctrl+Shift+Left`), and direct index selection (`Ctrl+Shift+1..5`) without race conditions.
+- **Three Switching Modes Media Support**:
+  - `Active + Live`: Takes media live immediately. Window activation gracefully skips file-backed sources without errors or focusing unrelated windows.
+  - `Live Only`: Takes media live without changing application window focus.
+  - `Active Only`: Updates selected queue cursor only without changing On-Air presentation output.
+- **Fail-Closed & Video Playback Controls**:
+  - Video Play, Pause, Resume, Restart, Loop toggle, and timecode position integrated with on-air state in Control Dashboard.
+  - Fail-closed error handling for non-existent, moved, or corrupted files without application crashing or presentation HWND disruption.
+- **Automated Regression Test Suite**:
+  - Added [SwitchCast.Tests/Services/PresentationCoordinatorMediaTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresentationCoordinatorMediaTests.cs) coverage for 4-source mixed navigation, previous navigation, direct index switching, and switching modes.
+  - Expanded test suite to **239 automated unit tests** (100% pass rate).
+
+---
+
 ## [Floating Presenter Dock Native Dragging Hotfix] - 2026-10-09
 
 ### Fixed / Improved (fix / UI / test / docs)

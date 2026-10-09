@@ -84,6 +84,8 @@ public partial class PresenterDockViewModel : ObservableObject
         _presentationStateService.ActiveSource?.Title ??
         "No Active Source";
 
+    public string ActiveSourceGlyph => SelectedSource?.TypeGlyph ?? "\uE7F4";
+
     public string OnAirSourceTitle =>
         _presentationCoordinator.CurrentPresentationSource?.Title ??
         _presentationStateService.ActiveSource?.Title ??
@@ -259,6 +261,7 @@ public partial class PresenterDockViewModel : ObservableObject
         OnPropertyChanged(nameof(Status));
         OnPropertyChanged(nameof(StatusDisplayText));
         OnPropertyChanged(nameof(ActiveSourceTitle));
+        OnPropertyChanged(nameof(ActiveSourceGlyph));
         OnPropertyChanged(nameof(OnAirSourceTitle));
         OnPropertyChanged(nameof(SourceFullTooltip));
         OnPropertyChanged(nameof(HasActiveSource));

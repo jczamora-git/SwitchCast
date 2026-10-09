@@ -61,7 +61,7 @@
                                     </Grid.ColumnDefinitions>
 
                                     <!-- Icon -->
-                                    <FontIcon Grid.Column="0" Glyph="&#xE7F4;" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" VerticalAlignment="Center" />
+                                    <FontIcon Grid.Column="0" Glyph="{x:Bind TypeGlyph}" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" VerticalAlignment="Center" />
 
                                     <!-- Title & Type text -->
                                     <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
@@ -73,7 +73,7 @@
                                                    TextWrapping="NoWrap"
                                                    MaxLines="1"
                                                    ToolTipService.ToolTip="{x:Bind Title}" />
-                                        <TextBlock Text="{x:Bind Type}"
+                                        <TextBlock Text="{x:Bind CategoryLabel}"
                                                    FontSize="9"
                                                    Foreground="{ThemeResource AppTextTertiaryBrush}"
                                                    TextTrimming="CharacterEllipsis"

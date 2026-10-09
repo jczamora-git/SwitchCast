@@ -237,4 +237,125 @@ public class PresentationCoordinatorMediaTests
         await coordinator.SwitchToNextSourceAsync();
         _mockMediaPresentationService.Verify(m => m.PlayVideoAsync(vid), Times.Once);
     }
+
+    [Fact]
+    public async Task SwitchToPreviousSourceAsync_With4Sources_CyclesCorrectly()
+    {
+        var win = new WindowSource { Id = "win-1", Title = "Chrome", IsAvailable = true };
+        var img = new ImageMediaSource { Id = "media:welcome.png", Title = "Welcome.png", FilePath = @"C:\welcome.png", IsAvailable = true };
+        var vid = new VideoMediaSource { Id = "media:demo.mp4", Title = "Demo.mp4", FilePath = @"C:\demo.mp4", IsAvailable = true };
+        var mon = new MonitorSource { Id = "mon-1", Title = "Display 1", DeviceName = @"\\.\DISPLAY1", Width = 1920, Height = 1080, IsAvailable = true };
+
+        var queue = new List<CaptureSource> { win, img, vid, mon };
+
+        _mockStateService.SetupGet(s => s.SelectedSources).Returns(queue);
+        _mockStateService.SetupGet(s => s.ActiveSource).Returns(mon);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+        _mockCaptureCoordinator.SetupGet(c => c.State).Returns(CaptureState.Capturing);
+
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object,
+            _mockMediaPresentationService.Object);
+
+        // Previous from mon -> vid (CaptureCoordinator stops)
+        await coordinator.SwitchToPreviousSourceAsync();
+        _mockMediaPresentationService.Verify(m => m.PlayVideoAsync(vid), Times.Once);
+        _mockCaptureCoordinator.SetupGet(c => c.State).Returns(CaptureState.Idle);
+
+        // Previous from vid -> img
+        _mockStateService.SetupGet(s => s.ActiveSource).Returns(vid);
+        await coordinator.SwitchToPreviousSourceAsync();
+        _mockMediaPresentationService.Verify(m => m.LoadImageAsync(img), Times.Once);
+
+        // Previous from img -> win
+        _mockStateService.SetupGet(s => s.ActiveSource).Returns(img);
+        await coordinator.SwitchToPreviousSourceAsync();
+        _mockCaptureCoordinator.Verify(c => c.StartPreviewAsync(win), Times.Once);
+    }
+
+    [Fact]
+    public async Task SwitchToSourceIndexAsync_DirectHotkeys_SwitchesDirectlyToMediaSources()
+    {
+        var win = new WindowSource { Id = "win-1", Title = "Chrome", IsAvailable = true };
+        var img = new ImageMediaSource { Id = "media:welcome.png", Title = "Welcome.png", FilePath = @"C:\welcome.png", IsAvailable = true };
+        var vid = new VideoMediaSource { Id = "media:demo.mp4", Title = "Demo.mp4", FilePath = @"C:\demo.mp4", IsAvailable = true };
+        var mon = new MonitorSource { Id = "mon-1", Title = "Display 1", DeviceName = @"\\.\DISPLAY1", Width = 1920, Height = 1080, IsAvailable = true };
+
+        var queue = new List<CaptureSource> { win, img, vid, mon };
+
+        _mockStateService.SetupGet(s => s.SelectedSources).Returns(queue);
+        _mockStateService.SetupGet(s => s.ActiveSource).Returns(win);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object,
+            _mockMediaPresentationService.Object);
+
+        // Hotkey 2: index 1 -> image
+        await coordinator.SwitchToSourceIndexAsync(1);
+        _mockMediaPresentationService.Verify(m => m.LoadImageAsync(img), Times.Once);
+
+        // Hotkey 3: index 2 -> video
+        await coordinator.SwitchToSourceIndexAsync(2);
+        _mockMediaPresentationService.Verify(m => m.PlayVideoAsync(vid), Times.Once);
+
+        // Hotkey 4: index 3 -> monitor
+        await coordinator.SwitchToSourceIndexAsync(3);
+        _mockCaptureCoordinator.Verify(c => c.StartPreviewAsync(mon), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(PresenterSwitchMode.ActiveAndLive)]
+    [InlineData(PresenterSwitchMode.LiveOnly)]
+    public async Task ExecuteSourceSwitchAsync_MediaSource_TakesMediaLive(PresenterSwitchMode mode)
+    {
+        var img = new ImageMediaSource { Id = "media:welcome.png", Title = "Welcome.png", FilePath = @"C:\welcome.png", IsAvailable = true };
+
+        _mockStateService.SetupGet(s => s.SwitchMode).Returns(mode);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object,
+            _mockMediaPresentationService.Object);
+
+        await coordinator.ExecuteSourceSwitchAsync(img);
+
+        _mockMediaPresentationService.Verify(m => m.LoadImageAsync(img), Times.Once);
+        _mockStateService.Verify(s => s.SetSelectedSource(img), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteSourceSwitchAsync_ActiveOnly_UpdatesSelectedSourceOnlyWithoutSwitchingLiveOutput()
+    {
+        var img = new ImageMediaSource { Id = "media:welcome.png", Title = "Welcome.png", FilePath = @"C:\welcome.png", IsAvailable = true };
+
+        _mockStateService.SetupGet(s => s.SwitchMode).Returns(PresenterSwitchMode.ActiveOnly);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object,
+            _mockMediaPresentationService.Object);
+
+        await coordinator.ExecuteSourceSwitchAsync(img);
+
+        // In Active Only, live presentation output is NOT changed
+        _mockMediaPresentationService.Verify(m => m.LoadImageAsync(It.IsAny<ImageMediaSource>()), Times.Never);
+        _mockStateService.Verify(s => s.SetSelectedSource(img), Times.Once);
+    }
 }

@@ -3,27 +3,26 @@
 ---
 
 ## Task Details
-- **Task**: Floating Presenter Dock Native Dragging Hotfix
-- **Date**: 2026-10-09T15:10:00+08:00 (UTC+8)
+- **Task**: Phase 6.1: Complete Media Presentation Integration
+- **Date**: 2026-10-09T15:20:00+08:00 (UTC+8)
 - **Status**: Completed
 
 ---
 
 ## 1. Objectives Implemented
 
-1. **Floating Presenter Dock Surface & Gesture Dragging**:
-   - Resolved the issue where only a tiny fraction of the Presenter Dock surface could initiate window dragging.
-   - Wired routed pointer events (`PointerPressed`, `PointerMoved`, `PointerReleased`, `PointerCanceled`, `PointerCaptureLost`) with `handledEventsToo: true` on `DockCardBorder` in [Views/PresenterDockWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml.cs).
-   - **Non-Interactive Surfaces** (Dock background, toolbar padding, status badge pill, status dot, subtle dividers, non-button label areas): Starts native OS dragging (`ReleaseCapture` + `WM_NCLBUTTONDOWN` / `HTCAPTION`) immediately on press with 0ms latency.
-   - **Interactive Controls** (Active Source dropdown button, Switching Mode button, Previous/Next, Pause, Blackout, Stop, More options, Expand/Collapse, Close): Tracks movement with a 5 physical pixel threshold (`DragThresholdSquared = 25`).
-     - Normal clicks (< 5px movement) execute the intended button / dropdown action without moving the dock.
-     - Intentional drag gestures (>= 5px movement) smoothly initiate native Windows OS dragging without triggering accidental button clicks when released.
-   - Zero modifications to `MainWindow` or `PresentationWindow` title-bar implementations.
+1. **End-to-End Media Pipeline Integration**:
+   - Audited and verified full pipeline: `Media Import` -> `Media Library` -> `Presentation Queue` -> `Dashboard Source Picker / Floating Dock / Hotkeys` -> `PresentationCoordinator` -> `MediaPresentationService` -> `PresentationWindow`.
+   - Single unified presentation queue across all 4 source types (`WindowSource`, `MonitorSource`, `ImageMediaSource`, `VideoMediaSource`).
+   - Dynamic glyph and category binding in Floating Presenter Dock button (`ActiveSourceGlyph`) and menu dropdown (`PresenterDockMenuWindow.xaml`).
+   - Mixed-source queue navigation (`NextSource`, `PreviousSource`, `SelectSource1..5`) validated across 4-source cycles (`Window -> Image -> Video -> Monitor`).
+   - Video playback controls (Play, Pause, Resume, Restart, Loop toggle, timecode position) connected to on-air state in Control Dashboard.
+   - Three Switching Modes (`Active + Live`, `Live Only`, `Active Only`) verified for media sources (graceful skip of native HWND activation without error).
+   - Fail-closed error handling and resource cleanup on source transitions and window close.
 
-2. **Preserved Multi-Monitor & DPI Window Behavior**:
-   - Window movement is fully managed by Windows DWM via native `WM_NCLBUTTONDOWN` with `HTCAPTION`.
-   - DPI scaling across monitors, multi-display coordinates, and snap behaviors remain fully native.
-   - All dropdown popups, hotkeys, and presentation controls remain 100% operational.
+2. **Automated Test Suite Expansion**:
+   - Added comprehensive tests for 4-source mixed navigation, previous navigation, direct index switching, and switching modes.
+   - 239 automated unit and regression tests passing with 100% success rate.
 
 ---
 
