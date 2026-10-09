@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.2.1] - 2026-10-10
+
+### Fixed
+- **Floating Presenter Dock Double-Click Maximization**: Prevented caption double-click from maximizing or entering fullscreen on `PresenterDockWindow` by subclassing the dock HWND (`WM_NCLBUTTONDBLCLK` on `HTCAPTION`, `SC_MAXIMIZE` interception, `WM_GETMINMAXINFO` clamping, and removal of `WS_MAXIMIZEBOX`). Native hold-and-drag and Presentation Window fullscreen toggle remain fully functional.
+- **Mixed-Source Next/Previous Navigation**: Repaired Next/Previous queue cycling between Window, Monitor, Image, and Video sources by maintaining a single authoritative sequence across all types, resolving `ActiveSource` clearing during capture stop, and supporting direct live transitions for media without failing on HWND activation.
+
+### Added
+- **Presenter Dock Direct Source Unqueue**: Enabled presenters to remove individual sources directly from the Floating Dock "Queued Sources" dropdown via interactive checkmark checkboxes. Preserved On-Air presentation continuity, maintained open dropdown for multi-item unqueue, and synchronized state immediately with the Main Dashboard and Sources tab.
+
+---
+
 ## [1.2.0] - 2026-10-10
 
 ### Added

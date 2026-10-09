@@ -53,16 +53,18 @@ graph TD
 - **Components**:
   - `MainWindow.xaml` / `DashboardViewModel.cs`: Control dashboard for window/monitor/media selection, preview grids, hotkey configuration, video playback controls, and session controls.
   - `PresentationWindow.xaml` / `PresentationViewModel.cs`: Clean, isolated output window hosting mutually exclusive visual presentation layers (Screen Capture `Image`, Direct Static `Image`, Video `MediaPlayerElement`, Standby overlay, and topmost Blackout overlay) for screen sharing in Zoom/Teams/Meet. Supports seamless toggle between `PresentationDisplayMode.Windowed` (with custom title bar) and `PresentationDisplayMode.Fullscreen` (true borderless `AppWindowPresenterKind.FullScreen` filling 100% of viewport with same HWND).
+  - `PresenterDockWindow.xaml` / `PresenterDockViewModel.cs`: Lightweight always-on-top floating toolbar with native non-client dragging (`InputNonClientPointerSource`), maximized prevention via Win32 window subclassing (`WM_NCLBUTTONDBLCLK` / `SC_MAXIMIZE`), transport controls, and fullscreen output triggering.
+  - `PresenterDockMenuWindow.xaml`: Borderless popup window hosting unconstrained dropdown menus (Queued Sources with direct interactive unqueue, Switching Mode, More Options).
 - **Dependencies**: Depends on `SwitchCast.Application` and `SwitchCast.Core`. Has zero direct coupling to native Win32/Direct3D implementation classes.
 
 ### 2. `SwitchCast.Application` (Orchestration Layer)
 - **Role**: Application use cases and state coordination.
 - **Components**:
-  - `PresentationCoordinator`: Coordinates transitions across all 4 source types (`Window`, `Display`, `Image`, `Video`), manages pause freeze/resume, blackout overlay, and error recovery.
-  - `MediaPresentationService`: Manages static image decoding (`BitmapImage`) and native video playback (`Windows.Media.Playback.MediaPlayer`, muted by default).
+  - `PresentationCoordinator`: Coordinates transitions across all 4 source types (`Window`, `Display`, `Image`, `Video`), manages pause freeze/resume, blackout overlay, and error recovery. Maintains single authoritative queue traversal order across mixed media and capture sources.
+  - `MediaPresentationService`: Manages static image decoding (`BitmapImage`) and native video playback (`Windows.Media.Playback.MediaPlayer`, synchronized audio/video with volume/mute controls).
   - `MediaDiscoveryService`: Asynchronous media file validation and metadata discovery (dimensions, durations, file sizes).
   - `Win32MediaPickerService`: Native WinUI 3 `FileOpenPicker` integration with HWND desktop interop.
-  - `SourceSelectionManager`: Manages the ordered queue of sources selected by the user.
+  - `PresentationStateService`: Authoritative central state store managing `SelectedSources`, `SelectedSource` cursor, `ActiveSource`, `ForegroundSource`, `SwitchMode`, and `Status`. Enforces On-Air presentation continuity on unqueue and deterministic selection cursor recalculation.
   - `HotkeyCoordinator`: Maps keyboard shortcuts to presentation actions.
 - **Dependencies**: Depends purely on `SwitchCast.Core` interfaces.
 
