@@ -7,29 +7,35 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Runtime Bug Fix — Floating Dock Playback Slider Cross-Thread Update (COMException 0x8001010E)
+- **Current Phase**: Runtime Bug Fix — Floating Dock Playback Slider Cross-Thread Update (COMException 0x8001010E Permanent Hotfix)
 - **Overall Status**: **Completed & Tested**
-- **Last Updated**: 2026-10-09T20:25:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-09T20:45:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
-- [x] **Presenter Dock Playback Progress Cross-Thread COMException Fix (0x8001010E)**:
+- [x] **Presenter Dock Playback Progress Cross-Thread COMException Permanent Hotfix (0x8001010E)**:
   - **Confirmed Root Cause**:
-    - `PresenterDockViewModel` previously initialized a `System.Threading.Timer` that executed `OnPlaybackProgressTick` on worker thread pool threads.
+    - Previous attempt retained a `System.Threading.Timer` fallback (`_playbackProgressTimer`) when dynamic reflection or delegate casting failed.
+    - `RunOnUIThread` contained an unsafe fallback: when `TryEnqueue` was unavailable, failed, or threw, it executed `action()` directly on the calling ThreadPool thread.
     - Firing `OnPropertyChanged(nameof(VideoPositionSeconds))` from the thread pool forced compiled WinUI 3 XAML bindings (`RangeBase.set_Value`) in `PresenterDockWindow` to execute off the owning UI thread, throwing WinRT `COMException` `0x8001010E` (`RPC_E_WRONG_THREAD`).
-  - **UI Dispatcher-Owned Progress Timer**:
-    - Replaced thread-pool timer with native UI thread `DispatcherQueueTimer` created on `PresenterDockWindow`'s UI dispatcher.
-    - Added `SetDispatcherQueue` to `PresenterDockViewModel` and passed `DispatcherQueue` on window initialization.
-    - All periodic timeline slider and timecode ticks run natively on the owning UI thread.
-    - Added safe `RunOnUIThread` marshaling for all event-driven state and coordinator notifications (`OnStatePropertyChanged`, `OnCoordinatorPropertyChanged`, `OnWindowDisplayModeChanged`, `OnMediaStateChanged`).
+  - **Authoritative Single UI-Owned DispatcherQueueTimer**:
+    - Completely eliminated `System.Threading.Timer`, `_playbackProgressTimer`, and `OnFallbackTimerTick`.
+    - Strongly typed `Microsoft.UI.Dispatching.DispatcherQueue` and `Microsoft.UI.Dispatching.DispatcherQueueTimer` in `PresenterDockViewModel`.
+    - `PresenterDockWindow` passes its UI thread `DispatcherQueue` directly to `PresenterDockViewModel.SetDispatcherQueue(DispatcherQueue)`.
+    - A single repeating `DispatcherQueueTimer` (250ms interval) executes exclusively on the UI thread to update `VideoPositionSeconds` and `VideoPositionText`.
+  - **Unsafe Fallback Execution Eliminated**:
+    - Refactored `RunOnUIThread(Action)`: if called off-thread, invokes `dispatcher.TryEnqueue(callback)`. If `TryEnqueue` fails (returns `false`), the update is safely dropped and NEVER executed synchronously on the worker thread.
+  - **Scrubbing & Slider Seek Loop Protection**:
+    - While user is actively dragging the slider (`_isScrubbing = true`), automatic timer updates to `VideoPositionSeconds` are suppressed to prevent slider jitter.
+    - User commit via `CompleteScrubbing` seeks to the clamped target position once.
   - **Clean Timer & ViewModel Lifecycle**:
-    - Wired `PresenterDockWindow.Closed` to unsubscribe event handlers and dispose ViewModel timer immediately.
-    - Protected `Dispose()` against double disposal and stopped any active timers without leaks or orphan updates.
+    - `PresenterDockWindow.Closed` unhooks `PropertyChanged` and calls `ViewModel.Dispose()`.
+    - `Dispose()` stops the `DispatcherQueueTimer`, detaches event handlers, unhooks coordinator and service events, and sets `_disposed = true`.
   - **Automated Unit Tests**:
-    - Expanded test suite to **251 automated tests** (100% pass rate) validating dispatcher queue configuration, scrubbing safety, and disposal lifecycle.
+    - Expanded test suite to **255 automated tests** (100% pass rate) validating UI dispatcher ownership, timer ticks, scrubbing state, off-thread event marshaling, and TryEnqueue failure safety.
 - [x] **Main Dashboard Source Selector Empty-State UX Fix**:
   - **Informative Empty State Surface**:
     - Replaced blank gray selector box with an informative `DropDownButton` and styled Flyout matching the Floating Presenter Dock's empty state.

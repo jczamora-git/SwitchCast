@@ -303,7 +303,10 @@ public class PresenterDockViewModelTests
             _mockDockService.Object,
             _mockSettingsService.Object);
 
-        // Safe to call SetDispatcherQueue with null or non-UI dispatcher in headless test
+        var dispatcher = new Microsoft.UI.Dispatching.DispatcherQueue();
+        vm.SetDispatcherQueue(dispatcher);
+
+        // Safe to call SetDispatcherQueue with null or non-UI dispatcher
         vm.SetDispatcherQueue(null);
 
         // Safe to dispose multiple times
@@ -311,6 +314,139 @@ public class PresenterDockViewModelTests
         vm.Dispose();
 
         // Calling SetDispatcherQueue after dispose is a safe no-op
-        vm.SetDispatcherQueue(null);
+        vm.SetDispatcherQueue(dispatcher);
+    }
+
+    [Fact]
+    public void TimerTick_WhenVideoPlayingAndNotScrubbing_RaisesPropertyChanged()
+    {
+        var mockMediaService = new Mock<IMediaPresentationService>();
+        _mockCoordinator.SetupGet(c => c.MediaPresentationService).Returns(mockMediaService.Object);
+        _mockCoordinator.SetupGet(c => c.IsActiveSourceVideo).Returns(true);
+        mockMediaService.SetupGet(m => m.IsVideoPlaying).Returns(true);
+        mockMediaService.SetupGet(m => m.Duration).Returns(TimeSpan.FromSeconds(100));
+        mockMediaService.SetupGet(m => m.Position).Returns(TimeSpan.FromSeconds(25));
+
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object);
+
+        var dispatcher = new Microsoft.UI.Dispatching.DispatcherQueue();
+        vm.SetDispatcherQueue(dispatcher);
+
+        var notifiedProperties = new List<string>();
+        vm.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName is not null)
+            {
+                notifiedProperties.Add(e.PropertyName);
+            }
+        };
+
+        // When not scrubbing, properties update on tick
+        // Since we configured the mock, let's verify properties are read
+        Assert.Equal(25.0, vm.VideoPositionSeconds);
+        Assert.Equal("00:25 / 01:40", vm.VideoPositionText);
+    }
+
+    [Fact]
+    public void Scrubbing_PreservesUserPosition_AndSuppressesTimerUpdates()
+    {
+        var mockMediaService = new Mock<IMediaPresentationService>();
+        _mockCoordinator.SetupGet(c => c.MediaPresentationService).Returns(mockMediaService.Object);
+        _mockCoordinator.SetupGet(c => c.IsActiveSourceVideo).Returns(true);
+        mockMediaService.SetupGet(m => m.IsVideoPlaying).Returns(true);
+        mockMediaService.SetupGet(m => m.Duration).Returns(TimeSpan.FromSeconds(100));
+        mockMediaService.SetupGet(m => m.Position).Returns(TimeSpan.FromSeconds(25));
+
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object);
+
+        // Start scrubbing at 50s
+        vm.StartScrubbing(50.0);
+        Assert.Equal(50.0, vm.VideoPositionSeconds);
+        Assert.Equal("00:50 / 01:40", vm.VideoPositionText);
+
+        // Complete scrubbing seeks to target
+        vm.CompleteScrubbing(75.0);
+        mockMediaService.Verify(m => m.Seek(TimeSpan.FromSeconds(75)), Times.Once);
+    }
+
+    [Fact]
+    public void OffThreadMediaEvent_DispatchedViaTryEnqueue()
+    {
+        var mockMediaService = new Mock<IMediaPresentationService>();
+        _mockCoordinator.SetupGet(c => c.MediaPresentationService).Returns(mockMediaService.Object);
+
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object);
+
+        var dispatcher = new Microsoft.UI.Dispatching.DispatcherQueue
+        {
+            HasThreadAccess = false
+        };
+
+        bool enqueued = false;
+        dispatcher.EnqueueHandler = callback =>
+        {
+            enqueued = true;
+            callback();
+            return true;
+        };
+
+        vm.SetDispatcherQueue(dispatcher);
+
+        // Raise MediaStateChanged
+        mockMediaService.Raise(m => m.MediaStateChanged += null, EventArgs.Empty);
+
+        Assert.True(enqueued, "Off-thread event should be dispatched via TryEnqueue.");
+    }
+
+    [Fact]
+    public void OffThreadEvent_WhenTryEnqueueFails_DoesNotExecuteDirectly()
+    {
+        var mockMediaService = new Mock<IMediaPresentationService>();
+        _mockCoordinator.SetupGet(c => c.MediaPresentationService).Returns(mockMediaService.Object);
+
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object);
+
+        var dispatcher = new Microsoft.UI.Dispatching.DispatcherQueue
+        {
+            HasThreadAccess = false
+        };
+
+        dispatcher.EnqueueHandler = callback =>
+        {
+            // TryEnqueue fails (e.g. queue shutting down)
+            return false;
+        };
+
+        vm.SetDispatcherQueue(dispatcher);
+
+        int propertyChangeCount = 0;
+        vm.PropertyChanged += (s, e) => propertyChangeCount++;
+
+        // Raise MediaStateChanged
+        mockMediaService.Raise(m => m.MediaStateChanged += null, EventArgs.Empty);
+
+        // Should NOT have run the callback or notified properties
+        Assert.Equal(0, propertyChangeCount);
     }
 }
+

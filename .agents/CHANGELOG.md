@@ -7,17 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [Floating Dock Playback Slider Cross-Thread Fix] - 2026-10-09
+## [Floating Dock Playback Slider Cross-Thread COMException Permanent Hotfix] - 2026-10-09
 
 ### Fixed (fix / threading / winui / test / docs)
 - **Eliminate COMException 0x8001010E (RPC_E_WRONG_THREAD)**:
-  - Fixed cross-thread `RangeBase.set_Value` crash triggered when `PresenterDockViewModel.OnPlaybackProgressTick` ran on a ThreadPool worker thread and notified `VideoPositionSeconds`.
-  - Replaced background thread pool timer with native UI thread `DispatcherQueueTimer` initialized with `PresenterDockWindow`'s UI `DispatcherQueue`.
-  - Added safe `RunOnUIThread` marshaling for all event callbacks (`OnStatePropertyChanged`, `OnCoordinatorPropertyChanged`, `OnWindowDisplayModeChanged`, `OnMediaStateChanged`).
-  - Added clean disposal and teardown in `PresenterDockWindow.OnWindowClosed` to prevent timer leaks or orphan property updates.
+  - Eliminated the fallback `System.Threading.Timer` (`_playbackProgressTimer`), `OnFallbackTimerTick`, and unsafe synchronous execution in `RunOnUIThread`.
+  - Replaced reflection/dynamic dispatch with strongly typed `Microsoft.UI.Dispatching.DispatcherQueue` and `Microsoft.UI.Dispatching.DispatcherQueueTimer`.
+  - Configured `PresenterDockWindow` to pass its UI thread `DispatcherQueue` on window initialization.
+  - Ensured all UI-bound `PropertyChanged` notifications occur strictly on the owning UI thread, with clean drop semantics on `TryEnqueue` failure rather than fallback to worker thread execution.
+  - Implemented safe timer disposal on dock close to prevent orphan callbacks.
 - **Automated Unit & Regression Tests**:
-  - Added tests in [SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs) verifying `SetDispatcherQueue` initialization, scrubbing behavior, and safe disposal.
-  - **251 automated unit tests passing with 100% success rate**.
+  - Added unit tests in [SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs) validating UI dispatcher ownership, timer ticks, scrubbing state, off-thread marshaling, and TryEnqueue failure handling.
+  - **255 automated unit tests passing with 100% success rate**.
 
 ---
 

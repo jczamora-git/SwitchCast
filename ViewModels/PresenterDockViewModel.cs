@@ -1,6 +1,8 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.UI.Dispatching;
 using SwitchCast.Models;
 using SwitchCast.Services;
 
@@ -16,9 +18,8 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
     private readonly IPresentationWindowService _presentationWindowService;
     private readonly IPresenterDockService _dockService;
     private readonly IApplicationSettingsService _settingsService;
-    private object? _dispatcherQueue;
-    private object? _dispatcherTimer;
-    private Timer? _playbackProgressTimer;
+    private DispatcherQueue? _dispatcherQueue;
+    private DispatcherQueueTimer? _playbackTimer;
     private bool _isScrubbing;
     private double _scrubbingPositionSeconds;
     private bool _disposed;
@@ -47,23 +48,15 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
             _presentationCoordinator.MediaPresentationService.MediaStateChanged += OnMediaStateChanged;
         }
 
-        // Attempt to capture ambient Windows.System.DispatcherQueue if initialized on a UI thread
-        try
-        {
-            _dispatcherQueue = Windows.System.DispatcherQueue.GetForCurrentThread();
-        }
-        catch
-        {
-            // Non-WinUI / headless unit test fallback
-        }
-
-        SetupPlaybackProgressTimer();
+        // Capture ambient dispatcher if initialized on a UI thread
+        _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+        InitializePlaybackTimer();
     }
 
     /// <summary>
-    /// Configures the UI thread DispatcherQueue for this ViewModel, instantiating a DispatcherQueueTimer for frame progress.
+    /// Configures the authoritative UI thread DispatcherQueue for this ViewModel.
     /// </summary>
-    public void SetDispatcherQueue(object? dispatcherQueue)
+    public void SetDispatcherQueue(DispatcherQueue? dispatcherQueue)
     {
         if (_disposed)
         {
@@ -71,92 +64,64 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         }
 
         _dispatcherQueue = dispatcherQueue;
-        SetupPlaybackProgressTimer();
+        InitializePlaybackTimer();
     }
 
-    private void SetupPlaybackProgressTimer()
+    private void InitializePlaybackTimer()
     {
-        // Clean up previous timers if reconfiguring
-        StopDispatcherTimer();
+        StopPlaybackTimer();
 
-        if (_playbackProgressTimer is not null)
+        if (_disposed || _dispatcherQueue is null)
         {
-            _playbackProgressTimer.Dispose();
-            _playbackProgressTimer = null;
+            return;
         }
 
-        if (_dispatcherQueue is not null)
+        try
+        {
+            _playbackTimer = _dispatcherQueue.CreateTimer();
+            _playbackTimer.Interval = TimeSpan.FromMilliseconds(250);
+            _playbackTimer.IsRepeating = true;
+            _playbackTimer.Tick += OnPlaybackTimerTick;
+            _playbackTimer.Start();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[PresenterDockViewModel] Failed to create DispatcherQueueTimer: {ex.Message}");
+            _playbackTimer = null;
+        }
+    }
+
+    private void StopPlaybackTimer()
+    {
+        if (_playbackTimer is not null)
         {
             try
             {
-                dynamic dq = _dispatcherQueue;
-                dynamic timer = dq.CreateTimer();
-                timer.Interval = TimeSpan.FromMilliseconds(250);
-                timer.IsRepeating = true;
-                timer.Tick += (Windows.Foundation.TypedEventHandler<object, object>)((sender, args) =>
-                {
-                    OnDispatcherTimerTick();
-                });
-                timer.Start();
-                _dispatcherTimer = timer;
-                return;
+                _playbackTimer.Stop();
+                _playbackTimer.Tick -= OnPlaybackTimerTick;
             }
             catch
             {
-                // Fallback to thread pool timer if DispatcherQueue or dynamic timer creation fails
+                // Ignore cleanup errors
             }
-        }
-
-        // Fallback for non-UI/test environments
-        _playbackProgressTimer = new Timer(OnFallbackTimerTick, null, 250, 250);
-    }
-
-    private void StopDispatcherTimer()
-    {
-        if (_dispatcherTimer is not null)
-        {
-            try
-            {
-                dynamic timer = _dispatcherTimer;
-                timer.Stop();
-            }
-            catch
-            {
-                // Ignore disposal errors on timer
-            }
-            _dispatcherTimer = null;
+            _playbackTimer = null;
         }
     }
 
-    private void OnDispatcherTimerTick()
+    private void OnPlaybackTimerTick(DispatcherQueueTimer sender, object args)
     {
         if (_disposed)
         {
             return;
         }
+
+        Debug.Assert(_dispatcherQueue is null || _dispatcherQueue.HasThreadAccess, "Playback timer tick must execute on UI thread.");
 
         if (IsActiveSourceVideo && IsVideoPlaying && !_isScrubbing)
         {
             OnPropertyChanged(nameof(VideoPositionSeconds));
             OnPropertyChanged(nameof(VideoPositionText));
         }
-    }
-
-    private void OnFallbackTimerTick(object? state)
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        RunOnUIThread(() =>
-        {
-            if (!_disposed && IsActiveSourceVideo && IsVideoPlaying && !_isScrubbing)
-            {
-                OnPropertyChanged(nameof(VideoPositionSeconds));
-                OnPropertyChanged(nameof(VideoPositionText));
-            }
-        });
     }
 
     private void RunOnUIThread(Action action)
@@ -166,30 +131,33 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_dispatcherQueue is not null)
+        var dispatcher = _dispatcherQueue ?? DispatcherQueue.GetForCurrentThread();
+        if (dispatcher is null)
         {
-            try
-            {
-                dynamic dq = _dispatcherQueue;
-                if (!(bool)dq.HasThreadAccess)
-                {
-                    dq.TryEnqueue(new Action(() =>
-                    {
-                        if (!_disposed)
-                        {
-                            action();
-                        }
-                    }));
-                    return;
-                }
-            }
-            catch
-            {
-                // Fallback if dispatcher call fails
-            }
+            // Headless unit test environment fallback
+            action();
+            return;
         }
 
-        action();
+        if (dispatcher.HasThreadAccess)
+        {
+            action();
+        }
+        else
+        {
+            bool enqueued = dispatcher.TryEnqueue(() =>
+            {
+                if (!_disposed)
+                {
+                    action();
+                }
+            });
+
+            if (!enqueued)
+            {
+                Debug.WriteLine("[PresenterDockViewModel] RunOnUIThread: TryEnqueue returned false. Dropping UI update.");
+            }
+        }
     }
 
     public void Dispose()
@@ -201,10 +169,7 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
 
         _disposed = true;
 
-        StopDispatcherTimer();
-
-        _playbackProgressTimer?.Dispose();
-        _playbackProgressTimer = null;
+        StopPlaybackTimer();
 
         _presentationStateService.PropertyChanged -= OnStatePropertyChanged;
         _presentationCoordinator.PropertyChanged -= OnCoordinatorPropertyChanged;

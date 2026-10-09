@@ -56,17 +56,67 @@ namespace Microsoft.UI.Xaml.Media.Imaging
 namespace Microsoft.UI.Dispatching
 {
     /// <summary>
+    /// Stubs Microsoft.UI.Dispatching.DispatcherQueueHandler for headless test runner.
+    /// </summary>
+    public delegate void DispatcherQueueHandler();
+
+    /// <summary>
+    /// Stubs Microsoft.UI.Dispatching.DispatcherQueuePriority for headless test runner.
+    /// </summary>
+    public enum DispatcherQueuePriority
+    {
+        Low = -10,
+        Normal = 0,
+        High = 10
+    }
+
+    /// <summary>
+    /// Stubs Microsoft.UI.Dispatching.DispatcherQueueTimer for headless test runner.
+    /// </summary>
+    public class DispatcherQueueTimer
+    {
+        public TimeSpan Interval { get; set; }
+        public bool IsRepeating { get; set; }
+        public bool IsRunning { get; private set; }
+
+        public event Windows.Foundation.TypedEventHandler<DispatcherQueueTimer, object>? Tick;
+
+        public void Start() => IsRunning = true;
+        public void Stop() => IsRunning = false;
+
+        public void RaiseTick()
+        {
+            Tick?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>
     /// Stubs Microsoft.UI.Dispatching.DispatcherQueue for headless test runner.
     /// </summary>
     public class DispatcherQueue
     {
         public static DispatcherQueue? GetForCurrentThread() => null;
-        public bool HasThreadAccess => true;
-        public bool TryEnqueue(Action action)
+        public bool HasThreadAccess { get; set; } = true;
+
+        public Func<DispatcherQueueHandler, bool>? EnqueueHandler { get; set; }
+
+        public bool TryEnqueue(DispatcherQueueHandler callback)
         {
-            action();
+            if (EnqueueHandler != null)
+            {
+                return EnqueueHandler(callback);
+            }
+
+            callback();
             return true;
         }
+
+        public bool TryEnqueue(DispatcherQueuePriority priority, DispatcherQueueHandler callback)
+        {
+            return TryEnqueue(callback);
+        }
+
+        public DispatcherQueueTimer CreateTimer() => new DispatcherQueueTimer();
     }
 }
 

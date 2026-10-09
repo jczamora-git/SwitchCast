@@ -3,33 +3,35 @@
 ---
 
 ## Task Details
-- **Task**: Runtime Bug Fix — Floating Dock Playback Slider Cross-Thread Update (COMException 0x8001010E)
-- **Date**: 2026-10-09T20:25:00+08:00 (UTC+8)
+- **Task**: Permanent Hotfix — Presenter Dock Playback Progress Cross-Thread COMException (0x8001010E)
+- **Date**: 2026-10-09T20:45:00+08:00 (UTC+8)
 - **Status**: Completed & Verified
 
 ---
 
 ## 1. Objectives Implemented
 
-1. **Eliminate RPC_E_WRONG_THREAD COMException (0x8001010E)**:
-   - Diagnosed root cause: `PresenterDockViewModel` previously utilized a background `System.Threading.Timer` that invoked `OnPlaybackProgressTick` on a ThreadPool worker thread.
-   - Calling `OnPropertyChanged(nameof(VideoPositionSeconds))` triggered WinUI 3 compiled bindings (`RangeBase.set_Value`) in `PresenterDockWindow.g.cs` from outside the UI thread, causing single-threaded apartment (STA) thread-affinity violations.
+1. **Permanently Eliminate RPC_E_WRONG_THREAD COMException (0x8001010E)**:
+   - Root cause identified: The previous implementation relied on dynamic invocation of `DispatcherQueue.CreateTimer()`, which failed or threw a runtime cast exception on `TypedEventHandler<object, object>`, falling back to `_playbackProgressTimer = new Timer(OnFallbackTimerTick)`.
+   - `RunOnUIThread` had an unsafe fallback executing `action()` synchronously on the calling worker thread when `TryEnqueue` failed or threw, triggering `PropertyChanged(nameof(VideoPositionSeconds))` directly onto WinUI 3 XAML compiled binding setters (`RangeBase.set_Value`).
+   - Completely deleted `System.Threading.Timer`, `_playbackProgressTimer`, and `OnFallbackTimerTick`.
 
-2. **UI Dispatcher-Owned Progress Timer**:
-   - Replaced thread-pool timer with native UI thread `DispatcherQueueTimer` created on the UI thread's `DispatcherQueue`.
-   - Added `SetDispatcherQueue` to `PresenterDockViewModel`, invoked by `PresenterDockWindow` upon initialization.
-   - Ensured all recurring timeline slider and timecode ticks run natively on the owning UI thread.
+2. **Strongly-Typed Microsoft.UI.Dispatching Dispatcher Integration**:
+   - Replaced untyped `object? _dispatcherQueue` with strongly typed `Microsoft.UI.Dispatching.DispatcherQueue` and `Microsoft.UI.Dispatching.DispatcherQueueTimer`.
+   - `PresenterDockWindow` passes its UI thread `DispatcherQueue` directly into `PresenterDockViewModel.SetDispatcherQueue(DispatcherQueue)`.
+   - A single repeating `DispatcherQueueTimer` ticks at 250ms on the native UI thread, safely firing `OnPropertyChanged(nameof(VideoPositionSeconds))` and `OnPropertyChanged(nameof(VideoPositionText))` only when video is active, playing, and not being scrubbed.
 
-3. **Event Notification Marshaling**:
-   - Wrapped `OnStatePropertyChanged`, `OnCoordinatorPropertyChanged`, `OnWindowDisplayModeChanged`, `OnMediaStateChanged`, and window open/closed handlers with `RunOnUIThread` using `DispatcherQueue.TryEnqueue` when called off the UI thread.
+3. **Strict UI Thread Marshaling & Drop-On-Failure Semantics**:
+   - `RunOnUIThread` now verifies `dispatcher.HasThreadAccess`. If false, calls `dispatcher.TryEnqueue`. If `TryEnqueue` returns false, it drops the UI notification cleanly without executing on the worker thread.
 
-4. **Timer & ViewModel Lifecycle Management**:
-   - Wired `PresenterDockWindow.Closed` to unsubscribe event handlers and dispose ViewModel timer immediately.
-   - Protected `Dispose()` against double disposal and stopped any active timers without leaks or orphan updates.
+4. **Scrubbing & Slider Loop Safety**:
+   - `StartScrubbing` and `CompleteScrubbing` ensure slider dragging isolates the user position and commits seek once on completion.
 
-5. **Automated Unit & Regression Tests**:
-   - Added unit tests in `PresenterDockViewModelTests.cs` validating `SetDispatcherQueue`, scrubbing safety, and disposal lifecycle.
-   - **251 automated tests passing with 100% success rate**.
+5. **Safe Lifecycle and Disposal**:
+   - `PresenterDockViewModel.Dispose()` cleanly stops `_playbackTimer`, unhooks tick handlers, and unbinds all coordinator/service listeners.
+
+6. **Automated Unit & Regression Tests**:
+   - Test suite expanded to **255 tests passing with 100% success rate** (0 errors, 0 warnings on build and test).
 
 ---
 
