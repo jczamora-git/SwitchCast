@@ -25,6 +25,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     private CaptureSource? _targetRequestedPresentationSource;
     private long _presentationSequenceNumber;
     private PresentationStatus _previousStatusBeforeBlackout = PresentationStatus.Active;
+    private volatile bool _isStoppingOrShuttingDown;
 
     [ObservableProperty]
     private string? _lastErrorMessage;
@@ -217,10 +218,22 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             _presentationStateService.SetSelectedSource(targetSource);
             if (SwitchMode == PresenterSwitchMode.ActiveAndLive)
             {
-                bool activated = _windowActivationService.ActivateSource(targetSource);
-                if (activated)
+                if (targetSource is WindowSource)
                 {
-                    _presentationStateService.SetForegroundSource(targetSource);
+                    bool activated = _windowActivationService.ActivateSource(targetSource);
+                    if (activated)
+                    {
+                        _presentationStateService.SetForegroundSource(targetSource);
+                    }
+                }
+                else if (targetSource is ImageMediaSource or VideoMediaSource)
+                {
+                    ActivatePresentationOutput();
+                    _presentationStateService.SetForegroundSource(null);
+                }
+                else
+                {
+                    _presentationStateService.SetForegroundSource(null);
                 }
             }
             _presentationStateService.SetStatus(PresentationStatus.Active);
@@ -246,6 +259,8 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         Volatile.Write(ref _targetRequestedPresentationSource, null);
 
         Debug.WriteLine($"[PresentationCoordinator] StopPresentation requested seq={sequence} isShuttingDown={isShuttingDown}");
+
+        _isStoppingOrShuttingDown = true;
 
         await _transitionSemaphore.WaitAsync().ConfigureAwait(false);
         try
@@ -274,6 +289,10 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         }
         finally
         {
+            if (!isShuttingDown)
+            {
+                _isStoppingOrShuttingDown = false;
+            }
             _transitionSemaphore.Release();
         }
     }
@@ -362,6 +381,12 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             {
                 _presentationStateService.SetStatus(PresentationStatus.Active);
             }
+
+            if (SwitchMode == PresenterSwitchMode.ActiveAndLive && (newSource is ImageMediaSource or VideoMediaSource))
+            {
+                ActivatePresentationOutput();
+            }
+
             Debug.WriteLine($"[PresentationCoordinator] SwitchPresentation completed seq={sequence} target={newSource.Id}");
         }
         catch (Exception ex)
@@ -524,6 +549,11 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                         _presentationStateService.SetForegroundSource(null);
                     }
                 }
+                else if (targetSource is ImageMediaSource or VideoMediaSource)
+                {
+                    _presentationStateService.SetForegroundSource(null);
+                    ActivatePresentationOutput();
+                }
                 else
                 {
                     _presentationStateService.SetForegroundSource(null);
@@ -683,6 +713,30 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         if (Status != PresentationStatus.Idle)
         {
             _ = StopPresentationAsync();
+        }
+    }
+
+    private void ActivatePresentationOutput()
+    {
+        if (_isStoppingOrShuttingDown)
+        {
+            return;
+        }
+
+        if (!_presentationWindowService.IsWindowOpen)
+        {
+            _presentationWindowService.ShowPresentationWindow();
+            OnPropertyChanged(nameof(IsOutputWindowOpen));
+        }
+
+        var hwnd = _presentationWindowService.WindowHandle;
+        if (hwnd != IntPtr.Zero)
+        {
+            _windowActivationService.ActivateWindow(hwnd);
+        }
+        else if (_presentationWindowService.IsWindowOpen)
+        {
+            _presentationWindowService.ShowPresentationWindow();
         }
     }
 

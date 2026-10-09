@@ -222,8 +222,8 @@ public sealed partial class PresenterDockMenuWindow : Window
 
         if (e.ClickedItem is CaptureSource source)
         {
-            _ = _viewModel.SwitchSourceCommand.ExecuteAsync(source);
             CloseMenu();
+            _ = _viewModel.SwitchSourceCommand.ExecuteAsync(source);
         }
     }
 

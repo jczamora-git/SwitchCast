@@ -7,15 +7,34 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Dashboard & Floating Dock UX Hotfix (Correct Stop Icon & Return to Dashboard on Dock Close)
+- **Current Phase**: Media Source Activation Behavior Fix (Active + Live & Active Only Activate Presentation Output)
 - **Overall Status**: **Implemented & Verified**
-- **Last Updated**: 2026-10-10T05:25:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-10T05:40:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Media Source Activation Behavior Fix (Active + Live & Active Only Activate Presentation Output)**:
+  - **Active + Live for Media**:
+    - When an Image or Video media source is switched live in `ActiveAndLive` mode, SwitchCast starts rendering the image or playing the video and activates the existing `PresentationWindow` (restoring if minimized and bringing to the foreground via `IWindowActivationService.ActivateWindow`).
+    - Does NOT launch external media applications (e.g. VLC or Photos). Reuses existing output window without recreation or recentering, preserving fullscreen/windowed geometry.
+  - **Active Only for Media**:
+    - When an Image or Video media source is navigated to in `ActiveOnly` mode, advances the selection cursor (`SetSelectedSource`), resolves `PresentationWindow`, restores if minimized, and brings it to the foreground.
+    - Crucially preserves On-Air continuity: does NOT change `ActiveSource`, does NOT start media playback, does NOT seek or replace audience-facing frames. If closed, opens in Standby without taking media live.
+  - **Live Only for Media**:
+    - Preserved existing behavior: takes media live without requesting foreground focus or stealing focus from current active applications.
+  - **Window and Monitor Source Semantics Preserved**:
+    - Application window activation (`ActivateSource`) and monitor capture behavior remain completely untouched.
+  - **Floating Dock Focus Handoff**:
+    - Popup dropdown menu (`PresenterDockMenuWindow`) is closed and detached prior to executing the source switch command, preventing dropdown dismissal from reclaiming foreground focus away from the newly activated `PresentationWindow`.
+  - **Native Application Icon Integration**:
+    - Embedded multi-resolution `Assets/SwitchCast.ico` (16, 24, 32, 48, 64, 128, 256) generated from high-resolution `Assets/SwitchCast_1.png`.
+    - Configured project deployment in `SwitchCast.csproj` (`<ApplicationIcon>Assets\SwitchCast.ico</ApplicationIcon>`, `<Content Include="Assets\SwitchCast.ico">`, and `<Content Include="Assets\SwitchCast_1.png">`).
+    - Added automated branding unit tests in `ApplicationBrandingTests.cs` verifying multi-resolution ICO header, resolutions (16, 24, 32, 48, 64, 128, 256), file existence of `SwitchCast.ico` and `SwitchCast_1.png`, and csproj build configurations.
+  - **Automated Regression Tests**:
+    - Expanded test suite to **281 automated unit tests** (100% pass rate).
 - [x] **Dashboard Start/Stop Presenting Dynamic Icon Correction**:
   - Replaced hardcoded play glyph `&#xE768;` in `DashboardPage.xaml` with compiled binding `{x:Bind ViewModel.PresentationButtonGlyph, Mode=OneWay}`.
   - Bound glyph dynamically in `DashboardViewModel.cs` to authoritative presentation state: `PresentationButtonGlyph => HasActivePresentation ? "\uE71A" : "\uE768"`.

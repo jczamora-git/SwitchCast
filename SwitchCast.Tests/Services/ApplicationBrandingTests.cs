@@ -98,6 +98,16 @@ public class ApplicationBrandingTests
 
         Assert.Contains("<ApplicationIcon>Assets\\SwitchCast.ico</ApplicationIcon>", content);
         Assert.Contains("<Content Include=\"Assets\\SwitchCast.ico\">", content);
+        Assert.Contains("<Content Include=\"Assets\\SwitchCast_1.png\">", content);
         Assert.Contains("<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>", content);
+    }
+
+    [Fact]
+    public void SwitchCastPng_FileExistsInAssetsFolder()
+    {
+        string projectRoot = GetProjectRoot();
+        string pngPath = Path.Combine(projectRoot, "Assets", "SwitchCast_1.png");
+
+        Assert.True(File.Exists(pngPath), $"Expected SwitchCast_1.png at: {pngPath}");
     }
 }
