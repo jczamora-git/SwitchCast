@@ -294,7 +294,7 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
 
     public bool HasSelectedSources => _presentationStateService.SelectedSourceCount > 0;
 
-    public bool CanSwitchSources => _presentationStateService.SelectedSources.Count(s => s.IsAvailable) > 1;
+    public bool CanSwitchSources => _presentationStateService.SelectedSourceCount > 1;
 
     public bool IsOutputWindowOpen => _presentationWindowService.IsWindowOpen;
 

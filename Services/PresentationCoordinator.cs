@@ -351,7 +351,14 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             }
 
             _presentationStateService.SetActiveSource(newSource);
-            if (Status != PresentationStatus.Paused && Status != PresentationStatus.Blackout)
+            if (Status == PresentationStatus.Paused || Status == PresentationStatus.Blackout)
+            {
+                if (newSource is VideoMediaSource)
+                {
+                    _mediaPresentationService.PauseVideo();
+                }
+            }
+            else
             {
                 _presentationStateService.SetStatus(PresentationStatus.Active);
             }
@@ -477,10 +484,21 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         switch (mode)
         {
             case PresenterSwitchMode.ActiveAndLive:
-                bool activated = _windowActivationService.ActivateSource(targetSource);
-                if (activated)
+                if (targetSource is WindowSource)
                 {
-                    _presentationStateService.SetForegroundSource(targetSource);
+                    bool activated = _windowActivationService.ActivateSource(targetSource);
+                    if (activated)
+                    {
+                        _presentationStateService.SetForegroundSource(targetSource);
+                    }
+                    else
+                    {
+                        _presentationStateService.SetForegroundSource(null);
+                    }
+                }
+                else
+                {
+                    _presentationStateService.SetForegroundSource(null);
                 }
 
                 if (Status == PresentationStatus.Idle)
@@ -494,10 +512,21 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                 break;
 
             case PresenterSwitchMode.ActiveOnly:
-                bool actOnly = _windowActivationService.ActivateSource(targetSource);
-                if (actOnly)
+                if (targetSource is WindowSource)
                 {
-                    _presentationStateService.SetForegroundSource(targetSource);
+                    bool actOnly = _windowActivationService.ActivateSource(targetSource);
+                    if (actOnly)
+                    {
+                        _presentationStateService.SetForegroundSource(targetSource);
+                    }
+                    else
+                    {
+                        _presentationStateService.SetForegroundSource(null);
+                    }
+                }
+                else
+                {
+                    _presentationStateService.SetForegroundSource(null);
                 }
                 break;
 
@@ -517,45 +546,75 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
     public async Task SwitchToNextSourceAsync()
     {
-        var availableSources = _presentationStateService.SelectedSources.Where(s => s.IsAvailable).ToList();
-        if (availableSources.Count == 0)
+        var queue = _presentationStateService.SelectedSources;
+        if (queue.Count == 0)
         {
             return;
         }
 
-        var current = SelectedSource ?? CurrentPresentationSource ?? _presentationStateService.ActiveSource;
-        int currentIndex = current is not null ? availableSources.FindIndex(s => s.Id == current.Id) : -1;
-        int nextIndex = (currentIndex + 1) % availableSources.Count;
-        var nextSource = availableSources[nextIndex];
+        var current = (Status != PresentationStatus.Idle && SwitchMode != PresenterSwitchMode.ActiveOnly)
+            ? (CurrentPresentationSource ?? SelectedSource)
+            : (SelectedSource ?? CurrentPresentationSource);
+
+        int currentIndex = -1;
+        if (current is not null)
+        {
+            for (int i = 0; i < queue.Count; i++)
+            {
+                if (queue[i].Id == current.Id)
+                {
+                    currentIndex = i;
+                    break;
+                }
+            }
+        }
+
+        int nextIndex = (currentIndex + 1) % queue.Count;
+        var nextSource = queue[nextIndex];
 
         await ExecuteSourceSwitchAsync(nextSource).ConfigureAwait(false);
     }
 
     public async Task SwitchToPreviousSourceAsync()
     {
-        var availableSources = _presentationStateService.SelectedSources.Where(s => s.IsAvailable).ToList();
-        if (availableSources.Count == 0)
+        var queue = _presentationStateService.SelectedSources;
+        if (queue.Count == 0)
         {
             return;
         }
 
-        var current = SelectedSource ?? CurrentPresentationSource ?? _presentationStateService.ActiveSource;
-        int currentIndex = current is not null ? availableSources.FindIndex(s => s.Id == current.Id) : -1;
-        int prevIndex = (currentIndex - 1 + availableSources.Count) % availableSources.Count;
-        var prevSource = availableSources[prevIndex];
+        var current = (Status != PresentationStatus.Idle && SwitchMode != PresenterSwitchMode.ActiveOnly)
+            ? (CurrentPresentationSource ?? SelectedSource)
+            : (SelectedSource ?? CurrentPresentationSource);
+
+        int currentIndex = -1;
+        if (current is not null)
+        {
+            for (int i = 0; i < queue.Count; i++)
+            {
+                if (queue[i].Id == current.Id)
+                {
+                    currentIndex = i;
+                    break;
+                }
+            }
+        }
+
+        int prevIndex = (currentIndex - 1 + queue.Count) % queue.Count;
+        var prevSource = queue[prevIndex];
 
         await ExecuteSourceSwitchAsync(prevSource).ConfigureAwait(false);
     }
 
     public async Task SwitchToSourceIndexAsync(int index)
     {
-        var availableSources = _presentationStateService.SelectedSources.Where(s => s.IsAvailable).ToList();
-        if (index < 0 || index >= availableSources.Count)
+        var queue = _presentationStateService.SelectedSources;
+        if (index < 0 || index >= queue.Count)
         {
             return;
         }
 
-        var targetSource = availableSources[index];
+        var targetSource = queue[index];
         await ExecuteSourceSwitchAsync(targetSource).ConfigureAwait(false);
     }
 

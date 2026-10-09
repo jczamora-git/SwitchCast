@@ -554,6 +554,11 @@ public partial class DashboardViewModel : ObservableObject
         }
         else if (e.PropertyName == nameof(IPresentationStateService.ActiveSource))
         {
+            if (_presentationStateService.ActiveSource is not null &&
+                SelectedPresentationSource?.Id != _presentationStateService.ActiveSource.Id)
+            {
+                SelectedPresentationSource = _presentationStateService.ActiveSource;
+            }
             OnPropertyChanged(nameof(ActiveSourceTitle));
             OnPropertyChanged(nameof(HasActiveSource));
             NotifyMediaPlaybackProperties();

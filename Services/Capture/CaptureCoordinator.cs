@@ -201,7 +201,6 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
         _sessionManager.StopCapture();
         _previewRenderer.Clear();
         CurrentPreviewSource = null;
-        _presentationStateService.SetActiveSource(null);
         await Task.CompletedTask;
     }
 

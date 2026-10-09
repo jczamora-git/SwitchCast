@@ -358,4 +358,89 @@ public class PresentationCoordinatorMediaTests
         _mockMediaPresentationService.Verify(m => m.LoadImageAsync(It.IsAny<ImageMediaSource>()), Times.Never);
         _mockStateService.Verify(s => s.SetSelectedSource(img), Times.Once);
     }
+
+    [Fact]
+    public async Task SwitchToNextSourceAsync_WithActiveWindowToVideo_PlaysVideoWithoutWindowActivation()
+    {
+        var win = new WindowSource { Id = "win-1", Title = "Window 1", WindowHandle = 100, IsAvailable = true };
+        var vid = new VideoMediaSource { Id = "media:vid.mp4", Title = "vid.mp4", FilePath = @"C:\vid.mp4", IsAvailable = true };
+        var queue = new List<CaptureSource> { win, vid };
+
+        _mockStateService.SetupGet(s => s.SelectedSources).Returns(queue);
+        _mockStateService.SetupGet(s => s.ActiveSource).Returns(win);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+        _mockStateService.SetupGet(s => s.SwitchMode).Returns(PresenterSwitchMode.ActiveAndLive);
+        _mockCaptureCoordinator.SetupGet(c => c.State).Returns(CaptureState.Capturing);
+
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object,
+            _mockMediaPresentationService.Object);
+
+        await coordinator.SwitchToNextSourceAsync();
+
+        // Video played, capture stopped, window activation not called on media
+        _mockMediaPresentationService.Verify(m => m.PlayVideoAsync(vid), Times.Once);
+        _mockWindowActivationService.Verify(w => w.ActivateSource(vid), Times.Never);
+        _mockStateService.Verify(s => s.SetForegroundSource(null), Times.Once);
+        _mockStateService.Verify(s => s.SetActiveSource(vid), Times.Once);
+    }
+
+    [Fact]
+    public async Task SwitchToPreviousSourceAsync_WithMixedQueue_CyclesBackwardCorrectly()
+    {
+        var win = new WindowSource { Id = "win-1", Title = "Window 1", IsAvailable = true };
+        var vid = new VideoMediaSource { Id = "media:vid.mp4", Title = "vid.mp4", FilePath = @"C:\vid.mp4", IsAvailable = true };
+        var img = new ImageMediaSource { Id = "media:img.png", Title = "img.png", FilePath = @"C:\img.png", IsAvailable = true };
+        var queue = new List<CaptureSource> { win, vid, img };
+
+        _mockStateService.SetupGet(s => s.SelectedSources).Returns(queue);
+        _mockStateService.SetupGet(s => s.ActiveSource).Returns(img);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+        _mockStateService.SetupGet(s => s.SwitchMode).Returns(PresenterSwitchMode.LiveOnly);
+
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object,
+            _mockMediaPresentationService.Object);
+
+        // Previous from img -> vid
+        await coordinator.SwitchToPreviousSourceAsync();
+        _mockMediaPresentationService.Verify(m => m.PlayVideoAsync(vid), Times.Once);
+    }
+
+    [Fact]
+    public async Task SwitchToNextSourceAsync_InActiveOnlyMode_AdvancesSelectedCursorWithoutTakingLive()
+    {
+        var win = new WindowSource { Id = "win-1", Title = "Window 1", IsAvailable = true };
+        var vid = new VideoMediaSource { Id = "media:vid.mp4", Title = "vid.mp4", FilePath = @"C:\vid.mp4", IsAvailable = true };
+        var queue = new List<CaptureSource> { win, vid };
+
+        _mockStateService.SetupGet(s => s.SelectedSources).Returns(queue);
+        _mockStateService.SetupGet(s => s.SelectedSource).Returns(win);
+        _mockStateService.SetupGet(s => s.ActiveSource).Returns(win);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+        _mockStateService.SetupGet(s => s.SwitchMode).Returns(PresenterSwitchMode.ActiveOnly);
+
+        using var coordinator = new PresentationCoordinator(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockOutputRenderer.Object,
+            _mockWindowActivationService.Object,
+            _mockMediaPresentationService.Object);
+
+        await coordinator.SwitchToNextSourceAsync();
+
+        // Selected source cursor moves to vid, but video is not played live
+        _mockStateService.Verify(s => s.SetSelectedSource(vid), Times.Once);
+        _mockMediaPresentationService.Verify(m => m.PlayVideoAsync(It.IsAny<VideoMediaSource>()), Times.Never);
+        _mockStateService.Verify(s => s.SetActiveSource(vid), Times.Never);
+    }
 }
