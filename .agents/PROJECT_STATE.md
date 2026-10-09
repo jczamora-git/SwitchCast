@@ -7,15 +7,22 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Global Text Truncation & Layout Overflow Fix (UI/UX Robustness)
+- **Current Phase**: Floating Presenter Dock Native Dragging Hotfix (Desktop UX Refinement)
 - **Overall Status**: **Completed & Tested**
-- **Last Updated**: 2026-10-09T15:00:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-09T15:10:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Floating Presenter Dock Native Dragging Hotfix**:
+  - Implemented routed pointer event handlers (`AddHandler` with `handledEventsToo: true`) on `DockCardBorder` in [Views/PresenterDockWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml.cs).
+  - Instant native dragging (`ReleaseCapture` + `WM_NCLBUTTONDOWN` / `HTCAPTION`) when pressing on non-interactive surfaces (background, padding, status badge, status dot, dividers).
+  - Smooth click-versus-drag detection on interactive controls (buttons, dropdown triggers, action icons) using physical pixel movement threshold (5px / `DragThresholdSquared = 25`).
+  - Normal clicks execute intended actions (opening menus, switching sources, pause, blackout, stop) without moving the window.
+  - Intentional hold-and-drag gestures across the dock toolbar seamlessly initiate native Windows OS dragging without firing button clicks upon release.
+  - Zero modification to `MainWindow` or `PresentationWindow` title-bar implementations.
 - [x] **Global Text Truncation & Dropdown Width Constraints**:
   - Fixed horizontal expansion and clipping on Dashboard source selectors (`ComboBox` in Primary Control Bar, Live Preview switcher, and Ready-to-Preview switcher).
   - Provided custom `ComboBox.ItemTemplate` with bounded max-widths, `TextTrimming="CharacterEllipsis"`, `TextWrapping="NoWrap"`, and `ToolTipService.ToolTip="{x:Bind Title}"`.
@@ -24,10 +31,6 @@ This is the authoritative progress, state, and environmental tracking document f
   - Constrained Floating Presenter Dock active source buttons with `MaxWidth="135"` (Expanded) and `MaxWidth="85"` (Compact) on the `TextBlock` inside horizontal button toolbars, with full tooltip strings.
   - Added tooltips and single-line trimming on `PresenterDockMenuWindow` ListView items.
   - Preserved 100% of underlying full window titles, HWNDs, process IDs, and source queue identifiers in models and ViewModels.
-- [x] **Floating Presenter Dock Dragging Refinement**:
-  - Removed the dedicated visible drag handle icon (`\uE76F`) and its layout column/spacing from both Expanded (7 columns) and Compact (6 columns) dock modes.
-  - Implemented native Windows window dragging (`ReleaseCapture` + `WM_NCLBUTTONDOWN` / `HTCAPTION`) from all non-interactive toolbar surfaces (card border, status badge pill, status dot, and padding).
-  - Implemented visual tree hit-testing (`IsInteractiveControl`) that strictly protects all interactive controls (`ButtonBase`, `ComboBox`, `TextBox`, `Slider`, `ToggleSwitch`, `ListViewItem`, `MenuFlyoutItem`) from dragging triggers, preserving normal button clicks, hovers, and flyout interactions.
 - [x] **Unified Stop Presenting Workflow & Automatic Dashboard Activation**:
   - Unified Stop Presenting across Control Dashboard, Floating Presenter Dock, Presenter Dock Menu, and Global Hotkey (`Ctrl+Shift+S`).
   - Authoritative Stop sequence in `PresentationCoordinator.StopPresentationAsync()` safely terminates active capture or media playback, sets presentation status to `Idle`, closes the `PresentationWindow` (it no longer remains visible on Standby), restores `MainWindow` if minimized, brings the Control Dashboard to the foreground via `IWindowActivationService.ActivateMainWindow()`, and navigates to `DashboardPage`.

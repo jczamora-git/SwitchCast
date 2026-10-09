@@ -28,6 +28,10 @@ public sealed partial class PresenterDockWindow : Window
     private const int HTCAPTION = 0x0002;
     private const uint MONITOR_DEFAULTTONEAREST = 2;
 
+    private const int DragThresholdSquared = 25; // 5 physical pixels squared threshold
+    private bool _isPointerDown;
+    private POINT _dragStartPoint;
+
     private AppWindow? _appWindow;
     private PresenterDockMenuWindow? _activeMenuWindow;
     private long _lastMenuClosedTicks;
@@ -41,6 +45,7 @@ public sealed partial class PresenterDockWindow : Window
         Closed += OnWindowClosed;
 
         InitializeAppWindow();
+        SetupPointerHandlers();
     }
 
     public PresenterDockViewModel ViewModel { get; }
@@ -80,6 +85,15 @@ public sealed partial class PresenterDockWindow : Window
 
             SetWindowPos(WindowHandle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
         }
+    }
+
+    private void SetupPointerHandlers()
+    {
+        DockCardBorder.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(OnDockPointerPressed), handledEventsToo: true);
+        DockCardBorder.AddHandler(UIElement.PointerMovedEvent, new PointerEventHandler(OnDockPointerMoved), handledEventsToo: true);
+        DockCardBorder.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(OnDockPointerReleased), handledEventsToo: true);
+        DockCardBorder.AddHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(OnDockPointerCanceled), handledEventsToo: true);
+        DockCardBorder.AddHandler(UIElement.PointerCaptureLostEvent, new PointerEventHandler(OnDockPointerCaptureLost), handledEventsToo: true);
     }
 
     private void ApplyWindowSizingAndPosition(bool isCompact, bool initialCenter = false)
@@ -141,9 +155,38 @@ public sealed partial class PresenterDockWindow : Window
         }
     }
 
-    private void OnDockSurfacePointerPressed(object sender, PointerRoutedEventArgs e)
+    private void OnDockPointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (e.Handled)
+        var ptr = e.GetCurrentPoint(null);
+        if (!ptr.Properties.IsLeftButtonPressed)
+        {
+            _isPointerDown = false;
+            return;
+        }
+
+        if (!GetCursorPos(out _dragStartPoint))
+        {
+            return;
+        }
+
+        if (!IsInteractiveControl(e.OriginalSource as DependencyObject))
+        {
+            // Direct press on non-interactive toolbar surfaces (background, padding, status badge, dividers, text labels)
+            _isPointerDown = false;
+            CloseActiveMenu();
+            ReleaseCapture();
+            SendMessage(WindowHandle, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
+            e.Handled = true;
+            return;
+        }
+
+        // Press on interactive control (buttons, dropdowns): track movement threshold to distinguish click vs drag
+        _isPointerDown = true;
+    }
+
+    private void OnDockPointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_isPointerDown)
         {
             return;
         }
@@ -151,20 +194,38 @@ public sealed partial class PresenterDockWindow : Window
         var ptr = e.GetCurrentPoint(null);
         if (!ptr.Properties.IsLeftButtonPressed)
         {
+            _isPointerDown = false;
             return;
         }
 
-        if (IsInteractiveControl(e.OriginalSource as DependencyObject))
+        if (GetCursorPos(out POINT currentPoint))
         {
-            return;
+            int dx = currentPoint.X - _dragStartPoint.X;
+            int dy = currentPoint.Y - _dragStartPoint.Y;
+            if ((dx * dx + dy * dy) >= DragThresholdSquared)
+            {
+                _isPointerDown = false;
+                CloseActiveMenu();
+                ReleaseCapture();
+                SendMessage(WindowHandle, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
+                e.Handled = true;
+            }
         }
+    }
 
-        CloseActiveMenu();
+    private void OnDockPointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        _isPointerDown = false;
+    }
 
-        // Hand off dragging directly to the Windows window manager
-        ReleaseCapture();
-        SendMessage(WindowHandle, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
-        e.Handled = true;
+    private void OnDockPointerCanceled(object sender, PointerRoutedEventArgs e)
+    {
+        _isPointerDown = false;
+    }
+
+    private void OnDockPointerCaptureLost(object sender, PointerRoutedEventArgs e)
+    {
+        _isPointerDown = false;
     }
 
     private static bool IsInteractiveControl(DependencyObject? element)
@@ -306,6 +367,17 @@ public sealed partial class PresenterDockWindow : Window
 
     [DllImport("user32.dll")]
     private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetCursorPos(out POINT lpPoint);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);

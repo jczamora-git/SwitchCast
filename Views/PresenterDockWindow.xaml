@@ -44,8 +44,7 @@
                 BorderThickness="1"
                 CornerRadius="8"
                 Padding="6,3"
-                Margin="0"
-                PointerPressed="OnDockSurfacePointerPressed">
+                Margin="0">
             
             <Grid VerticalAlignment="Center">
                 <!-- ========================================================= -->

@@ -3,84 +3,108 @@
 ---
 
 ## Task Details
-- **Task**: Global Text Truncation & Layout Overflow Fix
-- **Date**: 2026-10-09T15:00:00+08:00 (UTC+8)
+- **Task**: Floating Presenter Dock Native Dragging Hotfix
+- **Date**: 2026-10-09T15:10:00+08:00 (UTC+8)
 - **Status**: Completed
 
 ---
 
 ## 1. Objectives Implemented
 
-1. **Dashboard Source Dropdowns (`ComboBox`) & Layout Constraints**:
-   - Fixed root-cause defect where `ComboBox` with `DisplayMemberPath="Title"` measured against unconstrained string lengths and expanded horizontally beyond the window bounds when long source titles were present.
-   - Replaced default string display with custom `ComboBox.ItemTemplate` across Target Source Selector, Live Preview Switcher, and Ready-to-Preview Switcher in [Views/DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml).
-   - Applied bounded max-widths (`MaxWidth="300"`, `MaxWidth="260"`, `MaxWidth="280"`), 2-column item grid layouts (`Auto, *`), `TextTrimming="CharacterEllipsis"`, `TextWrapping="NoWrap"`, `MaxLines="1"`, and complete title tooltips via `ToolTipService.ToolTip="{x:Bind Title}"`.
-   - Replaced unbounded horizontal `StackPanel` in Status Strip Active Source with a 2-column `Grid` (`ColumnDefinitions="Auto, *"`) ensuring proper single-line ellipsis and full title tooltip.
-   - Added tooltip and single-line trimming to Queued Presentation Sources mini-strip.
+1. **Floating Presenter Dock Surface & Gesture Dragging**:
+   - Resolved the issue where only a tiny fraction of the Presenter Dock surface could initiate window dragging.
+   - Wired routed pointer events (`PointerPressed`, `PointerMoved`, `PointerReleased`, `PointerCanceled`, `PointerCaptureLost`) with `handledEventsToo: true` on `DockCardBorder` in [Views/PresenterDockWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml.cs).
+   - **Non-Interactive Surfaces** (Dock background, toolbar padding, status badge pill, status dot, subtle dividers, non-button label areas): Starts native OS dragging (`ReleaseCapture` + `WM_NCLBUTTONDOWN` / `HTCAPTION`) immediately on press with 0ms latency.
+   - **Interactive Controls** (Active Source dropdown button, Switching Mode button, Previous/Next, Pause, Blackout, Stop, More options, Expand/Collapse, Close): Tracks movement with a 5 physical pixel threshold (`DragThresholdSquared = 25`).
+     - Normal clicks (< 5px movement) execute the intended button / dropdown action without moving the dock.
+     - Intentional drag gestures (>= 5px movement) smoothly initiate native Windows OS dragging without triggering accidental button clicks when released.
+   - Zero modifications to `MainWindow` or `PresentationWindow` title-bar implementations.
 
-2. **Sources Page Row Trimming**:
-   - Ensured `Title` and `Subtitle` in [Views/SourcesPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SourcesPage.xaml) source rows have `TextWrapping="NoWrap"`, `TextTrimming="CharacterEllipsis"`, and `MaxLines="1"`.
-   - Added `ToolTipService.ToolTip="{x:Bind Title}"` and `ToolTipService.ToolTip="{x:Bind Subtitle}"`.
-   - Verified that flexible star-column layout (`Grid.Column="1"`) receives exact available space and never pushes the Queue checkbox in Column 4 outside the view.
-
-3. **Floating Presenter Dock Title Trimming**:
-   - Constrained `ExpandedSourceButton` text block with `MaxWidth="135"` and `CompactSourceButton` text block with `MaxWidth="85"` in [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml) to guarantee ellipsis within horizontal toolbars.
-   - Maintained full title tooltips via `ToolTipService.ToolTip="{x:Bind ViewModel.SourceFullTooltip, Mode=OneWay}"`.
-   - Added `ToolTipService.ToolTip="{x:Bind Title}"` and `ToolTipService.ToolTip="{x:Bind Type}"` to `ListView` items in [Views/PresenterDockMenuWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml).
-
-4. **Underlying Source Identity & Capture Model Preservation**:
-   - Preserved 100% of underlying full window titles, HWNDs, process IDs, and source queue identifiers in models (`WindowSource`, `MonitorSource`, `ImageMediaSource`, `VideoMediaSource`) and ViewModels.
-   - Truncation is purely visual and responsive in XAML.
+2. **Preserved Multi-Monitor & DPI Window Behavior**:
+   - Window movement is fully managed by Windows DWM via native `WM_NCLBUTTONDOWN` with `HTCAPTION`.
+   - DPI scaling across monitors, multi-display coordinates, and snap behaviors remain fully native.
+   - All dropdown popups, hotkeys, and presentation controls remain 100% operational.
 
 ---
 
 ## 2. Architecture & Implementation Details
 
-1. **Dashboard ComboBox Item Templates**:
-   ```xml
-   <ComboBox Grid.Column="1"
-             ItemsSource="{x:Bind ViewModel.SelectedSources, Mode=OneWay}"
-             SelectedItem="{x:Bind ViewModel.SelectedPresentationSource, Mode=TwoWay}"
-             PlaceholderText="Select target source..."
-             MinWidth="220"
-             MaxWidth="300"
-             VerticalAlignment="Center">
-       <ComboBox.ItemTemplate>
-           <DataTemplate x:DataType="models:CaptureSource">
-               <Grid ColumnSpacing="8" MaxWidth="260" ToolTipService.ToolTip="{x:Bind Title}">
-                   <Grid.ColumnDefinitions>
-                       <ColumnDefinition Width="Auto" />
-                       <ColumnDefinition Width="*" />
-                   </Grid.ColumnDefinitions>
-                   <FontIcon Grid.Column="0" Glyph="{x:Bind TypeGlyph}" FontSize="12" Foreground="{ThemeResource AppAccentBrush}" VerticalAlignment="Center" />
-                   <TextBlock Grid.Column="1"
-                              Text="{x:Bind Title}"
-                              FontSize="12"
-                              TextTrimming="CharacterEllipsis"
-                              TextWrapping="NoWrap"
-                              MaxLines="1"
-                              VerticalAlignment="Center" />
-               </Grid>
-           </DataTemplate>
-       </ComboBox.ItemTemplate>
-   </ComboBox>
-   ```
+1. **Pointer Routing & Click-vs-Drag Logic ([Views/PresenterDockWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml.cs))**:
+   ```csharp
+   private const int DragThresholdSquared = 25; // 5 physical pixels squared
+   private bool _isPointerDown;
+   private POINT _dragStartPoint;
 
-2. **Automated Unit & Regression Tests**:
-   - Added [SwitchCast.Tests/ViewModels/SourceTitleTruncationTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/SourceTitleTruncationTests.cs) verifying short, long (80+ chars), extremely long (150+ chars), empty, and unicode/emoji titles, model preservation, and ViewModel tooltip integrity.
+   private void SetupPointerHandlers()
+   {
+       DockCardBorder.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(OnDockPointerPressed), handledEventsToo: true);
+       DockCardBorder.AddHandler(UIElement.PointerMovedEvent, new PointerEventHandler(OnDockPointerMoved), handledEventsToo: true);
+       DockCardBorder.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(OnDockPointerReleased), handledEventsToo: true);
+       DockCardBorder.AddHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(OnDockPointerCanceled), handledEventsToo: true);
+       DockCardBorder.AddHandler(UIElement.PointerCaptureLostEvent, new PointerEventHandler(OnDockPointerCaptureLost), handledEventsToo: true);
+   }
+
+   private void OnDockPointerPressed(object sender, PointerRoutedEventArgs e)
+   {
+       var ptr = e.GetCurrentPoint(null);
+       if (!ptr.Properties.IsLeftButtonPressed)
+       {
+           _isPointerDown = false;
+           return;
+       }
+
+       if (!GetCursorPos(out _dragStartPoint))
+       {
+           return;
+       }
+
+       if (!IsInteractiveControl(e.OriginalSource as DependencyObject))
+       {
+           _isPointerDown = false;
+           CloseActiveMenu();
+           ReleaseCapture();
+           SendMessage(WindowHandle, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
+           e.Handled = true;
+           return;
+       }
+
+       _isPointerDown = true;
+   }
+
+   private void OnDockPointerMoved(object sender, PointerRoutedEventArgs e)
+   {
+       if (!_isPointerDown) return;
+
+       var ptr = e.GetCurrentPoint(null);
+       if (!ptr.Properties.IsLeftButtonPressed)
+       {
+           _isPointerDown = false;
+           return;
+       }
+
+       if (GetCursorPos(out POINT currentPoint))
+       {
+           int dx = currentPoint.X - _dragStartPoint.X;
+           int dy = currentPoint.Y - _dragStartPoint.Y;
+           if ((dx * dx + dy * dy) >= DragThresholdSquared)
+           {
+               _isPointerDown = false;
+               CloseActiveMenu();
+               ReleaseCapture();
+               SendMessage(WindowHandle, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
+               e.Handled = true;
+           }
+       }
+   }
+   ```
 
 ---
 
-## 3. Files Modified & Added
-
-### Added Files
-- [SwitchCast.Tests/ViewModels/SourceTitleTruncationTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/SourceTitleTruncationTests.cs)
+## 3. Files Modified
 
 ### Modified Files
-- [Views/DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml)
-- [Views/SourcesPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SourcesPage.xaml)
 - [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml)
-- [Views/PresenterDockMenuWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml)
+- [Views/PresenterDockWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml.cs)
 - [.agents/PROJECT_STATE.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/PROJECT_STATE.md)
 - [.agents/HANDOFF.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/HANDOFF.md)
 - [.agents/CHANGELOG.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/CHANGELOG.md)

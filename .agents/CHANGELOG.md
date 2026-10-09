@@ -7,6 +7,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Floating Presenter Dock Native Dragging Hotfix] - 2026-10-09
+
+### Fixed / Improved (fix / UI / test / docs)
+- **Floating Presenter Dock Surface & Gesture Dragging**:
+  - Implemented routed pointer event handlers (`AddHandler` with `handledEventsToo: true`) on `DockCardBorder` in [Views/PresenterDockWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml.cs).
+  - Instant native dragging (`ReleaseCapture` + `WM_NCLBUTTONDOWN` / `HTCAPTION`) when pressing on non-interactive surfaces (background, padding, status badge, status dot, dividers).
+  - Smooth click-versus-drag detection on interactive controls (buttons, dropdown triggers, action icons) using physical pixel movement threshold (5px / `DragThresholdSquared = 25`).
+  - Normal clicks execute intended actions (opening menus, switching sources, pause, blackout, stop) without moving the window.
+  - Intentional hold-and-drag gestures across the dock toolbar seamlessly initiate native Windows OS dragging without firing button clicks upon release.
+  - Zero modification to `MainWindow` or `PresentationWindow` title-bar implementations.
+
+---
+
 ## [Global Text Truncation & Layout Overflow Fix] - 2026-10-09
 
 ### Fixed / Improved (fix / UI / test / docs)
