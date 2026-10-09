@@ -150,17 +150,25 @@
                     BorderThickness="1"
                     CornerRadius="8"
                     Padding="14,12">
-                <Grid ColumnSpacing="12">
+                <Grid ColumnSpacing="10">
                     <Grid.ColumnDefinitions>
+                        <!-- Start / Stop Presenting -->
                         <ColumnDefinition Width="Auto" />
+                        <!-- Presentation Source Selector (Normal or Empty State) -->
                         <ColumnDefinition Width="Auto" />
+                        <!-- Add Source Button -->
                         <ColumnDefinition Width="Auto" />
+                        <!-- Pause / Blackout -->
+                        <ColumnDefinition Width="Auto" />
+                        <!-- Guidance Note -->
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
                     <!-- Start / Stop Presenting Button -->
                     <Button Grid.Column="0"
                             Command="{x:Bind ViewModel.TogglePresentationCommand}"
+                            IsEnabled="{x:Bind ViewModel.CanStartPresentation, Mode=OneWay}"
+                            ToolTipService.ToolTip="{x:Bind ViewModel.StartPresentingTooltip, Mode=OneWay}"
                             Style="{StaticResource PrimaryAccentButtonStyle}"
                             Padding="16,8"
                             VerticalAlignment="Center">
@@ -170,36 +178,138 @@
                         </StackPanel>
                     </Button>
 
-                    <!-- Target Source Selector -->
-                    <ComboBox Grid.Column="1"
-                              ItemsSource="{x:Bind ViewModel.SelectedSources, Mode=OneWay}"
-                              SelectedItem="{x:Bind ViewModel.SelectedPresentationSource, Mode=TwoWay}"
-                              PlaceholderText="Select target source..."
-                              MinWidth="220"
-                              MaxWidth="300"
-                              VerticalAlignment="Center">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate x:DataType="models:CaptureSource">
-                                <Grid ColumnSpacing="8" MaxWidth="260" ToolTipService.ToolTip="{x:Bind Title}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <FontIcon Grid.Column="0" Glyph="{x:Bind TypeGlyph}" FontSize="12" Foreground="{ThemeResource AppAccentBrush}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1"
-                                               Text="{x:Bind Title}"
-                                               FontSize="12"
-                                               TextTrimming="CharacterEllipsis"
-                                               TextWrapping="NoWrap"
-                                               MaxLines="1"
-                                               VerticalAlignment="Center" />
-                                </Grid>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
+                    <!-- Target Source Selector Container -->
+                    <Grid Grid.Column="1" VerticalAlignment="Center">
+                        <!-- STATE 1: Sources exist in presentation queue (Normal ComboBox) -->
+                        <ComboBox ItemsSource="{x:Bind ViewModel.SelectedSources, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.SelectedPresentationSource, Mode=TwoWay}"
+                                  PlaceholderText="Select target source..."
+                                  Visibility="{x:Bind ViewModel.HasSelectedSourcesVisibility, Mode=OneWay}"
+                                  MinWidth="210"
+                                  MaxWidth="280"
+                                  VerticalAlignment="Center">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="models:CaptureSource">
+                                    <Grid ColumnSpacing="8" MaxWidth="250" ToolTipService.ToolTip="{x:Bind Title}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Grid.Column="0" Glyph="{x:Bind TypeGlyph}" FontSize="12" Foreground="{ThemeResource AppAccentBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{x:Bind Title}"
+                                                   FontSize="12"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   TextWrapping="NoWrap"
+                                                   MaxLines="1"
+                                                   VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+
+                        <!-- STATE 2: Zero queued sources (Empty-State Selector Button with Flyout) -->
+                        <DropDownButton Visibility="{x:Bind ViewModel.NoSelectedSourcesVisibility, Mode=OneWay}"
+                                        MinWidth="210"
+                                        MaxWidth="280"
+                                        HorizontalContentAlignment="Stretch"
+                                        Padding="10,6"
+                                        VerticalAlignment="Center"
+                                        ToolTipService.ToolTip="No queued presentation sources. Click to manage sources.">
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Grid.Column="0" Glyph="&#xE7F4;" FontSize="12" Foreground="{ThemeResource AppTextTertiaryBrush}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                                           Text="No queued sources"
+                                           FontSize="12"
+                                           Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                           TextTrimming="CharacterEllipsis"
+                                           TextWrapping="NoWrap"
+                                           MaxLines="1"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+                            <DropDownButton.Flyout>
+                                <Flyout Placement="BottomEdgeAlignedLeft">
+                                    <Flyout.FlyoutPresenterStyle>
+                                        <Style TargetType="FlyoutPresenter">
+                                            <Setter Property="Background" Value="{ThemeResource AppSurfaceElevatedBrush}" />
+                                            <Setter Property="BorderBrush" Value="{ThemeResource AppBorderBrush}" />
+                                            <Setter Property="BorderThickness" Value="1" />
+                                            <Setter Property="CornerRadius" Value="8" />
+                                            <Setter Property="Padding" Value="16" />
+                                            <Setter Property="MaxWidth" Value="320" />
+                                        </Style>
+                                    </Flyout.FlyoutPresenterStyle>
+                                    <StackPanel Spacing="10" HorizontalAlignment="Center">
+                                        <!-- Header Title & Count -->
+                                        <Grid Margin="0,0,0,2">
+                                            <TextBlock Text="Queued Sources (0)"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+
+                                        <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" Margin="0,0,0,4" />
+
+                                        <!-- Empty State Visual -->
+                                        <Border Width="40" Height="40"
+                                                Background="{ThemeResource AppBadgeBackgroundBrush}"
+                                                BorderBrush="{ThemeResource AppBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="20"
+                                                HorizontalAlignment="Center">
+                                            <FontIcon Glyph="&#xE7F4;" FontSize="16" Foreground="{ThemeResource AppTextTertiaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+
+                                        <TextBlock Text="No queued sources"
+                                                   FontSize="13"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{ThemeResource AppTextPrimaryBrush}"
+                                                   HorizontalAlignment="Center" />
+
+                                        <TextBlock Text="Add application windows, displays, images, or videos from the Sources tab."
+                                                   FontSize="11"
+                                                   Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                                   HorizontalAlignment="Center"
+                                                   TextAlignment="Center"
+                                                   TextWrapping="Wrap"
+                                                   MaxWidth="260" />
+
+                                        <!-- Action Button -->
+                                        <Button Command="{x:Bind ViewModel.NavigateToSourcesCommand}"
+                                                Style="{StaticResource PrimaryAccentButtonStyle}"
+                                                HorizontalAlignment="Stretch"
+                                                Margin="0,4,0,0"
+                                                Padding="12,7">
+                                            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xE710;" FontSize="12" />
+                                                <TextBlock Text="Add Presentation Source" FontSize="12" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </Flyout>
+                            </DropDownButton.Flyout>
+                        </DropDownButton>
+                    </Grid>
+
+                    <!-- Add Source Button -->
+                    <Button Grid.Column="2"
+                            Command="{x:Bind ViewModel.NavigateToSourcesCommand}"
+                            Padding="12,7"
+                            VerticalAlignment="Center"
+                            ToolTipService.ToolTip="Navigate to Sources tab to queue presentation sources (Ctrl+S)">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <FontIcon Glyph="&#xE710;" FontSize="12" Foreground="{ThemeResource AppAccentBrush}" />
+                            <TextBlock Text="Add Source" FontSize="12" />
+                        </StackPanel>
+                    </Button>
 
                     <!-- Live Control Group (Pause / Blackout) -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <Button Command="{x:Bind ViewModel.TogglePauseCommand}"
                                 IsEnabled="{x:Bind ViewModel.HasActivePresentation, Mode=OneWay}"
                                 Padding="12,6"
@@ -222,7 +332,7 @@
                     </StackPanel>
 
                     <!-- Presenter Instruction Note -->
-                    <TextBlock Grid.Column="3"
+                    <TextBlock Grid.Column="4"
                                Text="Share the 'SwitchCast Presentation Output' window in your meeting."
                                FontSize="11"
                                Foreground="{ThemeResource AppTextSecondaryBrush}"
@@ -439,13 +549,14 @@
                                            FontWeight="SemiBold"
                                            Foreground="{ThemeResource AppTextPrimaryBrush}"
                                            HorizontalAlignment="Center" />
-                                <TextBlock Text="Select application windows, display monitors, or media files from the Sources page."
+                                <TextBlock Text="Select application windows, display monitors, or media files from the Sources tab to prepare your presentation workspace."
                                            FontSize="12"
                                            Foreground="{ThemeResource AppTextSecondaryBrush}"
                                            HorizontalAlignment="Center"
                                            TextAlignment="Center"
-                                           MaxWidth="380" />
-                                <Button Content="Manage Presentation Sources"
+                                           TextWrapping="Wrap"
+                                           MaxWidth="420" />
+                                <Button Content="Add Presentation Sources"
                                         Command="{x:Bind ViewModel.NavigateToSourcesCommand}"
                                         Style="{StaticResource PrimaryAccentButtonStyle}"
                                         HorizontalAlignment="Center"

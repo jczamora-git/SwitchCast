@@ -3,31 +3,38 @@
 ---
 
 ## Task Details
-- **Task**: Floating Presenter Dock Finalization
-- **Date**: 2026-10-09T19:48:00+08:00 (UTC+8)
+- **Task**: Dashboard Source Selector Empty-State UX Fix
+- **Date**: 2026-10-09T19:59:00+08:00 (UTC+8)
 - **Status**: Completed & Verified
 
 ---
 
 ## 1. Objectives Implemented
 
-1. **Native Windows Caption Dragging**:
-   - Replaced custom pointer routing and manual Win32 `SendMessage(WM_NCLBUTTONDOWN)` with Windows App SDK `Microsoft.UI.Input.InputNonClientPointerSource`.
-   - Mapped the dock background to `NonClientRegionKind.Caption` and all interactive controls (buttons, dropdown triggers, sliders) to `NonClientRegionKind.Passthrough`.
-   - Completely resolved sticky dragging / click-to-move anomaly; window drag initiates exclusively while holding left mouse button and terminates instantly on release.
+1. **Dashboard Source Selector Empty-State Flyout**:
+   - Replaced the uninitialized blank gray box when zero sources are queued with an informative `DropDownButton` displaying `No queued sources`.
+   - Clicking/opening reveals a styled Flyout matching the Floating Presenter Dock with:
+     - Header: `Queued Sources (0)`
+     - Icon: `\uE7F4`
+     - Title: `No queued sources`
+     - Description: `Add application windows, displays, images, or videos from the Sources tab.`
+     - Button: `+ Add Presentation Source` (navigates to Sources).
 
-2. **Removal of Compact/Expanded Modes**:
-   - Replaced dual-layout system with one permanent, polished Floating Presenter Dock layout (680 DIP width baseline).
-   - Removed obsolete expand/contract toggle buttons, tooltips, ViewModel properties/commands, and legacy settings rows.
+2. **Presentation Control Bar "+ Add Source" Button**:
+   - Added a compact `+ Add Source` button adjacent to the presentation source selector.
+   - Invokes `NavigateToSourcesCommand`, routing to `SourcesPage` and properly highlighting `NavView.SelectedItem`.
 
-3. **Adaptive Video Playback & Timeline Controls**:
-   - When a video source is On Air, the dock automatically reveals a second video transport row (height adapts from 52 DIPs to 86 DIPs).
-   - Added Restart video (`\uE777`), Seek backward 10s (`\uEB9E`), Play/Pause video (`\uE768`/`\uE769`), Seek forward 10s (`\uEB9D`), timeline slider scrubber with smooth drag commitment, and live timecode text (`00:00 / 00:00`).
-   - Non-video sources (Window, Display, Image) cleanly hide the video row and shrink dock height to 52 DIPs with dynamic hit-test region recalculation.
+3. **Start Presenting Validation & Tooltip**:
+   - Disabled Start Presenting when 0 presentation sources are queued and presentation is inactive.
+   - Dynamic tooltip explains why button is disabled: `Add a presentation source first.`.
 
-4. **Comprehensive Automated Testing**:
-   - Updated [SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs) verifying video playback commands, seeking, scrubbing, and duration/timecode formatting.
-   - **247 automated unit tests passing with 100% success rate**.
+4. **Preview Workspace Description Wrapping Fix**:
+   - Added `TextWrapping="Wrap"` and constrained `MaxWidth="420"` to ensure full paragraph is readable without truncation.
+   - Unified button label to `Add Presentation Sources`.
+
+5. **Automated Unit & Regression Tests**:
+   - Added unit tests in `DashboardViewModelTests.cs` for empty state properties, placeholder text, enablement rules, and queue count transitions.
+   - **250 automated tests passing with 100% success rate**.
 
 ---
 
@@ -107,8 +114,9 @@
 ## 3. Files Modified
 
 ### Modified Files
-- [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml)
-- [Views/PresenterDockWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml.cs)
+- [Views/DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml)
+- [ViewModels/DashboardViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/DashboardViewModel.cs)
+- [SwitchCast.Tests/ViewModels/DashboardViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/DashboardViewModelTests.cs)
 - [.agents/PROJECT_STATE.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/PROJECT_STATE.md)
 - [.agents/HANDOFF.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/HANDOFF.md)
 - [.agents/CHANGELOG.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/CHANGELOG.md)
@@ -118,7 +126,7 @@
 ## 4. Validation Performed
 - **Level 1 (Build)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (**234 passed, 0 failed, 0 skipped**).
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (**250 passed, 0 failed, 0 skipped**).
 
 ---
 

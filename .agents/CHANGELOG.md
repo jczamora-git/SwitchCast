@@ -7,6 +7,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Dashboard Source Selector Empty-State UX Fix] - 2026-10-09
+
+### Fixed / Added / Improved (fix / UI / UX / test / docs)
+- **Main Dashboard Source Selector Empty-State UX**:
+  - Replaced the blank gray selector rectangle when zero sources are queued with an informative `DropDownButton` and styled Flyout matching the Floating Presenter Dock empty state in [Views/DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml).
+  - Surface displays `Queued Sources (0)`, icon `\uE7F4`, title `No queued sources`, description `Add application windows, displays, images, or videos from the Sources tab.`, and action button `+ Add Presentation Source`.
+- **Primary Presentation Control Bar "+ Add Source" Button**:
+  - Added a compact `+ Add Source` button to the main control bar navigating directly to `SourcesPage` via `INavigationService`.
+  - Automatically highlights the Sources tab in the `NavigationView` sidebar.
+- **Start Presenting Validation & Tooltip**:
+  - Disabled Start Presenting when 0 presentation sources are queued and presentation is inactive.
+  - Added dynamic tooltip: `Add a presentation source first.` when empty vs `Start Live Presentation` / `Stop Live Presentation`.
+- **Preview Workspace Description Wrapping**:
+  - Fixed clipped text in `EmptyWorkspacePanel` by adding `TextWrapping="Wrap"` and `MaxWidth="420"`.
+  - Renamed action button to `Add Presentation Sources`.
+- **Automated Unit & Regression Tests**:
+  - Added tests in [SwitchCast.Tests/ViewModels/DashboardViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/DashboardViewModelTests.cs) verifying empty state properties, placeholder text, enablement rules, and queue count transitions.
+  - **250 automated unit tests passing with 100% success rate**.
+
+---
+
 ## [Floating Presenter Dock Finalization] - 2026-10-09
 
 ### Fixed / Added / Improved (fix / feat / UI / test / docs)

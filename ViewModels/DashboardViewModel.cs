@@ -84,6 +84,16 @@ public partial class DashboardViewModel : ObservableObject
 
     public bool HasSelectedSources => SelectedSourceCount > 0;
 
+    public bool HasNoSelectedSources => !HasSelectedSources;
+
+    public string SourceSelectorPlaceholderText => HasSelectedSources ? "Select target source..." : "No queued sources";
+
+    public bool CanStartPresentation => HasActivePresentation || HasSelectedSources;
+
+    public string StartPresentingTooltip => HasActivePresentation
+        ? "Stop Live Presentation"
+        : (HasSelectedSources ? "Start Live Presentation" : "Add a presentation source first.");
+
     public bool HasActiveSource => _presentationCoordinator.CurrentPresentationSource is not null ||
                                   _captureCoordinator.CurrentPreviewSource is not null ||
                                   _presentationStateService.ActiveSource is not null;
@@ -538,6 +548,8 @@ public partial class DashboardViewModel : ObservableObject
             OnPropertyChanged(nameof(PresentationButtonText));
             OnPropertyChanged(nameof(PauseButtonText));
             OnPropertyChanged(nameof(BlackoutButtonText));
+            OnPropertyChanged(nameof(CanStartPresentation));
+            OnPropertyChanged(nameof(StartPresentingTooltip));
             NotifyMediaPlaybackProperties();
         }
         else if (e.PropertyName == nameof(IPresentationStateService.ActiveSource))
@@ -551,6 +563,10 @@ public partial class DashboardViewModel : ObservableObject
         {
             OnPropertyChanged(nameof(SelectedSourceCount));
             OnPropertyChanged(nameof(HasSelectedSources));
+            OnPropertyChanged(nameof(HasNoSelectedSources));
+            OnPropertyChanged(nameof(SourceSelectorPlaceholderText));
+            OnPropertyChanged(nameof(CanStartPresentation));
+            OnPropertyChanged(nameof(StartPresentingTooltip));
             OnPropertyChanged(nameof(HasSelectedSourcesVisibility));
             OnPropertyChanged(nameof(NoSelectedSourcesVisibility));
             OnPropertyChanged(nameof(SelectedSources));
@@ -598,6 +614,8 @@ public partial class DashboardViewModel : ObservableObject
         OnPropertyChanged(nameof(PresentationButtonText));
         OnPropertyChanged(nameof(PauseButtonText));
         OnPropertyChanged(nameof(BlackoutButtonText));
+        OnPropertyChanged(nameof(CanStartPresentation));
+        OnPropertyChanged(nameof(StartPresentingTooltip));
         OnPropertyChanged(nameof(HasCaptureError));
         OnPropertyChanged(nameof(CaptureErrorMessage));
         OnPropertyChanged(nameof(ActiveSourceTitle));

@@ -234,4 +234,70 @@ public class DashboardViewModelTests
 
         _mockNavigationService.Verify(n => n.NavigateTo(It.Is<Type>(t => t.Name == "SourcesPage"), null), Times.Once);
     }
+
+    [Fact]
+    public void SourceSelectorEmptyState_WhenZeroSources_CalculatesExpectedProperties()
+    {
+        _mockStateService.SetupGet(s => s.SelectedSourceCount).Returns(0);
+        _mockStateService.SetupGet(s => s.SelectedSources).Returns(new List<CaptureSource>());
+
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object);
+
+        Assert.False(vm.HasSelectedSources);
+        Assert.True(vm.HasNoSelectedSources);
+        Assert.Equal("No queued sources", vm.SourceSelectorPlaceholderText);
+        Assert.False(vm.CanStartPresentation);
+        Assert.Equal("Add a presentation source first.", vm.StartPresentingTooltip);
+    }
+
+    [Fact]
+    public void SourceSelectorState_WhenSourcesQueued_EnablesStartPresentation()
+    {
+        var source = new WindowSource { Id = "win-1", Title = "PowerPoint", IsAvailable = true };
+        _mockStateService.SetupGet(s => s.SelectedSourceCount).Returns(1);
+        _mockStateService.SetupGet(s => s.SelectedSources).Returns(new List<CaptureSource> { source });
+
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object);
+
+        Assert.True(vm.HasSelectedSources);
+        Assert.False(vm.HasNoSelectedSources);
+        Assert.Equal("Select target source...", vm.SourceSelectorPlaceholderText);
+        Assert.True(vm.CanStartPresentation);
+        Assert.Equal("Start Live Presentation", vm.StartPresentingTooltip);
+    }
+
+    [Fact]
+    public void SourceSelectorState_WhenQueueTransitionFromOneToZero_ReturnsToEmptyState()
+    {
+        var sourceList = new List<CaptureSource> { new WindowSource { Id = "win-1", Title = "PowerPoint", IsAvailable = true } };
+        _mockStateService.SetupGet(s => s.SelectedSourceCount).Returns(1);
+        _mockStateService.SetupGet(s => s.SelectedSources).Returns(sourceList);
+
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object);
+
+        Assert.True(vm.HasSelectedSources);
+
+        // Transition to 0
+        sourceList.Clear();
+        _mockStateService.SetupGet(s => s.SelectedSourceCount).Returns(0);
+        _mockStateService.Raise(s => s.PropertyChanged += null, new System.ComponentModel.PropertyChangedEventArgs(nameof(IPresentationStateService.SelectedSourceCount)));
+
+        Assert.False(vm.HasSelectedSources);
+        Assert.True(vm.HasNoSelectedSources);
+        Assert.Equal("No queued sources", vm.SourceSelectorPlaceholderText);
+        Assert.False(vm.CanStartPresentation);
+        Assert.Equal("Add a presentation source first.", vm.StartPresentingTooltip);
+    }
 }

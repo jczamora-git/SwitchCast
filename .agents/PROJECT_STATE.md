@@ -7,15 +7,30 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Floating Dock Finalization
+- **Current Phase**: Dashboard Source Selector Empty-State UX Fix
 - **Overall Status**: **Completed & Tested**
-- **Last Updated**: 2026-10-09T19:48:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-09T19:59:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Main Dashboard Source Selector Empty-State UX Fix**:
+  - **Informative Empty State Surface**:
+    - Replaced blank gray selector box with an informative `DropDownButton` and styled Flyout matching the Floating Presenter Dock's empty state.
+    - Displayed "No queued sources", `\uE7F4` icon, descriptive guidance ("Add application windows, displays, images, or videos from the Sources tab."), and a primary coral action button `+ Add Presentation Source`.
+  - **Dashboard "+ Add Source" Button**:
+    - Added a visible compact `+ Add Source` button to the primary presentation control bar that navigates directly to `SourcesPage` via `INavigationService`.
+    - Automatically updates `NavigationView` sidebar selection to highlight the Sources tab.
+  - **Start Presenting Validation & Tooltip**:
+    - Bound `IsEnabled` to `CanStartPresentation` (`false` when 0 sources are queued and presentation is not active).
+    - Added dynamic tooltip: "Add a presentation source first." when empty vs "Start Live Presentation" / "Stop Live Presentation".
+  - **Preview Workspace Text Wrapping Fix**:
+    - Fixed clipping on descriptive text block in `EmptyWorkspacePanel` with `TextWrapping="Wrap"` and `MaxWidth="420"`.
+    - Renamed action button to "Add Presentation Sources" with shared navigation command.
+  - **Automated Unit Tests**:
+    - Expanded test suite to **250 automated tests** (100% pass rate) validating empty state properties, placeholder text, enablement rules, and queue count transitions (0 -> 1 -> 0).
 - [x] **Floating Presenter Dock Finalization**:
   - **Native Windows Caption Dragging**:
     - Replaced pointer routing and manual `SendMessage(WM_NCLBUTTONDOWN)` implementation with genuine Windows App SDK `InputNonClientPointerSource` non-client caption regions.
@@ -124,7 +139,7 @@ This is the authoritative progress, state, and environmental tracking document f
 
 - **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (247 passed, 0 failed, 0 skipped).
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (250 passed, 0 failed, 0 skipped).
 
 ---
 
