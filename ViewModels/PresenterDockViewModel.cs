@@ -18,6 +18,7 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
     private readonly IPresentationWindowService _presentationWindowService;
     private readonly IPresenterDockService _dockService;
     private readonly IApplicationSettingsService _settingsService;
+    private readonly IApplicationLifecycleService? _lifecycleService;
     private DispatcherQueue? _dispatcherQueue;
     private DispatcherQueueTimer? _playbackTimer;
     private bool _isScrubbing;
@@ -29,13 +30,15 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         IPresentationStateService presentationStateService,
         IPresentationWindowService presentationWindowService,
         IPresenterDockService dockService,
-        IApplicationSettingsService settingsService)
+        IApplicationSettingsService settingsService,
+        IApplicationLifecycleService? lifecycleService = null)
     {
         _presentationCoordinator = presentationCoordinator ?? throw new ArgumentNullException(nameof(presentationCoordinator));
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
         _presentationWindowService = presentationWindowService ?? throw new ArgumentNullException(nameof(presentationWindowService));
         _dockService = dockService ?? throw new ArgumentNullException(nameof(dockService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        _lifecycleService = lifecycleService;
 
         _presentationStateService.PropertyChanged += OnStatePropertyChanged;
         _presentationCoordinator.PropertyChanged += OnCoordinatorPropertyChanged;
@@ -539,6 +542,10 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
     private void CloseDock()
     {
         _dockService.CloseDock();
+        if (_lifecycleService is null || (!_lifecycleService.IsShuttingDown && !_lifecycleService.IsShutdownApproved))
+        {
+            _dockService.ShowDashboard();
+        }
     }
 
     [RelayCommand]

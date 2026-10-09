@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [1.2.1] - 2026-10-10
 
 ### Fixed
+- **Dashboard Start/Stop Presenting Dynamic Icon**: Corrected misleading static Play icon when presenting is live on `DashboardPage.xaml`. Dynamic compiled binding `{x:Bind ViewModel.PresentationButtonGlyph, Mode=OneWay}` updates the icon between Play (`\uE768`) and Stop square (`\uE71A`) in lockstep with the button label and authoritative presentation status (`HasActivePresentation`), while preserving coral button styling and layout.
+- **Presenter Dock Close Dashboard Activation**: When clicking the Floating Presenter Dock X button, automatically restore and activate the existing `MainWindow` Control Dashboard (restoring if minimized, navigating to Dashboard, and requesting foreground) while preserving active live presentations (capture, video playback, and `PresentationWindow` remain live). Guarded against activation during application shutdown and preserved hotkey toggle semantics.
 - **Floating Presenter Dock Double-Click Maximization**: Prevented caption double-click from maximizing or entering fullscreen on `PresenterDockWindow` by subclassing the dock HWND (`WM_NCLBUTTONDBLCLK` on `HTCAPTION`, `SC_MAXIMIZE` interception, `WM_GETMINMAXINFO` clamping, and removal of `WS_MAXIMIZEBOX`). Native hold-and-drag and Presentation Window fullscreen toggle remain fully functional.
 - **Mixed-Source Next/Previous Navigation**: Repaired Next/Previous queue cycling between Window, Monitor, Image, and Video sources by maintaining a single authoritative sequence across all types, resolving `ActiveSource` clearing during capture stop, and supporting direct live transitions for media without failing on HWND activation.
 

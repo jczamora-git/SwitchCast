@@ -69,4 +69,30 @@ public class PresenterDockActionsActivationTests
 
         Assert.True(eventFired);
     }
+
+    [Fact]
+    public void PresenterDockViewModel_CloseDockTwice_HandledSafelyWithoutException()
+    {
+        var mockCoord = new Mock<IPresentationCoordinator>();
+        var mockState = new Mock<IPresentationStateService>();
+        var mockPresWin = new Mock<IPresentationWindowService>();
+        var mockDock = new Mock<IPresenterDockService>();
+        var mockSettings = new Mock<IApplicationSettingsService>();
+
+        mockSettings.Setup(s => s.CurrentSettings).Returns(new UserSettings());
+        mockState.Setup(s => s.SelectedSources).Returns(new List<CaptureSource>());
+
+        var vm = new PresenterDockViewModel(
+            mockCoord.Object,
+            mockState.Object,
+            mockPresWin.Object,
+            mockDock.Object,
+            mockSettings.Object);
+
+        vm.CloseDockCommand.Execute(null);
+        vm.CloseDockCommand.Execute(null);
+
+        mockDock.Verify(d => d.CloseDock(), Times.Exactly(2));
+        mockDock.Verify(d => d.ShowDashboard(), Times.Exactly(2));
+    }
 }

@@ -7,15 +7,25 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Floating Presenter Dock Stability, Mixed-Source Navigation & Direct Unqueue
+- **Current Phase**: Dashboard & Floating Dock UX Hotfix (Correct Stop Icon & Return to Dashboard on Dock Close)
 - **Overall Status**: **Implemented & Verified**
-- **Last Updated**: 2026-10-10T05:00:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-10T05:25:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Dashboard Start/Stop Presenting Dynamic Icon Correction**:
+  - Replaced hardcoded play glyph `&#xE768;` in `DashboardPage.xaml` with compiled binding `{x:Bind ViewModel.PresentationButtonGlyph, Mode=OneWay}`.
+  - Bound glyph dynamically in `DashboardViewModel.cs` to authoritative presentation state: `PresentationButtonGlyph => HasActivePresentation ? "\uE71A" : "\uE768"`.
+  - Notifies on presentation status changes (`Idle`, `Starting`, `Active`, `Paused`, `Blackout`, `Stopping`, `Stopped`), ensuring label ("Start Presenting" / "Stop Presenting") and icon (Play `\uE768` / Stop square `\uE71A`) update in strict synchronization while preserving coral styling, typography, corner radii, and command bindings.
+- [x] **Floating Presenter Dock X Dismissal -> Control Dashboard Activation**:
+  - Clicking the X button on the Floating Presenter Dock (`CloseDockCommand`) now dismisses the dock and restores/activates the existing `MainWindow` Control Dashboard.
+  - Reuses existing `IWindowActivationService` (`ActivateMainWindow()`) to restore `MainWindow` if minimized and bring to foreground, and navigates to Dashboard via `INavigationService.NavigateToDashboard()`.
+  - **Presentation Continuity**: Live presentation, Direct3D 11 capture, video playback, and `PresentationWindow` output remain completely active and untouched when dock is closed.
+  - **Application Exit Safety**: Guarded with `IApplicationLifecycleService.IsShuttingDown` and `IsShutdownApproved` in both `PresenterDockViewModel.CloseDock()` and `App.ActivateMainWindow()`, preventing dashboard reactivation during application shutdown.
+  - **Hotkey Distinction**: Global hotkey `Ctrl+Shift+D` (`ToggleDock`) continues normal toggle semantics without unwanted dashboard focus shifts.
 - [x] **Floating Presenter Dock Stability & Double-Click Maximize Prevention**:
   - **Confirmed Root Cause**: WinUI 3 `InputNonClientPointerSource` non-client caption regions (`HTCAPTION`) passed `WM_NCLBUTTONDBLCLK` to default window procedure, which interpreted double-clicks as caption double-click maximize commands despite `OverlappedPresenter.IsMaximizable = false`.
   - **Native Window Subclassing**: Subclassed dock HWND via `comctl32.dll` (`SetWindowSubclass`). Handled `WM_NCLBUTTONDBLCLK` on `HTCAPTION` (returns `IntPtr.Zero`), intercepted `WM_SYSCOMMAND` `SC_MAXIMIZE`, clamped `WM_GETMINMAXINFO` tracking bounds, stripped `WS_MAXIMIZEBOX` and `WS_THICKFRAME` from `GWL_STYLE`, removed `SC_MAXIMIZE` from system menu, and hooked `AppWindow.Changed` auto-restoration.

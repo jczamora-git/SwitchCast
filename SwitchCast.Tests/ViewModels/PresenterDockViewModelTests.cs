@@ -264,7 +264,7 @@ public class PresenterDockViewModelTests
     }
 
     [Fact]
-    public void CloseDockCommand_CallsDockServiceCloseDock()
+    public void CloseDockCommand_CallsDockServiceCloseDockAndShowDashboard()
     {
         var vm = new PresenterDockViewModel(
             _mockCoordinator.Object,
@@ -276,6 +276,64 @@ public class PresenterDockViewModelTests
         vm.CloseDockCommand.Execute(null);
 
         _mockDockService.Verify(d => d.CloseDock(), Times.Once);
+        _mockDockService.Verify(d => d.ShowDashboard(), Times.Once);
+    }
+
+    [Fact]
+    public void CloseDockCommand_DoesNotStopPresentationOrCloseOutput()
+    {
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object);
+
+        vm.CloseDockCommand.Execute(null);
+
+        // Verification: Closing dock must NOT stop presentation or close output window
+        _mockCoordinator.Verify(c => c.StopPresentationAsync(It.IsAny<bool>()), Times.Never);
+        _mockWindowService.Verify(w => w.ClosePresentationWindow(), Times.Never);
+    }
+
+    [Fact]
+    public void CloseDockCommand_WhenShuttingDown_DoesNotCallShowDashboard()
+    {
+        var mockLifecycle = new Mock<IApplicationLifecycleService>();
+        mockLifecycle.SetupGet(l => l.IsShuttingDown).Returns(true);
+
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object,
+            mockLifecycle.Object);
+
+        vm.CloseDockCommand.Execute(null);
+
+        _mockDockService.Verify(d => d.CloseDock(), Times.Once);
+        _mockDockService.Verify(d => d.ShowDashboard(), Times.Never);
+    }
+
+    [Fact]
+    public void CloseDockCommand_WhenShutdownApproved_DoesNotCallShowDashboard()
+    {
+        var mockLifecycle = new Mock<IApplicationLifecycleService>();
+        mockLifecycle.SetupGet(l => l.IsShutdownApproved).Returns(true);
+
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object,
+            mockLifecycle.Object);
+
+        vm.CloseDockCommand.Execute(null);
+
+        _mockDockService.Verify(d => d.CloseDock(), Times.Once);
+        _mockDockService.Verify(d => d.ShowDashboard(), Times.Never);
     }
 
     [Fact]

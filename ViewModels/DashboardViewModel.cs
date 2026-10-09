@@ -199,9 +199,9 @@ public partial class DashboardViewModel : ObservableObject
 
     public string PresentationOutputStatusText => IsOutputWindowOpen ? "Window Open" : "Window Closed";
 
-    public string PresenterDockStatusText => IsPresenterDockOpen ? "Dock Open" : "Dock Closed";
-
     public string PresentationButtonText => HasActivePresentation ? "Stop Presenting" : "Start Presenting";
+
+    public string PresentationButtonGlyph => HasActivePresentation ? "\uE71A" : "\uE768";
 
     public string PauseButtonText => IsPresentationPaused ? "Resume Stream" : "Pause Stream";
 
@@ -553,6 +553,7 @@ public partial class DashboardViewModel : ObservableObject
             OnPropertyChanged(nameof(IsPresentationBlackout));
             OnPropertyChanged(nameof(HasActivePresentation));
             OnPropertyChanged(nameof(PresentationButtonText));
+            OnPropertyChanged(nameof(PresentationButtonGlyph));
             OnPropertyChanged(nameof(PauseButtonText));
             OnPropertyChanged(nameof(BlackoutButtonText));
             OnPropertyChanged(nameof(CanStartPresentation));

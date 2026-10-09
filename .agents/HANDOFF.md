@@ -3,56 +3,43 @@
 ---
 
 ## Task Details
-- **Task**: Floating Presenter Dock Stability, Mixed-Source Navigation & Direct Unqueue
-- **Date**: 2026-10-10T05:00:00+08:00 (UTC+8)
-- **Status**: Completed, Verified & Committed Locally
+- **Task**: Dashboard & Floating Dock UX Hotfix (Correct Stop Icon + Return to Dashboard When Closing Dock)
+- **Date**: 2026-10-10T05:25:00+08:00 (UTC+8)
+- **Status**: Completed, Verified & Ready for Local Commit
 
 ---
 
 ## 1. Objectives Implemented
 
-1. **Bug 1 — Dock Double-Click Maximization Prevention**:
-   - **Confirmed Root Cause**: WinUI 3 `InputNonClientPointerSource` non-client caption regions (`HTCAPTION`) passed `WM_NCLBUTTONDBLCLK` to default window procedure, which interpreted double-clicks as caption double-click maximize commands despite `OverlappedPresenter.IsMaximizable = false`.
-   - **Native Window Subclassing**: Subclassed dock HWND via `comctl32.dll` (`SetWindowSubclass`). Handled `WM_NCLBUTTONDBLCLK` on `HTCAPTION` (returns `IntPtr.Zero`), intercepted `WM_SYSCOMMAND` `SC_MAXIMIZE`, clamped `WM_GETMINMAXINFO` tracking bounds, stripped `WS_MAXIMIZEBOX` and `WS_THICKFRAME` from `GWL_STYLE`, removed `SC_MAXIMIZE` from system menu, and hooked `AppWindow.Changed` auto-restoration.
-   - **Preserved Presentation Fullscreen**: The dock fullscreen button continues toggling fullscreen on `PresentationWindow` without dock maximization or window recreation. Native hold-and-drag, DPI scaling, and always-on-top remain intact.
+1. **Dashboard Start/Stop Presenting Dynamic Icon Correction**:
+   - **Issue**: Main Dashboard button displayed the Play triangle glyph (`&#xE768;`) even when the button label showed "Stop Presenting" during an active presentation.
+   - **Resolution**:
+     - Added computed property `PresentationButtonGlyph => HasActivePresentation ? "\uE71A" : "\uE768"` in [ViewModels/DashboardViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/DashboardViewModel.cs).
+     - Hooked property change notification for `PresentationButtonGlyph` in `OnPresentationStatePropertyChanged` on presentation status changes (`Idle`, `Active`, `Paused`, `Blackout`, `Stopping`, `Stopped`).
+     - Updated [Views/DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml) from static glyph `&#xE768;` to compiled one-way binding `{x:Bind ViewModel.PresentationButtonGlyph, Mode=OneWay}`.
+     - Preserved existing coral button background, typography, dimensions, hover effects, and command bindings.
 
-2. **Bug 2 — Next/Previous Mixed Source Navigation Fix**:
-   - **Confirmed Root Cause**:
-     1. `CaptureCoordinator.StopPreviewInternalAsync()` called `_presentationStateService.SetActiveSource(null)`, causing `ActiveSource` to drop to null midway through Window -> Media transitions, triggering `DashboardViewModel` to fire a redundant switch that canceled the transition as superseded.
-     2. `PresentationCoordinator.SwitchToNextSourceAsync()` previously filtered by `.Where(s => s.IsAvailable)` instead of the authoritative queue `_presentationStateService.SelectedSources`, causing index divergence from the dock dropdown.
-     3. `ActiveAndLive` mode attempted native HWND window activation on media sources (images/videos), which failed and blocked transition.
-   - **Authoritative Single Ordered Queue**: Both Next and Previous traverse `_presentationStateService.SelectedSources` directly across all source types (Window, Monitor, Image, Video) in exact dropdown order.
-   - **Switching Mode Semantics**: Media sources are taken live directly without window activation in `ActiveAndLive` mode. Paused and blackout states are respected upon video transitions.
-
-3. **Bug 3 — Presenter Dock Direct Source Unqueue**:
-   - **Interactive Checkbox Control**: Replaced static glyph in `PresenterDockMenuWindow` with an interactive `CheckBox` control with tooltip "Remove from presentation queue".
-   - **Popup Persistence**: Menu stays open upon unqueue, updates item count, shrinks window dimensions, and switches to empty state when queue count reaches 0.
-   - **On-Air Continuity Policy**: Unqueueing an On-Air source removes it from the future navigation queue while preserving active presentation output until the presenter explicitly switches or stops.
-   - **Deterministic Cursor Recalculation**: If the unqueued item was selected, cursor advances to the next queued item (or previous if removing final item; or null if empty).
-   - **UI Synchronization**: Dock dropdown, Dashboard source selector, and Sources tab checkboxes stay synchronized immediately.
+2. **Floating Presenter Dock X Dismissal -> Control Dashboard Activation**:
+   - **Issue**: Clicking the X button on the Floating Presenter Dock closed the dock, but did not restore or bring the Main Dashboard to the foreground.
+   - **Resolution**:
+     - Injected optional `IApplicationLifecycleService?` into [ViewModels/PresenterDockViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/PresenterDockViewModel.cs).
+     - Updated `CloseDock()`: calls `_dockService.CloseDock()`, and if not shutting down (`!_lifecycleService.IsShuttingDown && !_lifecycleService.IsShutdownApproved`), calls `_dockService.ShowDashboard()`.
+     - In [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs), updated `ActivateMainWindow()` to check `IApplicationLifecycleService` (aborts if shutting down), invoke `IWindowActivationService.ActivateMainWindow()` (restores `MainWindow` if minimized, sets foreground), and invoke `INavigationService.NavigateToDashboard()`.
+     - Preserved live presentation continuity: closing the dock does NOT stop capture, does NOT stop media playback, does NOT close `PresentationWindow`, and retains `Live` status.
+     - Preserved global hotkey toggle semantics (`Ctrl+Shift+D` invokes `ToggleDock()` without reactivating dashboard).
+     - Safe against application exit: suppresses dashboard reactivation when SwitchCast is closing.
 
 ---
 
-## 2. Key Commits & Files Changed
+## 2. Files Changed
 
-- **Commit 1 (`0bf9cc0`)**: `fix: prevent floating dock maximization`
-  - `Views/PresenterDockWindow.xaml.cs`
-- **Commit 2 (`9e676a3`)**: `fix: repair mixed-source queue navigation`
-  - `Services/Capture/CaptureCoordinator.cs`
-  - `Services/PresentationCoordinator.cs`
-  - `ViewModels/PresenterDockViewModel.cs`
-  - `ViewModels/DashboardViewModel.cs`
-  - `SwitchCast.Tests/Services/PresentationCoordinatorMediaTests.cs`
-- **Commit 3 (`8d0cf84`)**: `feat: allow source unqueue from presenter dock`
-  - `Services/PresentationStateService.cs`
-  - `Services/PresentationCoordinator.cs`
-  - `ViewModels/PresenterDockViewModel.cs`
-  - `ViewModels/SourcesViewModel.cs`
-  - `ViewModels/DashboardViewModel.cs`
-  - `Views/PresenterDockMenuWindow.xaml`
-  - `Views/PresenterDockMenuWindow.xaml.cs`
-  - `SwitchCast.Tests/Services/PresentationStateServiceTests.cs`
-  - `SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs`
+- `ViewModels/DashboardViewModel.cs` — Added `PresentationButtonGlyph` and state notification.
+- `Views/DashboardPage.xaml` — Bound `FontIcon.Glyph` to `PresentationButtonGlyph`.
+- `ViewModels/PresenterDockViewModel.cs` — Injected `IApplicationLifecycleService` and updated `CloseDock()` to trigger `ShowDashboard()`.
+- `App.xaml.cs` — Enhanced `ActivateMainWindow()` with shutdown guards and dashboard navigation.
+- `SwitchCast.Tests/ViewModels/DashboardViewModelTests.cs` — Verified glyph and text across Idle, Active, Paused, Blackout, and Stopped states.
+- `SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs` — Verified dock close triggers dashboard activation, preserves presentation, and respects shutdown.
+- `SwitchCast.Tests/Services/PresenterDockActionsActivationTests.cs` — Verified repeated dock close safety.
 
 ---
 
@@ -60,4 +47,5 @@
 
 - **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> **PASS** (0 errors, 0 warnings).
 - **Level 2 (Static Analysis)**: Roslyn compiler diagnostics -> **PASS** (0 errors, 0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests/SwitchCast.Tests.csproj -c Debug` -> **PASS** (263 passed, 0 failed, 0 skipped).
+- **Level 3 (Unit & Regression Tests)**: `dotnet test SwitchCast.Tests/SwitchCast.Tests.csproj -c Debug` -> **PASS** (268 passed, 0 failed, 0 skipped).
+- **Runtime Environment Note**: Automated tests executed on Windows .NET 8 harness. Physical desktop window foreground activation is governed by Windows OS foreground lock rules.

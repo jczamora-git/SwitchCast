@@ -59,6 +59,7 @@ public class DashboardViewModelTests
         Assert.False(vm.IsOutputWindowOpen);
         Assert.Equal("Window Closed", vm.PresentationOutputStatusText);
         Assert.Equal("Start Presenting", vm.PresentationButtonText);
+        Assert.Equal("\uE768", vm.PresentationButtonGlyph);
     }
 
     [Fact]
@@ -299,5 +300,58 @@ public class DashboardViewModelTests
         Assert.Equal("No queued sources", vm.SourceSelectorPlaceholderText);
         Assert.False(vm.CanStartPresentation);
         Assert.Equal("Add a presentation source first.", vm.StartPresentingTooltip);
+    }
+
+    [Fact]
+    public void PresentationButton_GlyphAndText_ReflectsAuthoritativePresentationState()
+    {
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object);
+
+        // 1. Idle state: Play icon + Start Presenting
+        Assert.False(vm.HasActivePresentation);
+        Assert.Equal("Start Presenting", vm.PresentationButtonText);
+        Assert.Equal("\uE768", vm.PresentationButtonGlyph);
+
+        // 2. Active/Live state: Stop square icon + Stop Presenting
+        _mockPresentationCoordinator.SetupGet(p => p.IsLive).Returns(true);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+        _mockStateService.Raise(s => s.PropertyChanged += null, new System.ComponentModel.PropertyChangedEventArgs(nameof(IPresentationStateService.Status)));
+
+        Assert.True(vm.HasActivePresentation);
+        Assert.Equal("Stop Presenting", vm.PresentationButtonText);
+        Assert.Equal("\uE71A", vm.PresentationButtonGlyph);
+
+        // 3. Paused state: Stop square icon + Stop Presenting
+        _mockPresentationCoordinator.SetupGet(p => p.IsLive).Returns(false);
+        _mockPresentationCoordinator.SetupGet(p => p.IsPaused).Returns(true);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Paused);
+        _mockStateService.Raise(s => s.PropertyChanged += null, new System.ComponentModel.PropertyChangedEventArgs(nameof(IPresentationStateService.Status)));
+
+        Assert.True(vm.HasActivePresentation);
+        Assert.Equal("Stop Presenting", vm.PresentationButtonText);
+        Assert.Equal("\uE71A", vm.PresentationButtonGlyph);
+
+        // 4. Blackout state: Stop square icon + Stop Presenting
+        _mockPresentationCoordinator.SetupGet(p => p.IsPaused).Returns(false);
+        _mockPresentationCoordinator.SetupGet(p => p.IsBlackout).Returns(true);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Blackout);
+        _mockStateService.Raise(s => s.PropertyChanged += null, new System.ComponentModel.PropertyChangedEventArgs(nameof(IPresentationStateService.Status)));
+
+        Assert.True(vm.HasActivePresentation);
+        Assert.Equal("Stop Presenting", vm.PresentationButtonText);
+        Assert.Equal("\uE71A", vm.PresentationButtonGlyph);
+
+        // 5. Stopped / Idle state: Play icon + Start Presenting
+        _mockPresentationCoordinator.SetupGet(p => p.IsBlackout).Returns(false);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Idle);
+        _mockStateService.Raise(s => s.PropertyChanged += null, new System.ComponentModel.PropertyChangedEventArgs(nameof(IPresentationStateService.Status)));
+
+        Assert.False(vm.HasActivePresentation);
+        Assert.Equal("Start Presenting", vm.PresentationButtonText);
+        Assert.Equal("\uE768", vm.PresentationButtonGlyph);
     }
 }

@@ -26,17 +26,26 @@ public partial class App : Application
     public MainWindow? MainWindow => _mainWindow as MainWindow;
 
     /// <summary>
-    /// Activates and brings the primary application window to the foreground, restoring if minimized.
+    /// Activates and brings the primary application window to the foreground, restoring if minimized, and ensures navigation to Dashboard.
     /// </summary>
     public void ActivateMainWindow()
     {
-        var activationService = Services.GetService<IWindowActivationService>();
-        if (activationService is not null && activationService.ActivateMainWindow())
+        var lifecycleService = Services.GetService<IApplicationLifecycleService>();
+        if (lifecycleService is not null && (lifecycleService.IsShuttingDown || lifecycleService.IsShutdownApproved))
         {
             return;
         }
 
-        _mainWindow?.Activate();
+        var activationService = Services.GetService<IWindowActivationService>();
+        bool activated = activationService?.ActivateMainWindow() ?? false;
+
+        if (!activated)
+        {
+            _mainWindow?.Activate();
+        }
+
+        var navigationService = Services.GetService<INavigationService>();
+        navigationService?.NavigateToDashboard();
     }
 
     private static IServiceProvider ConfigureServices()
