@@ -36,6 +36,21 @@ namespace Microsoft.UI.Xaml.Media.Imaging
         {
         }
     }
+
+    /// <summary>
+    /// Stubs Microsoft.UI.Xaml.Media.Imaging.BitmapImage for headless test runner.
+    /// </summary>
+    public class BitmapImage : ImageSource
+    {
+        public Uri? UriSource { get; set; }
+
+        public BitmapImage() { }
+
+        public BitmapImage(Uri uriSource)
+        {
+            UriSource = uriSource;
+        }
+    }
 }
 
 namespace Microsoft.UI.Dispatching

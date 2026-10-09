@@ -45,6 +45,10 @@ public partial class DashboardViewModel : ObservableObject
         _presentationStateService.PropertyChanged += OnPresentationStatePropertyChanged;
         _captureCoordinator.PropertyChanged += OnCaptureCoordinatorPropertyChanged;
         _presentationCoordinator.PropertyChanged += OnPresentationCoordinatorPropertyChanged;
+        if (_presentationCoordinator.MediaPresentationService is not null)
+        {
+            _presentationCoordinator.MediaPresentationService.MediaStateChanged += (s, e) => NotifyMediaPlaybackProperties();
+        }
 
         if (_dockService is not null)
         {
@@ -115,6 +119,41 @@ public partial class DashboardViewModel : ObservableObject
 
     public bool HasActivePresentation => IsPresenting || IsPresentationPaused || IsPresentationBlackout;
 
+    public bool IsActiveSourceVideo => _presentationCoordinator.IsActiveSourceVideo;
+
+    public bool IsActiveSourceImage => _presentationCoordinator.IsActiveSourceImage;
+
+    public bool IsVideoPlaying => _presentationCoordinator.MediaPresentationService.IsVideoPlaying;
+
+    public bool IsVideoPaused => _presentationCoordinator.MediaPresentationService.IsVideoPaused;
+
+    public bool IsVideoEnded => _presentationCoordinator.MediaPresentationService.IsVideoEnded;
+
+    public bool IsVideoLooping => _presentationCoordinator.MediaPresentationService.IsLooping;
+
+    public string VideoPlaybackButtonGlyph => IsVideoPlaying ? "\uE769" : "\uE768";
+
+    public string VideoPlaybackButtonText => IsVideoPlaying ? "Pause Video" : (IsVideoEnded ? "Replay Video" : "Play Video");
+
+    public string VideoLoopButtonText => IsVideoLooping ? "Loop: On" : "Loop: Off";
+
+    public Visibility VideoControlsVisibility => (HasActivePresentation && IsActiveSourceVideo) ? Visibility.Visible : Visibility.Collapsed;
+
+    public string VideoPositionText
+    {
+        get
+        {
+            var pos = _presentationCoordinator.MediaPresentationService.Position;
+            var dur = _presentationCoordinator.MediaPresentationService.Duration;
+            if (dur == TimeSpan.Zero && _presentationCoordinator.CurrentPresentationSource is VideoMediaSource v && v.Duration.HasValue)
+            {
+                dur = v.Duration.Value;
+            }
+
+            return $"{pos:mm\\:ss} / {dur:mm\\:ss}";
+        }
+    }
+
     public string PresentationOutputStatusText => IsOutputWindowOpen ? "Window Open" : "Window Closed";
 
     public string PresenterDockStatusText => IsPresenterDockOpen ? "Dock Open" : "Dock Closed";
@@ -171,6 +210,12 @@ public partial class DashboardViewModel : ObservableObject
             return;
         }
 
+        if (targetSource.Type == SourceType.Image || targetSource.Type == SourceType.Video)
+        {
+            // Direct media preview is ready to present
+            return;
+        }
+
         try
         {
             await _captureCoordinator.StartPreviewAsync(targetSource).ConfigureAwait(false);
@@ -207,7 +252,7 @@ public partial class DashboardViewModel : ObservableObject
             return;
         }
 
-        if (IsCapturing)
+        if (IsCapturing && (newSource.Type == SourceType.Window || newSource.Type == SourceType.Display))
         {
             try
             {
@@ -298,7 +343,7 @@ public partial class DashboardViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Pauses presentation output, freezing the current frame.
+    /// Pauses presentation output, freezing the current frame or pausing video.
     /// </summary>
     [RelayCommand]
     public async Task PausePresentationAsync()
@@ -338,6 +383,40 @@ public partial class DashboardViewModel : ObservableObject
     public async Task ToggleBlackoutAsync()
     {
         await _presentationCoordinator.ToggleBlackoutAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Restarts active video playback from the beginning.
+    /// </summary>
+    [RelayCommand]
+    public void RestartVideo()
+    {
+        _presentationCoordinator.MediaPresentationService.RestartVideo();
+    }
+
+    /// <summary>
+    /// Toggles video looping state.
+    /// </summary>
+    [RelayCommand]
+    public void ToggleVideoLoop()
+    {
+        _presentationCoordinator.MediaPresentationService.ToggleLoop();
+    }
+
+    /// <summary>
+    /// Toggles video playback (play / pause).
+    /// </summary>
+    [RelayCommand]
+    public void ToggleVideoPlayback()
+    {
+        if (IsVideoPlaying)
+        {
+            _presentationCoordinator.MediaPresentationService.PauseVideo();
+        }
+        else
+        {
+            _presentationCoordinator.MediaPresentationService.ResumeVideo();
+        }
     }
 
     /// <summary>
@@ -381,7 +460,7 @@ public partial class DashboardViewModel : ObservableObject
 
     partial void OnSelectedPreviewSourceChanged(CaptureSource? value)
     {
-        if (IsCapturing && value is not null && value.IsAvailable && value.Id != _captureCoordinator.CurrentPreviewSource?.Id)
+        if (IsCapturing && value is not null && value.IsAvailable && (value.Type == SourceType.Window || value.Type == SourceType.Display) && value.Id != _captureCoordinator.CurrentPreviewSource?.Id)
         {
             _ = SwitchPreviewSourceAsync(value);
         }
@@ -393,6 +472,21 @@ public partial class DashboardViewModel : ObservableObject
         {
             _ = SwitchPresentationSourceAsync(value);
         }
+    }
+
+    private void NotifyMediaPlaybackProperties()
+    {
+        OnPropertyChanged(nameof(IsActiveSourceVideo));
+        OnPropertyChanged(nameof(IsActiveSourceImage));
+        OnPropertyChanged(nameof(IsVideoPlaying));
+        OnPropertyChanged(nameof(IsVideoPaused));
+        OnPropertyChanged(nameof(IsVideoEnded));
+        OnPropertyChanged(nameof(IsVideoLooping));
+        OnPropertyChanged(nameof(VideoPlaybackButtonGlyph));
+        OnPropertyChanged(nameof(VideoPlaybackButtonText));
+        OnPropertyChanged(nameof(VideoLoopButtonText));
+        OnPropertyChanged(nameof(VideoPositionText));
+        OnPropertyChanged(nameof(VideoControlsVisibility));
     }
 
     private void OnPresentationStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -408,11 +502,13 @@ public partial class DashboardViewModel : ObservableObject
             OnPropertyChanged(nameof(PresentationButtonText));
             OnPropertyChanged(nameof(PauseButtonText));
             OnPropertyChanged(nameof(BlackoutButtonText));
+            NotifyMediaPlaybackProperties();
         }
         else if (e.PropertyName == nameof(IPresentationStateService.ActiveSource))
         {
             OnPropertyChanged(nameof(ActiveSourceTitle));
             OnPropertyChanged(nameof(HasActiveSource));
+            NotifyMediaPlaybackProperties();
         }
         else if (e.PropertyName == nameof(IPresentationStateService.SelectedSourceCount) ||
                  e.PropertyName == nameof(IPresentationStateService.SelectedSources))
@@ -470,5 +566,6 @@ public partial class DashboardViewModel : ObservableObject
         OnPropertyChanged(nameof(CaptureErrorMessage));
         OnPropertyChanged(nameof(ActiveSourceTitle));
         OnPropertyChanged(nameof(StatusDisplayText));
+        NotifyMediaPlaybackProperties();
     }
 }

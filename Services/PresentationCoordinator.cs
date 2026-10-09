@@ -3,12 +3,13 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.UI.Xaml.Media;
 using SwitchCast.Models;
 using SwitchCast.Services.Capture;
+using SwitchCast.Services.Media;
 
 namespace SwitchCast.Services;
 
 /// <summary>
 /// Authoritative coordinator managing the Presentation Output Window, presentation lifecycle, freeze/blackout, and frame distribution.
-/// Implements serialized transition management, latest-request-wins coalescing, and non-blocking frame forwarding.
+/// Implements serialized transition management, latest-request-wins coalescing, and non-blocking frame forwarding across all 4 source types.
 /// </summary>
 public sealed partial class PresentationCoordinator : ObservableObject, IPresentationCoordinator
 {
@@ -17,6 +18,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     private readonly ICaptureCoordinator _captureCoordinator;
     private readonly IPresentationOutputRenderer _outputRenderer;
     private readonly IWindowActivationService _windowActivationService;
+    private readonly IMediaPresentationService _mediaPresentationService;
     private readonly SemaphoreSlim _transitionSemaphore = new(1, 1);
 
     private CaptureSource? _targetRequestedPresentationSource;
@@ -31,13 +33,15 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         IPresentationWindowService presentationWindowService,
         ICaptureCoordinator captureCoordinator,
         IPresentationOutputRenderer outputRenderer,
-        IWindowActivationService windowActivationService)
+        IWindowActivationService windowActivationService,
+        IMediaPresentationService? mediaPresentationService = null)
     {
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
         _presentationWindowService = presentationWindowService ?? throw new ArgumentNullException(nameof(presentationWindowService));
         _captureCoordinator = captureCoordinator ?? throw new ArgumentNullException(nameof(captureCoordinator));
         _outputRenderer = outputRenderer ?? throw new ArgumentNullException(nameof(outputRenderer));
         _windowActivationService = windowActivationService ?? throw new ArgumentNullException(nameof(windowActivationService));
+        _mediaPresentationService = mediaPresentationService ?? new MediaPresentationService();
 
         _presentationStateService.PropertyChanged += (s, e) =>
         {
@@ -55,6 +59,19 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                 OnPropertyChanged(nameof(IsLive));
                 OnPropertyChanged(nameof(IsPaused));
                 OnPropertyChanged(nameof(IsBlackout));
+                OnPropertyChanged(nameof(IsActiveSourceMedia));
+                OnPropertyChanged(nameof(IsActiveSourceVideo));
+                OnPropertyChanged(nameof(IsActiveSourceImage));
+            }
+        };
+
+        _mediaPresentationService.MediaStateChanged += (s, e) =>
+        {
+            OnPropertyChanged(nameof(DirectImageSource));
+            OnPropertyChanged(nameof(MediaPlayer));
+            if (!string.IsNullOrEmpty(_mediaPresentationService.LastErrorMessage))
+            {
+                LastErrorMessage = _mediaPresentationService.LastErrorMessage;
             }
         };
 
@@ -81,6 +98,14 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
     public bool IsBlackout => Status == PresentationStatus.Blackout;
 
+    public bool IsActiveSourceMedia => CurrentPresentationSource?.Type == SourceType.Image || CurrentPresentationSource?.Type == SourceType.Video;
+
+    public bool IsActiveSourceVideo => CurrentPresentationSource?.Type == SourceType.Video;
+
+    public bool IsActiveSourceImage => CurrentPresentationSource?.Type == SourceType.Image;
+
+    public IMediaPresentationService MediaPresentationService => _mediaPresentationService;
+
     public Task SetSwitchModeAsync(PresenterSwitchMode mode)
     {
         _presentationStateService.SetSwitchMode(mode);
@@ -88,6 +113,10 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     }
 
     public ImageSource? PresentationImageSource => _outputRenderer.PresentationImageSource;
+
+    public ImageSource? DirectImageSource => _mediaPresentationService.DirectImageSource;
+
+    public Windows.Media.Playback.MediaPlayer? MediaPlayer => _mediaPresentationService.Player;
 
     public Task OpenOutputWindowAsync()
     {
@@ -121,7 +150,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         long sequence = Interlocked.Increment(ref _presentationSequenceNumber);
         Volatile.Write(ref _targetRequestedPresentationSource, targetSource);
 
-        Debug.WriteLine($"[PresentationCoordinator] StartPresentation requested seq={sequence} source={targetSource.Id}");
+        Debug.WriteLine($"[PresentationCoordinator] StartPresentation requested seq={sequence} source={targetSource.Id} type={targetSource.Type}");
 
         await _transitionSemaphore.WaitAsync().ConfigureAwait(false);
         try
@@ -139,23 +168,48 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             _presentationWindowService.ShowPresentationWindow();
             OnPropertyChanged(nameof(IsOutputWindowOpen));
 
-            // Start or switch underlying capture pipeline
-            if (_captureCoordinator.State != CaptureState.Capturing)
+            if (targetSource is ImageMediaSource imageSource)
             {
-                await _captureCoordinator.StartPreviewAsync(targetSource).ConfigureAwait(false);
+                if (_captureCoordinator.State == CaptureState.Capturing)
+                {
+                    await _captureCoordinator.StopPreviewAsync().ConfigureAwait(false);
+                }
+                await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
+                await _mediaPresentationService.LoadImageAsync(imageSource).ConfigureAwait(false);
             }
-            else if (_captureCoordinator.CurrentPreviewSource?.Id != targetSource.Id)
+            else if (targetSource is VideoMediaSource videoSource)
             {
-                await _captureCoordinator.SwitchPreviewSourceAsync(targetSource).ConfigureAwait(false);
+                if (_captureCoordinator.State == CaptureState.Capturing)
+                {
+                    await _captureCoordinator.StopPreviewAsync().ConfigureAwait(false);
+                }
+                _mediaPresentationService.ClearImage();
+                await _mediaPresentationService.PlayVideoAsync(videoSource).ConfigureAwait(false);
+            }
+            else
+            {
+                // Window or Display source
+                _mediaPresentationService.ClearImage();
+                await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
+
+                if (_captureCoordinator.State != CaptureState.Capturing)
+                {
+                    await _captureCoordinator.StartPreviewAsync(targetSource).ConfigureAwait(false);
+                }
+                else if (_captureCoordinator.CurrentPreviewSource?.Id != targetSource.Id)
+                {
+                    await _captureCoordinator.SwitchPreviewSourceAsync(targetSource).ConfigureAwait(false);
+                }
+
+                _outputRenderer.Resume();
             }
 
             if (Volatile.Read(ref _presentationSequenceNumber) != sequence)
             {
-                Debug.WriteLine($"[PresentationCoordinator] StartPresentation superseded after capture start seq={sequence}");
+                Debug.WriteLine($"[PresentationCoordinator] StartPresentation superseded after source start seq={sequence}");
                 return;
             }
 
-            _outputRenderer.Resume();
             _presentationStateService.SetActiveSource(targetSource);
             _presentationStateService.SetSelectedSource(targetSource);
             if (SwitchMode == PresenterSwitchMode.ActiveAndLive)
@@ -194,6 +248,9 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         try
         {
             _outputRenderer.Clear();
+            _mediaPresentationService.ClearImage();
+            await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
+
             _presentationStateService.SetActiveSource(null);
             _presentationStateService.SetForegroundSource(null);
             _presentationStateService.SetStatus(PresentationStatus.Idle);
@@ -214,7 +271,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         long sequence = Interlocked.Increment(ref _presentationSequenceNumber);
         Volatile.Write(ref _targetRequestedPresentationSource, newSource);
 
-        Debug.WriteLine($"[PresentationCoordinator] SwitchPresentation requested seq={sequence} target={newSource.Id}");
+        Debug.WriteLine($"[PresentationCoordinator] SwitchPresentation requested seq={sequence} target={newSource.Id} type={newSource.Type}");
 
         await _transitionSemaphore.WaitAsync().ConfigureAwait(false);
         try
@@ -237,19 +294,51 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
             LastErrorMessage = null;
 
-            // Switch capture engine source while keeping presentation output window open
-            await _captureCoordinator.SwitchPreviewSourceAsync(newSource).ConfigureAwait(false);
+            if (newSource is ImageMediaSource imageSource)
+            {
+                if (_captureCoordinator.State == CaptureState.Capturing)
+                {
+                    await _captureCoordinator.StopPreviewAsync().ConfigureAwait(false);
+                }
+                await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
+                await _mediaPresentationService.LoadImageAsync(imageSource).ConfigureAwait(false);
+            }
+            else if (newSource is VideoMediaSource videoSource)
+            {
+                if (_captureCoordinator.State == CaptureState.Capturing)
+                {
+                    await _captureCoordinator.StopPreviewAsync().ConfigureAwait(false);
+                }
+                _mediaPresentationService.ClearImage();
+                await _mediaPresentationService.PlayVideoAsync(videoSource).ConfigureAwait(false);
+            }
+            else
+            {
+                // Window or Display source
+                _mediaPresentationService.ClearImage();
+                await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
+
+                if (_captureCoordinator.State != CaptureState.Capturing)
+                {
+                    await _captureCoordinator.StartPreviewAsync(newSource).ConfigureAwait(false);
+                }
+                else
+                {
+                    await _captureCoordinator.SwitchPreviewSourceAsync(newSource).ConfigureAwait(false);
+                }
+
+                _outputRenderer.Resume();
+            }
 
             if (Volatile.Read(ref _presentationSequenceNumber) != sequence)
             {
-                Debug.WriteLine($"[PresentationCoordinator] SwitchPresentation superseded after capture switch seq={sequence}");
+                Debug.WriteLine($"[PresentationCoordinator] SwitchPresentation superseded after source switch seq={sequence}");
                 return;
             }
 
             _presentationStateService.SetActiveSource(newSource);
             if (Status != PresentationStatus.Paused && Status != PresentationStatus.Blackout)
             {
-                _outputRenderer.Resume();
                 _presentationStateService.SetStatus(PresentationStatus.Active);
             }
             Debug.WriteLine($"[PresentationCoordinator] SwitchPresentation completed seq={sequence} target={newSource.Id}");
@@ -275,7 +364,15 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         {
             if (Status == PresentationStatus.Active)
             {
-                _outputRenderer.Freeze();
+                if (CurrentPresentationSource?.Type == SourceType.Video)
+                {
+                    _mediaPresentationService.PauseVideo();
+                }
+                else
+                {
+                    _outputRenderer.Freeze();
+                }
+
                 _presentationStateService.SetStatus(PresentationStatus.Paused);
             }
         }
@@ -292,7 +389,15 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         {
             if (Status == PresentationStatus.Paused || Status == PresentationStatus.Blackout)
             {
-                _outputRenderer.Resume();
+                if (CurrentPresentationSource?.Type == SourceType.Video)
+                {
+                    _mediaPresentationService.ResumeVideo();
+                }
+                else
+                {
+                    _outputRenderer.Resume();
+                }
+
                 _presentationStateService.SetStatus(PresentationStatus.Active);
             }
         }
@@ -311,18 +416,32 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             {
                 if (_previousStatusBeforeBlackout == PresentationStatus.Active)
                 {
-                    _outputRenderer.Resume();
+                    if (CurrentPresentationSource?.Type == SourceType.Video)
+                    {
+                        _mediaPresentationService.ResumeVideo();
+                    }
+                    else
+                    {
+                        _outputRenderer.Resume();
+                    }
                     _presentationStateService.SetStatus(PresentationStatus.Active);
                 }
                 else
                 {
-                    _outputRenderer.Freeze();
+                    if (CurrentPresentationSource?.Type != SourceType.Video)
+                    {
+                        _outputRenderer.Freeze();
+                    }
                     _presentationStateService.SetStatus(PresentationStatus.Paused);
                 }
             }
             else if (Status == PresentationStatus.Active || Status == PresentationStatus.Paused)
             {
                 _previousStatusBeforeBlackout = Status;
+                if (CurrentPresentationSource?.Type == SourceType.Video)
+                {
+                    _mediaPresentationService.PauseVideo();
+                }
                 _presentationStateService.SetStatus(PresentationStatus.Blackout);
             }
         }
@@ -428,7 +547,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
     private void OnCaptureFrameArrived(object? sender, FrameArrivedEventArgs e)
     {
-        if (Status != PresentationStatus.Active)
+        if (Status != PresentationStatus.Active || IsActiveSourceMedia)
         {
             return;
         }
@@ -469,6 +588,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         _captureCoordinator.FrameArrived -= OnCaptureFrameArrived;
         _presentationWindowService.WindowClosed -= OnWindowClosed;
 
+        _mediaPresentationService.Dispose();
         _outputRenderer.Dispose();
         _transitionSemaphore.Dispose();
     }

@@ -42,6 +42,12 @@
     <Compile Include="..\Services\IPresentationCoordinator.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\PresentationCoordinator.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\WindowPositioningHelper.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Media\IMediaDiscoveryService.cs" Link="Linked\Services\Media\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Media\MediaDiscoveryService.cs" Link="Linked\Services\Media\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Media\IMediaPickerService.cs" Link="Linked\Services\Media\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Media\Win32MediaPickerService.cs" Link="Linked\Services\Media\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Media\IMediaPresentationService.cs" Link="Linked\Services\Media\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Media\MediaPresentationService.cs" Link="Linked\Services\Media\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\CaptureState.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\ICaptureCoordinator.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\CaptureCoordinator.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />

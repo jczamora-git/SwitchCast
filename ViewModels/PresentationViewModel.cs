@@ -4,11 +4,12 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using SwitchCast.Models;
 using SwitchCast.Services;
+using Windows.Media.Playback;
 
 namespace SwitchCast.ViewModels;
 
 /// <summary>
-/// ViewModel managing the dedicated presentation output window display states.
+/// ViewModel managing the dedicated presentation output window display states across all source layers (Capture, Image, Video, Standby, Blackout).
 /// </summary>
 public partial class PresentationViewModel : ObservableObject
 {
@@ -28,18 +29,41 @@ public partial class PresentationViewModel : ObservableObject
 
     public PresentationStatus Status => _presentationStateService.Status;
 
+    public CaptureSource? ActiveSource => _presentationStateService.ActiveSource;
+
     public ImageSource? PresentationImageSource => _presentationCoordinator.PresentationImageSource;
 
-    public string ActiveSourceTitle => _presentationStateService.ActiveSource?.Title ?? "Ready to Present";
+    public ImageSource? DirectImageSource => _presentationCoordinator.DirectImageSource;
+
+    public MediaPlayer? MediaPlayer => _presentationCoordinator.MediaPlayer;
+
+    public string ActiveSourceTitle => ActiveSource?.Title ?? "Ready to Present";
+
+    public bool IsLiveOrPaused => (Status == PresentationStatus.Active || Status == PresentationStatus.Paused) && ActiveSource is not null;
 
     public Visibility StandbyVisibility =>
-        (Status == PresentationStatus.Idle || Status == PresentationStatus.Starting || Status == PresentationStatus.Error || _presentationStateService.ActiveSource is null)
+        (Status == PresentationStatus.Idle || Status == PresentationStatus.Starting || Status == PresentationStatus.Error || ActiveSource is null)
         && Status != PresentationStatus.Blackout
             ? Visibility.Visible
             : Visibility.Collapsed;
 
+    public Visibility ScreenCaptureVisibility =>
+        IsLiveOrPaused && (ActiveSource?.Type == SourceType.Window || ActiveSource?.Type == SourceType.Display)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+    public Visibility DirectImageVisibility =>
+        IsLiveOrPaused && ActiveSource?.Type == SourceType.Image
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+    public Visibility DirectVideoVisibility =>
+        IsLiveOrPaused && ActiveSource?.Type == SourceType.Video
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
     public Visibility LiveContentVisibility =>
-        (Status == PresentationStatus.Active || Status == PresentationStatus.Paused) && _presentationStateService.ActiveSource is not null
+        IsLiveOrPaused && Status != PresentationStatus.Blackout
             ? Visibility.Visible
             : Visibility.Collapsed;
 
@@ -52,12 +76,7 @@ public partial class PresentationViewModel : ObservableObject
         if (e.PropertyName == nameof(IPresentationStateService.Status) ||
             e.PropertyName == nameof(IPresentationStateService.ActiveSource))
         {
-            OnPropertyChanged(nameof(Status));
-            OnPropertyChanged(nameof(ActiveSourceTitle));
-            OnPropertyChanged(nameof(StandbyVisibility));
-            OnPropertyChanged(nameof(LiveContentVisibility));
-            OnPropertyChanged(nameof(BlackoutVisibility));
-            OnPropertyChanged(nameof(PausedIndicatorVisibility));
+            NotifyAllLayers();
         }
     }
 
@@ -67,16 +86,34 @@ public partial class PresentationViewModel : ObservableObject
         {
             OnPropertyChanged(nameof(PresentationImageSource));
         }
+        else if (e.PropertyName == nameof(IPresentationCoordinator.DirectImageSource))
+        {
+            OnPropertyChanged(nameof(DirectImageSource));
+        }
+        else if (e.PropertyName == nameof(IPresentationCoordinator.MediaPlayer))
+        {
+            OnPropertyChanged(nameof(MediaPlayer));
+        }
         else if (e.PropertyName == nameof(IPresentationCoordinator.Status) ||
                  e.PropertyName == nameof(IPresentationCoordinator.IsLive) ||
                  e.PropertyName == nameof(IPresentationCoordinator.IsPaused) ||
                  e.PropertyName == nameof(IPresentationCoordinator.IsBlackout))
         {
-            OnPropertyChanged(nameof(Status));
-            OnPropertyChanged(nameof(StandbyVisibility));
-            OnPropertyChanged(nameof(LiveContentVisibility));
-            OnPropertyChanged(nameof(BlackoutVisibility));
-            OnPropertyChanged(nameof(PausedIndicatorVisibility));
+            NotifyAllLayers();
         }
+    }
+
+    private void NotifyAllLayers()
+    {
+        OnPropertyChanged(nameof(Status));
+        OnPropertyChanged(nameof(ActiveSource));
+        OnPropertyChanged(nameof(ActiveSourceTitle));
+        OnPropertyChanged(nameof(IsLiveOrPaused));
+        OnPropertyChanged(nameof(StandbyVisibility));
+        OnPropertyChanged(nameof(ScreenCaptureVisibility));
+        OnPropertyChanged(nameof(DirectImageVisibility));
+        OnPropertyChanged(nameof(DirectVideoVisibility));
+        OnPropertyChanged(nameof(BlackoutVisibility));
+        OnPropertyChanged(nameof(PausedIndicatorVisibility));
     }
 }

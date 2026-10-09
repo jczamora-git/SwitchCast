@@ -7,6 +7,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Phase 6 — Direct Media Sources & Settings UI Refinement] - 2026-10-09
+
+### Added / Improved (feat / UI / test / docs)
+- **Windows 11 Settings-Style Theme Selector & Appearance Layout**:
+  - Replaced cramped vertical theme RadioButtons in [Views/SettingsPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SettingsPage.xaml) with a compact right-aligned WinUI 3 `ComboBox` (140 DIP width) matching Windows 11 Settings.
+  - Corrected Grid column geometry to allocate flexible Star width to the title and description, preventing vertical word wrapping.
+  - Linked two-way to `SettingsViewModel.SelectedThemeIndex` for immediate theme switching across `System`, `Light`, and `Dark` with local persistence.
+- **Direct Local Image & Video Presentation Sources**:
+  - Extended domain models with `ImageMediaSource` and `VideoMediaSource` in [Models/MediaFileSource.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/MediaFileSource.cs) supporting dimensions, duration, and file size formatting.
+  - Implemented [Services/Media/MediaDiscoveryService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Media/MediaDiscoveryService.cs) for asynchronous metadata extraction via Windows imaging and storage APIs.
+  - Implemented [Services/Media/Win32MediaPickerService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Media/Win32MediaPickerService.cs) using native WinUI 3 `FileOpenPicker` with HWND desktop interop.
+  - Implemented [Services/Media/MediaPresentationService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Media/MediaPresentationService.cs) managing `BitmapImage` decoding and native `Windows.Media.Playback.MediaPlayer` (muted by default).
+  - Extended [Views/PresentationWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml) with mutually exclusive visual layers: Screen Capture `Image`, Direct Static `Image`, `MediaPlayerElement`, Standby Overlay, and topmost Blackout Overlay.
+  - Added video playback controls to [Views/DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml) (Play/Pause, Restart, Loop, timecode position, and progress).
+  - Preserved single stable Presentation Output HWND across mixed source switching (`Window` <-> `Image` <-> `Video` <-> `Monitor`).
+  - Preserved Blackout and Pause privacy rules: pausing video playback and preventing rendering/audio leaks during blackout.
+- **Sources Page Media Category & Persistence**:
+  - Added "Media Files" category tab to [Views/SourcesPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SourcesPage.xaml) alongside Application Windows and Displays.
+  - Added "Add Media" import button, compact file cards, queue toggles, and remove actions.
+  - Persisted imported media file paths in `UserSettings.ImportedMediaPaths` for automatic reloading on startup.
+- **Automated Unit & Regression Tests**:
+  - Added [SwitchCast.Tests/Models/MediaFileSourceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Models/MediaFileSourceTests.cs).
+  - Added [SwitchCast.Tests/Services/MediaDiscoveryServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/MediaDiscoveryServiceTests.cs).
+  - Added [SwitchCast.Tests/Services/PresentationCoordinatorMediaTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresentationCoordinatorMediaTests.cs).
+  - Added [SwitchCast.Tests/ViewModels/SourcesViewModelMediaTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/SourcesViewModelMediaTests.cs).
+  - Expanded test suite from 170 to **209 automated unit tests** (100% pass rate).
+
+---
+
 ## [v1.0.0 — Final UI Polish, Creator Attribution & First GitHub Release] - 2026-10-09
 
 ### Added / Improved (feat / UI / test / docs / release)

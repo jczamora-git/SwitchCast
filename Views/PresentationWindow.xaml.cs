@@ -29,6 +29,25 @@ public sealed partial class PresentationWindow : Window
         _settingsService.ThemeChanged += OnThemeChanged;
         Closed += OnWindowClosed;
 
+        if (ViewModel.MediaPlayer is not null)
+        {
+            PresentationVideoPlayer.SetMediaPlayer(ViewModel.MediaPlayer);
+        }
+
+        ViewModel.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(PresentationViewModel.MediaPlayer))
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (ViewModel.MediaPlayer is not null)
+                    {
+                        PresentationVideoPlayer.SetMediaPlayer(ViewModel.MediaPlayer);
+                    }
+                });
+            }
+        };
+
         InitializeAppWindow();
         ApplyTheme(_settingsService.CurrentSettings.Theme);
     }

@@ -21,7 +21,31 @@ public abstract record CaptureSource
     public SourceType Type { get; init; }
 
     /// <summary>
-    /// Whether this source is currently available and valid for capture.
+    /// Whether this source is currently available and valid for capture or presentation.
     /// </summary>
     public bool IsAvailable { get; init; } = true;
+
+    /// <summary>
+    /// Segoe Fluent icon glyph associated with this source type.
+    /// </summary>
+    public string TypeGlyph => Type switch
+    {
+        SourceType.Window => "\uE7F4",
+        SourceType.Display => "\uE790",
+        SourceType.Image => "\uEB9F",
+        SourceType.Video => "\uE714",
+        _ => "\uE7F4"
+    };
+
+    /// <summary>
+    /// Friendly category label for the source type.
+    /// </summary>
+    public string CategoryLabel => Type switch
+    {
+        SourceType.Window => "Window",
+        SourceType.Display => "Display",
+        SourceType.Image => "Image",
+        SourceType.Video => "Video",
+        _ => "Source"
+    };
 }

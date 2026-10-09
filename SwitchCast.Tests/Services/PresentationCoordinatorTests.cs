@@ -205,6 +205,7 @@ public class PresentationCoordinatorTests
 
         _mockStateService.SetupGet(s => s.ActiveSource).Returns(source1);
         _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+        _mockCaptureCoordinator.SetupGet(c => c.State).Returns(CaptureState.Capturing);
 
         using var coordinator = new PresentationCoordinator(
             _mockStateService.Object,

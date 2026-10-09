@@ -63,6 +63,11 @@ public partial class App : Application
         services.AddSingleton<ICapturePreviewRenderer, Direct3D11PreviewRenderer>();
         services.AddSingleton<ICaptureCoordinator, CaptureCoordinator>();
 
+        // Media Services
+        services.AddSingleton<Services.Media.IMediaDiscoveryService, Services.Media.MediaDiscoveryService>();
+        services.AddSingleton<Services.Media.IMediaPickerService, Services.Media.Win32MediaPickerService>();
+        services.AddSingleton<Services.Media.IMediaPresentationService, Services.Media.MediaPresentationService>();
+
         // Presentation Output & Orchestration Services
         services.AddSingleton<IWindowActivationService, Win32WindowActivationService>();
         services.AddSingleton<IPresentationWindowService, PresentationWindowService>();

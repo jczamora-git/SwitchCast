@@ -3,71 +3,97 @@
 ---
 
 ## Task Details
-- **Task**: Final UI Polish, Creator Attribution & First GitHub Release (v1.0.0)
-- **Date**: 2026-10-09T06:30:00+08:00 (UTC+8)
+- **Task**: Phase 6 — Direct Media Sources & Settings UI Refinement
+- **Date**: 2026-10-09T14:35:00+08:00 (UTC+8)
 - **Status**: Completed
 
 ---
 
 ## 1. Objective
-Perform a targeted visual and UX refinement of the SwitchCast Settings page (compact navigation, creator attribution, aligned preference controls, developer-tool shortcut table), establish single authoritative version metadata (`v1.0.0`), build a self-contained standalone Windows release package (`SwitchCast-v1.0.0-win-x64.zip`), and prepare the GitHub repository for release.
+1. Fix the Appearance settings layout and replace the cramped RadioButtons with a Windows 11 Settings-style `ComboBox` dropdown.
+2. Extend the presentation source architecture beyond application windows and monitors to support direct local image (PNG, JPG, JPEG, BMP, GIF, WEBP, TIF) and video (MP4, M4V, WMV, MOV, AVI, MKV) files without spawning external apps.
+3. Integrate media files into the existing source queue, three switching modes, and unified Presentation Output window with dedicated, mutually exclusive layers.
+4. Provide essential playback controls (Play, Pause, Resume, Restart, Loop) and maintain strict privacy policies (Blackout / Pause).
 
 ---
 
 ## 2. Architecture & Implementation Details
 
-1. **Settings Navigation & Layout Refinement ([Views/SettingsPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SettingsPage.xaml))**:
-   - Replaced bulky radio-button circles in the Settings sidebar with a compact `ListView` navigation list (38 DIP row height, 14 DIP icons, clean hover/selected states).
-   - Structured two-pane layout: 190 DIP navigation sidebar, 20 DIP column gap, flexible responsive content panel.
-   - Clean Appearance color mode options (System | Light | Dark) with consistent spacing.
-   - Standardized Window and Presenter preference toggles with responsive text wrapping.
-   - Streamlined Keyboard Shortcuts list (~46 DIP row height) with action descriptions, filter search, and monospace key badges.
+1. **Theme Selector & Appearance Grid ([Views/SettingsPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SettingsPage.xaml))**:
+   - Replaced vertical RadioButtons with a compact WinUI 3 `ComboBox` (140 DIP, right-aligned).
+   - Corrected Grid column geometry to flexible Star width with automatic text wrapping for the title and description.
+   - Bound two-way to `SettingsViewModel.SelectedThemeIndex` with immediate theme application and persistence.
 
-2. **Creator Attribution & Authoritative Metadata ([ViewModels/SettingsViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SettingsViewModel.cs), [SwitchCast.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.csproj))**:
-   - Creator Attribution: **John Christopher King Zamora**.
-   - Repository URL: [https://github.com/jczamora-git/SwitchCast](https://github.com/jczamora-git/SwitchCast).
-   - Added `OpenRepositoryCommand` launching the GitHub repository via `Windows.System.Launcher.LaunchUriAsync`.
-   - Single authoritative version metadata configured in `SwitchCast.csproj` (`Version 1.0.0`, `AssemblyVersion 1.0.0.0`, `InformationalVersion 1.0.0`).
-   - Factual privacy architecture statement (`100% Offline & Local • Zero Telemetry • No Network Access`).
+2. **Domain Models & Metadata**:
+   - Extended `SourceType` enum with `Image` and `Video`.
+   - Created `MediaFileSource`, `ImageMediaSource`, and `VideoMediaSource` in [Models/MediaFileSource.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/MediaFileSource.cs).
+   - Added `ImportedMediaPaths` in [Models/UserSettings.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/UserSettings.cs) for local persistence.
 
-3. **Release Packaging & Distribution**:
-   - Built standalone self-contained release package via `dotnet publish SwitchCast.csproj -c Release -r win-x64 --self-contained true`.
-   - Generated distribution zip archive `releases/SwitchCast-v1.0.0-win-x64.zip`.
-   - SHA-256 Checksum: `6C416C1A274A931EB9B487CCD9A0B5ADAFB8E423A54559386591A67850E495DE`.
+3. **Media Services**:
+   - [Services/Media/MediaDiscoveryService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Media/MediaDiscoveryService.cs): Asynchronous metadata discovery (dimensions, durations, file sizes).
+   - [Services/Media/Win32MediaPickerService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Media/Win32MediaPickerService.cs): Native WinUI 3 `FileOpenPicker` with desktop HWND interop.
+   - [Services/Media/MediaPresentationService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Media/MediaPresentationService.cs): Native `BitmapImage` decoding and `Windows.Media.Playback.MediaPlayer` (muted by default).
 
-4. **Documentation & Remote Configuration**:
-   - Created comprehensive [README.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/README.md) with overview, features, technology stack, keyboard shortcuts, usage guide, and creator attribution.
-   - Created [docs/RELEASE_NOTES_v1.0.0.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/RELEASE_NOTES_v1.0.0.md).
-   - Configured `origin` remote: `https://github.com/jczamora-git/SwitchCast.git`.
+4. **Unified Presentation Coordinator & Output Window**:
+   - [Services/PresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationCoordinator.cs): Orchestrates all 4 source types (`Window`, `Display`, `Image`, `Video`) with Latest-Request-Wins concurrency, blackout/pause synchronization, and resource disposal.
+   - [Views/PresentationWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml): Mutually exclusive presentation layers (Screen Capture, Direct Image, `MediaPlayerElement`, Standby, and topmost Blackout).
+
+5. **Sources Page & Dashboard UI**:
+   - [Views/SourcesPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SourcesPage.xaml): Added "Media Files" category tab with Add Media file picker, compact item cards, and remove actions.
+   - [Views/DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml): Added video playback controls bar (Play/Pause, Restart, Loop, timecode position, and progress).
 
 ---
 
-## 3. Files Modified
+## 3. Files Modified & Added
 
 ### Added Files
-- [README.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/README.md)
-- [docs/RELEASE_NOTES_v1.0.0.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/RELEASE_NOTES_v1.0.0.md)
+- [Models/MediaFileSource.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/MediaFileSource.cs)
+- [Services/Media/IMediaDiscoveryService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Media/IMediaDiscoveryService.cs)
+- [Services/Media/MediaDiscoveryService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Media/MediaDiscoveryService.cs)
+- [Services/Media/IMediaPickerService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Media/IMediaPickerService.cs)
+- [Services/Media/Win32MediaPickerService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Media/Win32MediaPickerService.cs)
+- [Services/Media/IMediaPresentationService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Media/IMediaPresentationService.cs)
+- [Services/Media/MediaPresentationService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Media/MediaPresentationService.cs)
+- [SwitchCast.Tests/Models/MediaFileSourceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Models/MediaFileSourceTests.cs)
+- [SwitchCast.Tests/Services/MediaDiscoveryServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/MediaDiscoveryServiceTests.cs)
+- [SwitchCast.Tests/Services/PresentationCoordinatorMediaTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresentationCoordinatorMediaTests.cs)
+- [SwitchCast.Tests/ViewModels/SourcesViewModelMediaTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/SourcesViewModelMediaTests.cs)
 
 ### Modified Files
-- [.gitignore](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.gitignore)
-- [SwitchCast.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.csproj)
-- [ViewModels/SettingsViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SettingsViewModel.cs)
+- [Models/SourceType.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/SourceType.cs)
+- [Models/CaptureSource.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/CaptureSource.cs)
+- [Models/UserSettings.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/UserSettings.cs)
+- [Services/IPresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/IPresentationCoordinator.cs)
+- [Services/PresentationCoordinator.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/PresentationCoordinator.cs)
+- [ViewModels/DashboardViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/DashboardViewModel.cs)
+- [ViewModels/PresentationViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/PresentationViewModel.cs)
+- [ViewModels/SelectableSourceItem.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SelectableSourceItem.cs)
+- [ViewModels/SourcesViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SourcesViewModel.cs)
+- [Views/DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml)
+- [Views/PresentationWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml)
+- [Views/PresentationWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml.cs)
 - [Views/SettingsPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SettingsPage.xaml)
-- [SwitchCast.Tests/ViewModels/SettingsViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/SettingsViewModelTests.cs)
+- [Views/SourcesPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SourcesPage.xaml)
+- [App.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/App.xaml.cs)
+- [SwitchCast.Tests/SwitchCast.Tests.csproj](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/SwitchCast.Tests.csproj)
+- [SwitchCast.Tests/Stubs/XamlStubs.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Stubs/XamlStubs.cs)
+- [SwitchCast.Tests/Services/PresentationCoordinatorTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresentationCoordinatorTests.cs)
 - [.agents/PROJECT_STATE.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/PROJECT_STATE.md)
 - [.agents/HANDOFF.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/HANDOFF.md)
 - [.agents/CHANGELOG.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/CHANGELOG.md)
+- [docs/SYSTEM_ARCHITECTURE.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/SYSTEM_ARCHITECTURE.md)
+- [docs/DEVELOPMENT_ROADMAP.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/DEVELOPMENT_ROADMAP.md)
 
 ---
 
 ## 4. Validation Performed
 - **Level 1 (Build)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors).
-- **Level 2 (Static Analysis)**: Analyzers and nullable reference checks -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (170 passed, 0 failed, 0 skipped in 523ms).
-- **Level 4 (Release Build & Package)**: Published self-contained `win-x64` Release build and verified `SwitchCast.exe` version `1.0.0` and `SwitchCast-v1.0.0-win-x64.zip` SHA-256 hash.
+- **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (**209 passed, 0 failed, 0 skipped**).
 
 ---
 
 ## 5. Next Steps
-- **Next Task**: **Phase 6 — Stability & Performance Optimization**
-- Implement Direct3D 11 device loss resilience, dynamic multi-monitor DPI scaling adaptation, and extended load verification.
+- **Next Task**: **Phase 7 — Advanced Presenter Features & Smoothing**
+- Implement live thumbnail preview rendering on dashboard cards, configurable smooth transitions, and presentation profiles.
+

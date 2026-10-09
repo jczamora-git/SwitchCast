@@ -55,9 +55,39 @@ public interface IPresentationCoordinator : INotifyPropertyChanged, IDisposable
     bool IsBlackout { get; }
 
     /// <summary>
-    /// ImageSource for the presentation output canvas.
+    /// ImageSource for the presentation output canvas (DirectX capture stream).
     /// </summary>
     ImageSource? PresentationImageSource { get; }
+
+    /// <summary>
+    /// Static image source for direct image presentation.
+    /// </summary>
+    ImageSource? DirectImageSource { get; }
+
+    /// <summary>
+    /// Native Windows MediaPlayer instance for direct video presentation.
+    /// </summary>
+    Windows.Media.Playback.MediaPlayer? MediaPlayer { get; }
+
+    /// <summary>
+    /// Direct media presentation service instance.
+    /// </summary>
+    Media.IMediaPresentationService MediaPresentationService { get; }
+
+    /// <summary>
+    /// Whether the active on-air source is a direct media file (Image or Video).
+    /// </summary>
+    bool IsActiveSourceMedia { get; }
+
+    /// <summary>
+    /// Whether the active on-air source is a video file.
+    /// </summary>
+    bool IsActiveSourceVideo { get; }
+
+    /// <summary>
+    /// Whether the active on-air source is a static image file.
+    /// </summary>
+    bool IsActiveSourceImage { get; }
 
     /// <summary>
     /// Gets the last error message encountered during presentation operations.

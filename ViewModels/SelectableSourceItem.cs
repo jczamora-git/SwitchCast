@@ -5,7 +5,7 @@ using SwitchCast.Models;
 namespace SwitchCast.ViewModels;
 
 /// <summary>
-/// ViewModel wrapping a discoverable CaptureSource with interactive selection state.
+/// ViewModel wrapping a discoverable CaptureSource (Window, Display, Image, Video) with interactive selection state.
 /// </summary>
 public partial class SelectableSourceItem : ObservableObject
 {
@@ -44,11 +44,17 @@ public partial class SelectableSourceItem : ObservableObject
 
     public SourceType Type => Source.Type;
 
-    public string TypeGlyph => Source.Type == SourceType.Window ? "\uE7F4" : "\uE790";
+    public string TypeGlyph => Source.TypeGlyph;
 
-    public string CategoryLabel => Source.Type == SourceType.Window ? "Window" : "Display";
+    public string CategoryLabel => Source.CategoryLabel;
+
+    public bool IsMediaSource => Source is MediaFileSource;
+
+    public string? FilePath => (Source as MediaFileSource)?.FilePath;
 
     public Visibility UnavailableBadgeVisibility => IsAvailable ? Visibility.Collapsed : Visibility.Visible;
+
+    public Visibility RemoveButtonVisibility => IsMediaSource ? Visibility.Visible : Visibility.Collapsed;
 
     public string Subtitle => Source switch
     {
@@ -56,6 +62,12 @@ public partial class SelectableSourceItem : ObservableObject
             ? $"Window Handle: 0x{w.WindowHandle:X}"
             : $"Process: {w.ProcessName} (PID: {w.ProcessId})",
         MonitorSource m => $"Resolution: {m.Width} × {m.Height} • {(m.IsPrimary ? "Primary Display" : "Secondary Display")}",
+        ImageMediaSource img => (img.Width.HasValue && img.Height.HasValue)
+            ? $"Image • {img.Width} × {img.Height} • {img.FormattedFileSize}"
+            : $"Image • {img.FormattedFileSize}",
+        VideoMediaSource vid => (vid.Width.HasValue && vid.Height.HasValue)
+            ? $"Video • {vid.FormattedDuration} • {vid.Width} × {vid.Height} • {vid.FormattedFileSize}"
+            : $"Video • {vid.FormattedDuration} • {vid.FormattedFileSize}",
         _ => string.Empty
     };
 

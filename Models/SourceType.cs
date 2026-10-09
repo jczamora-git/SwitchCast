@@ -13,5 +13,15 @@ public enum SourceType
     /// <summary>
     /// Connected physical or virtual display monitor.
     /// </summary>
-    Display
+    Display,
+
+    /// <summary>
+    /// Direct local static image file.
+    /// </summary>
+    Image,
+
+    /// <summary>
+    /// Direct local video media file.
+    /// </summary>
+    Video
 }

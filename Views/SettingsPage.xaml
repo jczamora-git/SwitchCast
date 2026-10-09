@@ -246,22 +246,23 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
                                     <TextBlock Text="App Theme" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
-                                    <TextBlock Text="Select color mode. Changes update title bars and surfaces immediately."
+                                    <TextBlock Text="Choose the application's color mode."
                                                FontSize="11"
                                                Foreground="{ThemeResource AppTextSecondaryBrush}"
                                                TextWrapping="Wrap" />
                                 </StackPanel>
 
-                                <RadioButtons Grid.Column="1"
-                                              SelectedIndex="{x:Bind ViewModel.SelectedThemeIndex, Mode=TwoWay}"
-                                              MaxColumns="3"
-                                              VerticalAlignment="Center">
-                                    <RadioButton Content="System" Tag="0" FontSize="12" Margin="0,0,12,0" />
-                                    <RadioButton Content="Light" Tag="1" FontSize="12" Margin="0,0,12,0" />
-                                    <RadioButton Content="Dark" Tag="2" FontSize="12" />
-                                </RadioButtons>
+                                <ComboBox Grid.Column="1"
+                                          SelectedIndex="{x:Bind ViewModel.SelectedThemeIndex, Mode=TwoWay}"
+                                          MinWidth="140"
+                                          Height="34"
+                                          VerticalAlignment="Center">
+                                    <ComboBoxItem Content="System" />
+                                    <ComboBoxItem Content="Light" />
+                                    <ComboBoxItem Content="Dark" />
+                                </ComboBox>
                             </Grid>
                         </StackPanel>
                     </Border>
