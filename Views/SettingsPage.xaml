@@ -393,31 +393,7 @@
 
                             <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
 
-                            <!-- Row 4: Start Dock in Compact Mode -->
-                            <Grid Margin="0,2">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
-                                    <TextBlock Text="Start Dock in Compact Mode" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
-                                    <TextBlock Text="Open the floating presenter dock in the ultra-slim single-row format."
-                                               FontSize="11"
-                                               Foreground="{ThemeResource AppTextSecondaryBrush}"
-                                               TextWrapping="Wrap" />
-                                </StackPanel>
-
-                                <ToggleSwitch Grid.Column="1"
-                                              IsOn="{x:Bind ViewModel.StartDockInCompactMode, Mode=TwoWay}"
-                                              OnContent="Enabled"
-                                              OffContent="Disabled"
-                                              VerticalAlignment="Center" />
-                            </Grid>
-
-                            <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
-
-                            <!-- Row 5: Default Source Switching Mode -->
+                            <!-- Row 4: Default Source Switching Mode -->
                             <StackPanel Spacing="6" Margin="0,2">
                                 <TextBlock Text="Source Switching Mode" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
                                 <TextBlock Text="Configure window focus and output switching behavior during presentation."

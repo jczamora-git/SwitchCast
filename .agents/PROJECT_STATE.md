@@ -7,15 +7,27 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Phase 6.3: Fullscreen Presentation Output
+- **Current Phase**: Floating Dock Finalization
 - **Overall Status**: **Completed & Tested**
-- **Last Updated**: 2026-10-09T17:48:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-09T19:48:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Floating Presenter Dock Finalization**:
+  - **Native Windows Caption Dragging**:
+    - Replaced pointer routing and manual `SendMessage(WM_NCLBUTTONDOWN)` implementation with genuine Windows App SDK `InputNonClientPointerSource` non-client caption regions.
+    - Set the dock surface as `NonClientRegionKind.Caption` while setting interactive controls (buttons, dropdown triggers, sliders) as `NonClientRegionKind.Passthrough`.
+    - Completely resolved sticky dragging / click-to-move anomaly; window drag initiates exclusively while holding left mouse button and terminates instantly on release.
+  - **Permanent Unified Dock Layout**:
+    - Removed compact vs expanded mode switching, obsolete toggle buttons, and legacy settings UI rows.
+    - Baseline width fixed to 680 DIPs single row with standard presenter controls (Live status badge, Previous/Next source navigation, Active source dropdown, Mode selector, Mute, Pause/Resume, Blackout, Stop Presenting, Fullscreen output toggle, More Options menu, Close dock).
+  - **Adaptive Video Playback & Timeline Controls**:
+    - When a video source is On Air, the dock automatically reveals a second video transport row (height adapts from 52 DIPs to 86 DIPs).
+    - Video controls include: Restart video (`00:00`), Seek backward 10s (`\uEB9E`), Play/Pause video (`\uE768`/`\uE769`), Seek forward 10s (`\uEB9D`), duration scrubber slider with smooth pause-during-scrubbing commitment, and live timecode text (`00:00 / 00:00`).
+    - Non-video sources (Window, Display, Image) cleanly hide the video row and shrink dock height to 52 DIPs with dynamic hit-test region recalculation.
 - [x] **Fullscreen Presentation Output (Phase 6.3)**:
   - **Native AppWindow Fullscreen Presenter**:
     - Leverages supported Windows App SDK `AppWindow.SetPresenter(AppWindowPresenterKind.FullScreen)` for true borderless fullscreen on the active monitor without custom window recreation hacks.

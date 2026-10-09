@@ -1,6 +1,7 @@
 using Moq;
 using SwitchCast.Models;
 using SwitchCast.Services;
+using SwitchCast.Services.Media;
 using SwitchCast.ViewModels;
 using Xunit;
 
@@ -214,8 +215,15 @@ public class PresenterDockViewModelTests
     }
 
     [Fact]
-    public void ToggleCompactModeCommand_TogglesIsCompactMode()
+    public void VideoPlaybackControls_ExecuteAgainstMediaService()
     {
+        var mockMediaService = new Mock<IMediaPresentationService>();
+        _mockCoordinator.SetupGet(c => c.MediaPresentationService).Returns(mockMediaService.Object);
+        _mockCoordinator.SetupGet(c => c.IsActiveSourceVideo).Returns(true);
+        mockMediaService.SetupGet(m => m.Duration).Returns(TimeSpan.FromSeconds(120));
+        mockMediaService.SetupGet(m => m.Position).Returns(TimeSpan.FromSeconds(30));
+        mockMediaService.SetupGet(m => m.IsVideoPlaying).Returns(true);
+
         var vm = new PresenterDockViewModel(
             _mockCoordinator.Object,
             _mockStateService.Object,
@@ -223,13 +231,36 @@ public class PresenterDockViewModelTests
             _mockDockService.Object,
             _mockSettingsService.Object);
 
-        Assert.False(vm.IsCompactMode);
+        Assert.True(vm.IsActiveSourceVideo);
+        Assert.True(vm.IsVideoPlaying);
+        Assert.Equal(120.0, vm.VideoDurationSeconds);
+        Assert.Equal(30.0, vm.VideoPositionSeconds);
+        Assert.Equal("00:30 / 02:00", vm.VideoPositionText);
+        Assert.Equal("\uE769", vm.VideoPlaybackButtonGlyph); // Pause icon when playing
 
-        vm.ToggleCompactModeCommand.Execute(null);
-        Assert.True(vm.IsCompactMode);
+        // 1. Toggle playback (pause)
+        vm.ToggleVideoPlaybackCommand.Execute(null);
+        mockMediaService.Verify(m => m.PauseVideo(), Times.Once);
 
-        vm.ToggleCompactModeCommand.Execute(null);
-        Assert.False(vm.IsCompactMode);
+        // 2. Restart video
+        vm.RestartVideoCommand.Execute(null);
+        mockMediaService.Verify(m => m.RestartVideo(), Times.Once);
+
+        // 3. Seek backward 10s (30s -> 20s)
+        vm.SeekBackward10Command.Execute(null);
+        mockMediaService.Verify(m => m.Seek(TimeSpan.FromSeconds(20)), Times.Once);
+
+        // 4. Seek forward 10s (30s -> 40s)
+        vm.SeekForward10Command.Execute(null);
+        mockMediaService.Verify(m => m.Seek(TimeSpan.FromSeconds(40)), Times.Once);
+
+        // 5. Scrubbing
+        vm.StartScrubbing(45.0);
+        Assert.Equal(45.0, vm.VideoPositionSeconds);
+        Assert.Equal("00:45 / 02:00", vm.VideoPositionText);
+
+        vm.CompleteScrubbing(75.0);
+        mockMediaService.Verify(m => m.Seek(TimeSpan.FromSeconds(75)), Times.Once);
     }
 
     [Fact]

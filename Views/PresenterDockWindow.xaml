@@ -43,17 +43,14 @@
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
                 CornerRadius="8"
-                Padding="6,3"
+                Padding="6,4"
                 Margin="0">
             
-            <Grid VerticalAlignment="Center">
+            <StackPanel Spacing="3" VerticalAlignment="Center">
                 <!-- ========================================================= -->
-                <!-- EXPANDED MODE (Single Row, Minimal Floating Toolbar)       -->
+                <!-- PRIMARY TOOLBAR ROW                                       -->
                 <!-- ========================================================= -->
-                <Grid x:Name="ExpandedRootGrid"
-                      ColumnSpacing="4"
-                      VerticalAlignment="Center"
-                      Visibility="{x:Bind views:PresenterDockWindow.InvertBoolToVis(ViewModel.IsCompactMode), Mode=OneWay}">
+                <Grid x:Name="PrimaryToolbarGrid" ColumnSpacing="4" VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
                         <!-- Status Badge Pill -->
                         <ColumnDefinition Width="Auto" />
@@ -63,11 +60,11 @@
                         <ColumnDefinition Width="Auto" />
                         <!-- Subtle Divider -->
                         <ColumnDefinition Width="Auto" />
-                        <!-- Live Action Controls (Pause, Blackout, Stop) -->
+                        <!-- Live Action Controls (Pause, Blackout, Stop, Fullscreen) -->
                         <ColumnDefinition Width="Auto" />
                         <!-- More Actions -->
                         <ColumnDefinition Width="Auto" />
-                        <!-- Window Controls (Collapse, Close) -->
+                        <!-- Window Controls (Close) -->
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
@@ -148,7 +145,7 @@
 
                     <!-- Live Action Controls -->
                     <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                        <!-- Video Mute / Unmute (Visible when active source is a video) -->
+                        <!-- Video Mute / Unmute (Visible in primary row when video is active) -->
                         <Button Command="{x:Bind ViewModel.ToggleMediaMuteCommand}"
                                 Visibility="{x:Bind views:PresenterDockWindow.BoolToVis(ViewModel.IsActiveSourceVideo), Mode=OneWay}"
                                 Style="{StaticResource DockIconButtonStyle}"
@@ -156,7 +153,7 @@
                             <FontIcon Glyph="{x:Bind ViewModel.MediaMuteButtonGlyph, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
                         </Button>
 
-                        <!-- Pause / Resume -->
+                        <!-- Pause / Resume Presentation -->
                         <Button Command="{x:Bind ViewModel.TogglePauseCommand}"
                                 IsEnabled="{x:Bind ViewModel.IsPresenting, Mode=OneWay}"
                                 Style="{StaticResource DockIconButtonStyle}"
@@ -198,161 +195,88 @@
                         <FontIcon Glyph="&#xE712;" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </Button>
 
-                    <!-- Window Controls (Collapse, Close) -->
-                    <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="1" VerticalAlignment="Center">
-                        <!-- Toggle Compact Mode -->
-                        <Button Command="{x:Bind ViewModel.ToggleCompactModeCommand}"
-                                Style="{StaticResource DockIconButtonStyle}"
-                                ToolTipService.ToolTip="{x:Bind ViewModel.CompactModeTooltip, Mode=OneWay}">
-                            <FontIcon Glyph="&#xE73F;" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        </Button>
-
-                        <!-- Close Dock -->
-                        <Button Command="{x:Bind ViewModel.CloseDockCommand}"
-                                Style="{StaticResource DockIconButtonStyle}"
-                                ToolTipService.ToolTip="Close Presenter Dock (Ctrl+Shift+D)">
-                            <FontIcon Glyph="&#xE8BB;" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        </Button>
-                    </StackPanel>
+                    <!-- Close Dock -->
+                    <Button Grid.Column="6"
+                            Command="{x:Bind ViewModel.CloseDockCommand}"
+                            Style="{StaticResource DockIconButtonStyle}"
+                            ToolTipService.ToolTip="Close Presenter Dock (Ctrl+Shift+D)">
+                        <FontIcon Glyph="&#xE8BB;" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </Button>
                 </Grid>
 
                 <!-- ========================================================= -->
-                <!-- COMPACT MODE (Single Row, Ultra-Minimal Floating Toolbar)  -->
+                <!-- ADAPTIVE VIDEO PLAYBACK & TIMELINE ROW                    -->
                 <!-- ========================================================= -->
-                <Grid x:Name="CompactRootGrid"
-                      ColumnSpacing="3"
+                <Grid x:Name="VideoPlaybackRowGrid"
+                      ColumnSpacing="4"
+                      Padding="2,2,2,0"
                       VerticalAlignment="Center"
-                      Visibility="{x:Bind views:PresenterDockWindow.BoolToVis(ViewModel.IsCompactMode), Mode=OneWay}">
+                      Visibility="{x:Bind views:PresenterDockWindow.BoolToVis(ViewModel.IsActiveSourceVideo), Mode=OneWay}">
                     <Grid.ColumnDefinitions>
-                        <!-- Status Dot -->
+                        <!-- Transport Buttons (Restart, Rewind 10s, Play/Pause, Forward 10s) -->
                         <ColumnDefinition Width="Auto" />
-                        <!-- Source Controls (Prev, Source Name, Next) -->
+                        <!-- Duration Timeline Slider -->
                         <ColumnDefinition Width="*" />
-                        <!-- Mode Selector (A+L / A / L) -->
-                        <ColumnDefinition Width="Auto" />
-                        <!-- Actions (Pause, Blackout) -->
-                        <ColumnDefinition Width="Auto" />
-                        <!-- More (Stop, Dashboard, Output) -->
-                        <ColumnDefinition Width="Auto" />
-                        <!-- Controls (Expand, Close) -->
+                        <!-- Timecode Text (00:00 / 00:00) -->
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Live Status Dot -->
-                    <Border Grid.Column="0"
-                            Padding="3,2"
+                    <!-- Video Transport Controls -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="1" VerticalAlignment="Center">
+                        <!-- Restart Video -->
+                        <Button Command="{x:Bind ViewModel.RestartVideoCommand}"
+                                Style="{StaticResource DockIconButtonStyle}"
+                                ToolTipService.ToolTip="Restart Video (00:00)">
+                            <FontIcon Glyph="&#xE777;" FontSize="11" />
+                        </Button>
+
+                        <!-- Seek Backward 10 Seconds -->
+                        <Button Command="{x:Bind ViewModel.SeekBackward10Command}"
+                                Style="{StaticResource DockIconButtonStyle}"
+                                ToolTipService.ToolTip="Seek Backward 10 Seconds">
+                            <FontIcon Glyph="&#xEB9E;" FontSize="11" />
+                        </Button>
+
+                        <!-- Play / Pause Video -->
+                        <Button Command="{x:Bind ViewModel.ToggleVideoPlaybackCommand}"
+                                Style="{StaticResource DockIconButtonStyle}"
+                                ToolTipService.ToolTip="{x:Bind ViewModel.VideoPlaybackButtonTooltip, Mode=OneWay}">
+                            <FontIcon Glyph="{x:Bind ViewModel.VideoPlaybackButtonGlyph, Mode=OneWay}" FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                        </Button>
+
+                        <!-- Seek Forward 10 Seconds -->
+                        <Button Command="{x:Bind ViewModel.SeekForward10Command}"
+                                Style="{StaticResource DockIconButtonStyle}"
+                                ToolTipService.ToolTip="Seek Forward 10 Seconds">
+                            <FontIcon Glyph="&#xEB9D;" FontSize="11" />
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Timeline Slider -->
+                    <Slider x:Name="VideoTimelineSlider"
+                            Grid.Column="1"
+                            Minimum="0"
+                            Maximum="{x:Bind ViewModel.VideoDurationSeconds, Mode=OneWay}"
+                            Value="{x:Bind ViewModel.VideoPositionSeconds, Mode=TwoWay}"
+                            StepFrequency="0.5"
+                            SmallChange="1"
+                            LargeChange="5"
+                            Padding="0"
+                            Margin="4,0"
                             VerticalAlignment="Center"
-                            ToolTipService.ToolTip="{x:Bind ViewModel.StatusDisplayText, Mode=OneWay}">
-                        <Ellipse Width="6" Height="6" Fill="{ThemeResource AccentFillColorDefaultBrush}" />
-                    </Border>
+                            PointerCaptureLost="OnTimelineSliderPointerCaptureLost" />
 
-                    <!-- Source Navigation in Compact Mode -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                        <Button Command="{x:Bind ViewModel.PreviousSourceCommand}"
-                                IsEnabled="{x:Bind ViewModel.CanSwitchSources, Mode=OneWay}"
-                                Style="{StaticResource DockIconButtonStyle}"
-                                ToolTipService.ToolTip="Previous Source (Ctrl+Shift+Left)">
-                            <FontIcon Glyph="&#xE76B;" FontSize="10" />
-                        </Button>
-
-                        <!-- Active Source Button in Compact Mode -->
-                        <Button x:Name="CompactSourceButton"
-                                Click="OnSourceSelectorClicked"
-                                Style="{StaticResource DockBadgeButtonStyle}"
-                                MaxWidth="125"
-                                Padding="4,2"
-                                ToolTipService.ToolTip="{x:Bind ViewModel.SourceFullTooltip, Mode=OneWay}">
-                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                                <TextBlock Text="{x:Bind ViewModel.ActiveSourceTitle, Mode=OneWay}"
-                                           FontSize="11"
-                                           FontWeight="SemiBold"
-                                           TextTrimming="CharacterEllipsis"
-                                           TextWrapping="NoWrap"
-                                           MaxLines="1"
-                                           MaxWidth="85"
-                                           VerticalAlignment="Center" />
-                                <FontIcon Glyph="&#xE70D;" FontSize="8" Foreground="{ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-
-                        <Button Command="{x:Bind ViewModel.NextSourceCommand}"
-                                IsEnabled="{x:Bind ViewModel.CanSwitchSources, Mode=OneWay}"
-                                Style="{StaticResource DockIconButtonStyle}"
-                                ToolTipService.ToolTip="Next Source (Ctrl+Shift+Right)">
-                            <FontIcon Glyph="&#xE76C;" FontSize="10" />
-                        </Button>
-                    </StackPanel>
-
-                    <!-- Mode Selector in Compact Mode (Opens External Dropdown Menu) -->
-                    <Button x:Name="CompactModeButton"
-                            Grid.Column="2"
-                            Click="OnModeSelectorClicked"
-                            Style="{StaticResource DockBadgeButtonStyle}"
-                            ToolTipService.ToolTip="{x:Bind ViewModel.SwitchModeTooltip, Mode=OneWay}">
-                        <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="{x:Bind ViewModel.SwitchModeBadge, Mode=OneWay}"
-                                       FontSize="9"
-                                       FontWeight="Bold"
-                                       Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                                       VerticalAlignment="Center" />
-                            <FontIcon Glyph="&#xE70D;" FontSize="7" Foreground="{ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-
-                    <!-- Compact Actions (Mute, Pause, Blackout) -->
-                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                        <!-- Video Mute / Unmute (Compact) -->
-                        <Button Command="{x:Bind ViewModel.ToggleMediaMuteCommand}"
-                                Visibility="{x:Bind views:PresenterDockWindow.BoolToVis(ViewModel.IsActiveSourceVideo), Mode=OneWay}"
-                                Style="{StaticResource DockIconButtonStyle}"
-                                ToolTipService.ToolTip="{x:Bind ViewModel.MediaMuteButtonTooltip, Mode=OneWay}">
-                            <FontIcon Glyph="{x:Bind ViewModel.MediaMuteButtonGlyph, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                        </Button>
-
-                        <!-- Pause -->
-                        <Button Command="{x:Bind ViewModel.TogglePauseCommand}"
-                                IsEnabled="{x:Bind ViewModel.IsPresenting, Mode=OneWay}"
-                                Style="{StaticResource DockIconButtonStyle}"
-                                ToolTipService.ToolTip="Pause / Resume (Ctrl+Shift+P)">
-                            <FontIcon Glyph="{x:Bind ViewModel.PauseButtonGlyph, Mode=OneWay}" FontSize="10" />
-                        </Button>
-
-                        <!-- Blackout -->
-                        <Button Command="{x:Bind ViewModel.ToggleBlackoutCommand}"
-                                IsEnabled="{x:Bind ViewModel.IsPresenting, Mode=OneWay}"
-                                Style="{StaticResource DockIconButtonStyle}"
-                                ToolTipService.ToolTip="Toggle Blackout (Ctrl+Shift+B)">
-                            <FontIcon Glyph="{x:Bind ViewModel.BlackoutButtonGlyph, Mode=OneWay}" FontSize="10" />
-                        </Button>
-                    </StackPanel>
-
-                    <!-- More Actions (Opens External Dropdown Menu) -->
-                    <Button x:Name="CompactMoreButton"
-                            Grid.Column="4"
-                            Click="OnMoreOptionsClicked"
-                            Style="{StaticResource DockIconButtonStyle}"
-                            ToolTipService.ToolTip="More Options &amp; Stop Presenting">
-                        <FontIcon Glyph="&#xE712;" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    </Button>
-
-                    <!-- Compact Controls (Expand, Close) -->
-                    <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="1" VerticalAlignment="Center">
-                        <!-- Expand Button -->
-                        <Button Command="{x:Bind ViewModel.ToggleCompactModeCommand}"
-                                Style="{StaticResource DockIconButtonStyle}"
-                                ToolTipService.ToolTip="{x:Bind ViewModel.CompactModeTooltip, Mode=OneWay}">
-                            <FontIcon Glyph="&#xE740;" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        </Button>
-
-                        <!-- Close Button -->
-                        <Button Command="{x:Bind ViewModel.CloseDockCommand}"
-                                Style="{StaticResource DockIconButtonStyle}"
-                                ToolTipService.ToolTip="Close Presenter Dock (Ctrl+Shift+D)">
-                            <FontIcon Glyph="&#xE8BB;" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        </Button>
-                    </StackPanel>
+                    <!-- Current Time / Total Duration -->
+                    <TextBlock Grid.Column="2"
+                               Text="{x:Bind ViewModel.VideoPositionText, Mode=OneWay}"
+                               FontSize="10"
+                               FontFamily="Consolas"
+                               FontWeight="SemiBold"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               VerticalAlignment="Center"
+                               Margin="2,0,4,0" />
                 </Grid>
-            </Grid>
+            </StackPanel>
         </Border>
     </Grid>
 </Window>

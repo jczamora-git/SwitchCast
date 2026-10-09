@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI;
+using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -15,7 +16,7 @@ using WinRT.Interop;
 namespace SwitchCast.Views;
 
 /// <summary>
-/// Minimal single-row floating presenter companion dock window designed for instant source switching during live presentations.
+/// Minimal permanent floating presenter companion dock window designed for instant source switching and video playback control.
 /// </summary>
 public sealed partial class PresenterDockWindow : Window
 {
@@ -23,16 +24,10 @@ public sealed partial class PresenterDockWindow : Window
     private const uint SWP_NOMOVE = 0x0002;
     private const uint SWP_NOSIZE = 0x0001;
     private const uint SWP_SHOWWINDOW = 0x0040;
-
-    private const uint WM_NCLBUTTONDOWN = 0x00A1;
-    private const int HTCAPTION = 0x0002;
     private const uint MONITOR_DEFAULTTONEAREST = 2;
 
-    private const int DragThresholdSquared = 25; // 5 physical pixels squared threshold
-    private bool _isPointerDown;
-    private POINT _dragStartPoint;
-
     private AppWindow? _appWindow;
+    private InputNonClientPointerSource? _nonClientPointerSource;
     private PresenterDockMenuWindow? _activeMenuWindow;
     private long _lastMenuClosedTicks;
 
@@ -45,7 +40,9 @@ public sealed partial class PresenterDockWindow : Window
         Closed += OnWindowClosed;
 
         InitializeAppWindow();
-        SetupPointerHandlers();
+
+        DockCardBorder.Loaded += OnDockCardLoaded;
+        DockCardBorder.SizeChanged += OnDockCardSizeChanged;
     }
 
     public PresenterDockViewModel ViewModel { get; }
@@ -81,22 +78,127 @@ public sealed partial class PresenterDockWindow : Window
                 presenter.SetBorderAndTitleBar(hasBorder: false, hasTitleBar: false);
             }
 
-            ApplyWindowSizingAndPosition(ViewModel.IsCompactMode, initialCenter: true);
+            ApplyWindowSizingAndPosition(ViewModel.IsActiveSourceVideo, initialCenter: true);
 
             SetWindowPos(WindowHandle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+
+            try
+            {
+                _nonClientPointerSource = InputNonClientPointerSource.GetForWindowId(windowId);
+            }
+            catch
+            {
+                // NonClient pointer source fallback handled if not supported
+            }
         }
     }
 
-    private void SetupPointerHandlers()
+    private void OnDockCardLoaded(object sender, RoutedEventArgs e)
     {
-        DockCardBorder.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(OnDockPointerPressed), handledEventsToo: true);
-        DockCardBorder.AddHandler(UIElement.PointerMovedEvent, new PointerEventHandler(OnDockPointerMoved), handledEventsToo: true);
-        DockCardBorder.AddHandler(UIElement.PointerReleasedEvent, new PointerEventHandler(OnDockPointerReleased), handledEventsToo: true);
-        DockCardBorder.AddHandler(UIElement.PointerCanceledEvent, new PointerEventHandler(OnDockPointerCanceled), handledEventsToo: true);
-        DockCardBorder.AddHandler(UIElement.PointerCaptureLostEvent, new PointerEventHandler(OnDockPointerCaptureLost), handledEventsToo: true);
+        UpdateNonClientRegions();
     }
 
-    private void ApplyWindowSizingAndPosition(bool isCompact, bool initialCenter = false)
+    private void OnDockCardSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateNonClientRegions();
+    }
+
+    /// <summary>
+    /// Dynamically defines genuine native Windows caption drag regions for non-interactive areas
+    /// and ensures interactive controls receive normal client mouse input.
+    /// </summary>
+    private void UpdateNonClientRegions()
+    {
+        if (_nonClientPointerSource is null || _appWindow is null)
+        {
+            return;
+        }
+
+        try
+        {
+            uint dpi = GetDpiForWindow(WindowHandle);
+            if (dpi == 0) dpi = 96;
+            double scale = dpi / 96.0;
+
+            int windowWidth = _appWindow.Size.Width;
+            int windowHeight = _appWindow.Size.Height;
+
+            if (windowWidth <= 0 || windowHeight <= 0)
+            {
+                return;
+            }
+
+            // 1. Set the entire dock surface as native caption (draggable)
+            _nonClientPointerSource.SetRegionRects(
+                NonClientRegionKind.Caption,
+                [new RectInt32(0, 0, windowWidth, windowHeight)]);
+
+            // 2. Discover all interactive elements and set them as Passthrough (interactive client regions)
+            var passthroughRects = new List<RectInt32>();
+            CollectInteractiveRects(DockCardBorder, passthroughRects, scale);
+
+            if (passthroughRects.Count > 0)
+            {
+                _nonClientPointerSource.SetRegionRects(
+                    NonClientRegionKind.Passthrough,
+                    passthroughRects.ToArray());
+            }
+        }
+        catch
+        {
+            // Defensive handling for non-client pointer configuration
+        }
+    }
+
+    private void CollectInteractiveRects(DependencyObject parent, List<RectInt32> rects, double scale)
+    {
+        int count = VisualTreeHelper.GetChildrenCount(parent);
+        for (int i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is FrameworkElement fe && fe.Visibility == Visibility.Visible)
+            {
+                if (IsDirectInteractiveControl(fe))
+                {
+                    try
+                    {
+                        var transform = fe.TransformToVisual(DockCardBorder);
+                        var bounds = transform.TransformBounds(new Windows.Foundation.Rect(0, 0, fe.ActualWidth, fe.ActualHeight));
+
+                        if (bounds.Width > 0 && bounds.Height > 0)
+                        {
+                            int x = (int)Math.Floor(bounds.X * scale);
+                            int y = (int)Math.Floor(bounds.Y * scale);
+                            int w = (int)Math.Ceiling(bounds.Width * scale);
+                            int h = (int)Math.Ceiling(bounds.Height * scale);
+
+                            rects.Add(new RectInt32(x, y, w, h));
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore visual transform issues on unattached nodes
+                    }
+                }
+                else
+                {
+                    CollectInteractiveRects(child, rects, scale);
+                }
+            }
+        }
+    }
+
+    private static bool IsDirectInteractiveControl(FrameworkElement element)
+    {
+        return element is ButtonBase ||
+               element is ComboBox ||
+               element is Slider ||
+               element is TextBox ||
+               element is ToggleSwitch ||
+               element is ListViewItem;
+    }
+
+    private void ApplyWindowSizingAndPosition(bool isVideoActive, bool initialCenter = false)
     {
         CloseActiveMenu();
 
@@ -113,9 +215,10 @@ public sealed partial class PresenterDockWindow : Window
 
         double scale = dpi / 96.0;
 
-        // Establish minimal single-row target DIP dimensions
-        double widthDip = isCompact ? 460.0 : 660.0;
-        double heightDip = isCompact ? 46.0 : 52.0;
+        // Baseline width: 680 DIPs (comfortable single row).
+        // Height: 52 DIPs for standard sources, 86 DIPs when adaptive video row is on air.
+        double widthDip = 680.0;
+        double heightDip = isVideoActive ? 86.0 : 52.0;
 
         int pixelWidth = (int)Math.Round(widthDip * scale);
         int pixelHeight = (int)Math.Round(heightDip * scale);
@@ -126,6 +229,8 @@ public sealed partial class PresenterDockWindow : Window
         {
             CenterDockOnTopWorkArea(pixelWidth);
         }
+
+        DispatcherQueue.TryEnqueue(UpdateNonClientRegions);
     }
 
     private void CenterDockOnTopWorkArea(int pixelWidth)
@@ -155,106 +260,12 @@ public sealed partial class PresenterDockWindow : Window
         }
     }
 
-    private void OnDockPointerPressed(object sender, PointerRoutedEventArgs e)
+    private void OnTimelineSliderPointerCaptureLost(object sender, PointerRoutedEventArgs e)
     {
-        var ptr = e.GetCurrentPoint(null);
-        if (!ptr.Properties.IsLeftButtonPressed)
+        if (sender is Slider slider)
         {
-            _isPointerDown = false;
-            return;
+            ViewModel.CompleteScrubbing(slider.Value);
         }
-
-        if (!GetCursorPos(out _dragStartPoint))
-        {
-            return;
-        }
-
-        if (!IsInteractiveControl(e.OriginalSource as DependencyObject))
-        {
-            // Direct press on non-interactive toolbar surfaces (background, padding, status badge, dividers, text labels)
-            _isPointerDown = false;
-            CloseActiveMenu();
-            ReleaseCapture();
-            SendMessage(WindowHandle, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
-            e.Handled = true;
-            return;
-        }
-
-        // Press on interactive control (buttons, dropdowns): track movement threshold to distinguish click vs drag
-        _isPointerDown = true;
-    }
-
-    private void OnDockPointerMoved(object sender, PointerRoutedEventArgs e)
-    {
-        if (!_isPointerDown)
-        {
-            return;
-        }
-
-        var ptr = e.GetCurrentPoint(null);
-        if (!ptr.Properties.IsLeftButtonPressed)
-        {
-            _isPointerDown = false;
-            return;
-        }
-
-        if (GetCursorPos(out POINT currentPoint))
-        {
-            int dx = currentPoint.X - _dragStartPoint.X;
-            int dy = currentPoint.Y - _dragStartPoint.Y;
-            if ((dx * dx + dy * dy) >= DragThresholdSquared)
-            {
-                _isPointerDown = false;
-                CloseActiveMenu();
-                ReleaseCapture();
-                SendMessage(WindowHandle, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
-                e.Handled = true;
-            }
-        }
-    }
-
-    private void OnDockPointerReleased(object sender, PointerRoutedEventArgs e)
-    {
-        _isPointerDown = false;
-    }
-
-    private void OnDockPointerCanceled(object sender, PointerRoutedEventArgs e)
-    {
-        _isPointerDown = false;
-    }
-
-    private void OnDockPointerCaptureLost(object sender, PointerRoutedEventArgs e)
-    {
-        _isPointerDown = false;
-    }
-
-    private static bool IsInteractiveControl(DependencyObject? element)
-    {
-        while (element is not null)
-        {
-            if (element is ButtonBase ||
-                element is ComboBox ||
-                element is TextBox ||
-                element is RichEditBox ||
-                element is PasswordBox ||
-                element is Slider ||
-                element is ToggleSwitch ||
-                element is ListViewItem ||
-                element is GridViewItem ||
-                element is MenuFlyoutItem ||
-                element is MenuFlyoutSubItem ||
-                element is FlyoutPresenter ||
-                element is MenuFlyoutPresenter ||
-                element is ScrollBar ||
-                element is Thumb)
-            {
-                return true;
-            }
-
-            element = VisualTreeHelper.GetParent(element);
-        }
-
-        return false;
     }
 
     private void OnSourceSelectorClicked(object sender, RoutedEventArgs e)
@@ -324,9 +335,9 @@ public sealed partial class PresenterDockWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(PresenterDockViewModel.IsCompactMode))
+        if (e.PropertyName == nameof(PresenterDockViewModel.IsActiveSourceVideo))
         {
-            DispatcherQueue.TryEnqueue(() => ApplyWindowSizingAndPosition(ViewModel.IsCompactMode, initialCenter: false));
+            DispatcherQueue.TryEnqueue(() => ApplyWindowSizingAndPosition(ViewModel.IsActiveSourceVideo, initialCenter: false));
         }
     }
 
@@ -361,23 +372,6 @@ public sealed partial class PresenterDockWindow : Window
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
-
-    [DllImport("user32.dll")]
-    private static extern bool ReleaseCapture();
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct POINT
-    {
-        public int X;
-        public int Y;
-    }
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool GetCursorPos(out POINT lpPoint);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);

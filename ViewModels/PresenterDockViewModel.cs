@@ -9,16 +9,16 @@ namespace SwitchCast.ViewModels;
 /// <summary>
 /// ViewModel managing the compact floating presenter companion dock window and three-mode source switching.
 /// </summary>
-public partial class PresenterDockViewModel : ObservableObject
+public partial class PresenterDockViewModel : ObservableObject, IDisposable
 {
     private readonly IPresentationCoordinator _presentationCoordinator;
     private readonly IPresentationStateService _presentationStateService;
     private readonly IPresentationWindowService _presentationWindowService;
     private readonly IPresenterDockService _dockService;
     private readonly IApplicationSettingsService _settingsService;
-
-    [ObservableProperty]
-    private bool _isCompactMode;
+    private Timer? _playbackProgressTimer;
+    private bool _isScrubbing;
+    private double _scrubbingPositionSeconds;
 
     public PresenterDockViewModel(
         IPresentationCoordinator presentationCoordinator,
@@ -33,8 +33,6 @@ public partial class PresenterDockViewModel : ObservableObject
         _dockService = dockService ?? throw new ArgumentNullException(nameof(dockService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
 
-        _isCompactMode = _settingsService.CurrentSettings.StartDockInCompactMode;
-
         _presentationStateService.PropertyChanged += OnStatePropertyChanged;
         _presentationCoordinator.PropertyChanged += OnCoordinatorPropertyChanged;
         _presentationWindowService.DisplayModeChanged += OnWindowDisplayModeChanged;
@@ -45,14 +43,31 @@ public partial class PresenterDockViewModel : ObservableObject
         {
             _presentationCoordinator.MediaPresentationService.MediaStateChanged += (s, e) =>
             {
-                OnPropertyChanged(nameof(IsActiveSourceVideo));
-                OnPropertyChanged(nameof(IsMediaMuted));
-                OnPropertyChanged(nameof(MediaVolume));
-                OnPropertyChanged(nameof(MediaVolumePercentText));
-                OnPropertyChanged(nameof(MediaMuteButtonGlyph));
-                OnPropertyChanged(nameof(MediaMuteButtonTooltip));
+                NotifyMediaProperties();
             };
         }
+
+        SetupPlaybackProgressTimer();
+    }
+
+    private void SetupPlaybackProgressTimer()
+    {
+        _playbackProgressTimer = new Timer(OnPlaybackProgressTick, null, 250, 250);
+    }
+
+    private void OnPlaybackProgressTick(object? state)
+    {
+        if (IsActiveSourceVideo && IsVideoPlaying && !_isScrubbing)
+        {
+            OnPropertyChanged(nameof(VideoPositionSeconds));
+            OnPropertyChanged(nameof(VideoPositionText));
+        }
+    }
+
+    public void Dispose()
+    {
+        _playbackProgressTimer?.Dispose();
+        _playbackProgressTimer = null;
     }
 
     public PresentationStatus Status => _presentationStateService.Status;
@@ -190,16 +205,133 @@ public partial class PresenterDockViewModel : ObservableObject
 
     public string BlackoutButtonGlyph => IsBlackout ? "\uE7B3" : "\uED1A"; // Eye / Closed Eye
 
-    public string CompactModeGlyph => IsCompactMode ? "\uE740" : "\uE73F"; // Expand / Contract
+    // ==========================================
+    // VIDEO PLAYBACK CONTROLS & TIMELINE
+    // ==========================================
 
-    public string CompactModeTooltip => IsCompactMode ? "Expand Presenter Dock" : "Collapse to Compact Mode";
+    public bool IsVideoPlaying => _presentationCoordinator.MediaPresentationService.IsVideoPlaying;
 
-    partial void OnIsCompactModeChanged(bool value)
+    public bool IsVideoPaused => _presentationCoordinator.MediaPresentationService.IsVideoPaused;
+
+    public bool IsVideoEnded => _presentationCoordinator.MediaPresentationService.IsVideoEnded;
+
+    public string VideoPlaybackButtonGlyph => IsVideoPlaying ? "\uE769" : "\uE768"; // Pause / Play
+
+    public string VideoPlaybackButtonTooltip => IsVideoPlaying ? "Pause Video" : (IsVideoEnded ? "Replay Video" : "Play Video");
+
+    public double VideoDurationSeconds
     {
-        _settingsService.CurrentSettings.StartDockInCompactMode = value;
-        _ = _settingsService.SaveSettingsAsync();
-        OnPropertyChanged(nameof(CompactModeGlyph));
-        OnPropertyChanged(nameof(CompactModeTooltip));
+        get
+        {
+            var dur = _presentationCoordinator.MediaPresentationService.Duration;
+            if (dur == TimeSpan.Zero && _presentationCoordinator.CurrentPresentationSource is VideoMediaSource v && v.Duration.HasValue)
+            {
+                dur = v.Duration.Value;
+            }
+            return Math.Max(0, dur.TotalSeconds);
+        }
+    }
+
+    public double VideoPositionSeconds
+    {
+        get
+        {
+            if (_isScrubbing)
+            {
+                return _scrubbingPositionSeconds;
+            }
+            return _presentationCoordinator.MediaPresentationService.Position.TotalSeconds;
+        }
+        set
+        {
+            if (_isScrubbing)
+            {
+                _scrubbingPositionSeconds = value;
+                OnPropertyChanged(nameof(VideoPositionSeconds));
+                OnPropertyChanged(nameof(VideoPositionText));
+            }
+        }
+    }
+
+    public string VideoPositionText
+    {
+        get
+        {
+            var pos = _isScrubbing
+                ? TimeSpan.FromSeconds(_scrubbingPositionSeconds)
+                : _presentationCoordinator.MediaPresentationService.Position;
+
+            var dur = _presentationCoordinator.MediaPresentationService.Duration;
+            if (dur == TimeSpan.Zero && _presentationCoordinator.CurrentPresentationSource is VideoMediaSource v && v.Duration.HasValue)
+            {
+                dur = v.Duration.Value;
+            }
+
+            return $"{pos:mm\\:ss} / {dur:mm\\:ss}";
+        }
+    }
+
+    public void StartScrubbing(double currentSeconds)
+    {
+        _isScrubbing = true;
+        _scrubbingPositionSeconds = currentSeconds;
+    }
+
+    public void CompleteScrubbing(double targetSeconds)
+    {
+        _isScrubbing = false;
+        var targetTime = TimeSpan.FromSeconds(Math.Clamp(targetSeconds, 0, VideoDurationSeconds));
+        _presentationCoordinator.MediaPresentationService.Seek(targetTime);
+        OnPropertyChanged(nameof(VideoPositionSeconds));
+        OnPropertyChanged(nameof(VideoPositionText));
+    }
+
+    [RelayCommand]
+    public void ToggleVideoPlayback()
+    {
+        if (IsVideoPlaying)
+        {
+            _presentationCoordinator.MediaPresentationService.PauseVideo();
+        }
+        else
+        {
+            _presentationCoordinator.MediaPresentationService.ResumeVideo();
+        }
+        NotifyMediaProperties();
+    }
+
+    [RelayCommand]
+    public void RestartVideo()
+    {
+        _presentationCoordinator.MediaPresentationService.RestartVideo();
+        NotifyMediaProperties();
+    }
+
+    [RelayCommand]
+    public void SeekBackward10()
+    {
+        var current = _presentationCoordinator.MediaPresentationService.Position;
+        var target = current - TimeSpan.FromSeconds(10);
+        if (target < TimeSpan.Zero)
+        {
+            target = TimeSpan.Zero;
+        }
+        _presentationCoordinator.MediaPresentationService.Seek(target);
+        NotifyMediaProperties();
+    }
+
+    [RelayCommand]
+    public void SeekForward10()
+    {
+        var current = _presentationCoordinator.MediaPresentationService.Position;
+        var max = TimeSpan.FromSeconds(VideoDurationSeconds);
+        var target = current + TimeSpan.FromSeconds(10);
+        if (target > max && max > TimeSpan.Zero)
+        {
+            target = max;
+        }
+        _presentationCoordinator.MediaPresentationService.Seek(target);
+        NotifyMediaProperties();
     }
 
     [RelayCommand]
@@ -285,12 +417,6 @@ public partial class PresenterDockViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ToggleCompactMode()
-    {
-        IsCompactMode = !IsCompactMode;
-    }
-
-    [RelayCommand]
     private void CloseDock()
     {
         _dockService.CloseDock();
@@ -339,6 +465,24 @@ public partial class PresenterDockViewModel : ObservableObject
         OnPropertyChanged(nameof(SourceFullTooltip));
     }
 
+    private void NotifyMediaProperties()
+    {
+        OnPropertyChanged(nameof(IsActiveSourceVideo));
+        OnPropertyChanged(nameof(IsVideoPlaying));
+        OnPropertyChanged(nameof(IsVideoPaused));
+        OnPropertyChanged(nameof(IsVideoEnded));
+        OnPropertyChanged(nameof(VideoPlaybackButtonGlyph));
+        OnPropertyChanged(nameof(VideoPlaybackButtonTooltip));
+        OnPropertyChanged(nameof(VideoDurationSeconds));
+        OnPropertyChanged(nameof(VideoPositionSeconds));
+        OnPropertyChanged(nameof(VideoPositionText));
+        OnPropertyChanged(nameof(IsMediaMuted));
+        OnPropertyChanged(nameof(MediaVolume));
+        OnPropertyChanged(nameof(MediaVolumePercentText));
+        OnPropertyChanged(nameof(MediaMuteButtonGlyph));
+        OnPropertyChanged(nameof(MediaMuteButtonTooltip));
+    }
+
     private void NotifyAllProperties()
     {
         OnPropertyChanged(nameof(Status));
@@ -359,14 +503,7 @@ public partial class PresenterDockViewModel : ObservableObject
         OnPropertyChanged(nameof(PauseButtonGlyph));
         OnPropertyChanged(nameof(BlackoutButtonText));
         OnPropertyChanged(nameof(BlackoutButtonGlyph));
-        OnPropertyChanged(nameof(CompactModeGlyph));
-        OnPropertyChanged(nameof(CompactModeTooltip));
-        OnPropertyChanged(nameof(IsActiveSourceVideo));
-        OnPropertyChanged(nameof(IsMediaMuted));
-        OnPropertyChanged(nameof(MediaVolume));
-        OnPropertyChanged(nameof(MediaVolumePercentText));
-        OnPropertyChanged(nameof(MediaMuteButtonGlyph));
-        OnPropertyChanged(nameof(MediaMuteButtonTooltip));
+        NotifyMediaProperties();
         NotifyFullscreenProperties();
         NotifyModeProperties();
     }

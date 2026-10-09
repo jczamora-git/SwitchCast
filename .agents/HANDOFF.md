@@ -3,44 +3,31 @@
 ---
 
 ## Task Details
-- **Task**: Phase 6.3: Fullscreen Presentation Output
-- **Date**: 2026-10-09T17:48:00+08:00 (UTC+8)
+- **Task**: Floating Presenter Dock Finalization
+- **Date**: 2026-10-09T19:48:00+08:00 (UTC+8)
 - **Status**: Completed & Verified
 
 ---
 
 ## 1. Objectives Implemented
 
-1. **Native AppWindow Fullscreen Mode**:
-   - Integrated `AppWindow.SetPresenter(AppWindowPresenterKind.FullScreen)` and `AppWindowPresenterKind.Default` in [Views/PresentationWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresentationWindow.xaml.cs).
-   - Removed window borders, title bar caption, and taskbar overlay in fullscreen without destroying or recreating the window instance.
+1. **Native Windows Caption Dragging**:
+   - Replaced custom pointer routing and manual Win32 `SendMessage(WM_NCLBUTTONDOWN)` with Windows App SDK `Microsoft.UI.Input.InputNonClientPointerSource`.
+   - Mapped the dock background to `NonClientRegionKind.Caption` and all interactive controls (buttons, dropdown triggers, sliders) to `NonClientRegionKind.Passthrough`.
+   - Completely resolved sticky dragging / click-to-move anomaly; window drag initiates exclusively while holding left mouse button and terminates instantly on release.
 
-2. **Stable HWND Preservation & Zero Session Recreation**:
-   - Transitioning between `Windowed` and `Fullscreen` preserves the exact same `PresentationWindow` HWND, DirectX 11 capture pipeline, active video/audio stream, and presentation state.
-   - Screen sharing targets in Google Meet, Zoom, and Microsoft Teams remain undisturbed.
+2. **Removal of Compact/Expanded Modes**:
+   - Replaced dual-layout system with one permanent, polished Floating Presenter Dock layout (680 DIP width baseline).
+   - Removed obsolete expand/contract toggle buttons, tooltips, ViewModel properties/commands, and legacy settings rows.
 
-3. **Responsive Presentation Viewport & Custom Title Bar Collapsing**:
-   - Custom XAML title bar (`AppTitleBar`) is completely collapsed in fullscreen (`TitleBarRow.Height = 0` / `AppTitleBar.Visibility = Collapsed` / `SetTitleBar(null)`).
-   - Presentation content (Screen Capture, Direct Image, Video `MediaPlayerElement`, Standby canvas, Blackout overlay) fills 100% of the active display with aspect ratio preserved (`Stretch="Uniform"`).
-   - Restoring windowed mode returns title bar height to 38px with full window dragging and caption controls restored.
+3. **Adaptive Video Playback & Timeline Controls**:
+   - When a video source is On Air, the dock automatically reveals a second video transport row (height adapts from 52 DIPs to 86 DIPs).
+   - Added Restart video (`\uE777`), Seek backward 10s (`\uEB9E`), Play/Pause video (`\uE768`/`\uE769`), Seek forward 10s (`\uEB9D`), timeline slider scrubber with smooth drag commitment, and live timecode text (`00:00 / 00:00`).
+   - Non-video sources (Window, Display, Image) cleanly hide the video row and shrink dock height to 52 DIPs with dynamic hit-test region recalculation.
 
-4. **Floating Presenter Dock Control Surface**:
-   - Added fullscreen icon toggle (`\uE740` Enter / `\uE73F` Exit) in Expanded dock mode in [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml).
-   - Added fullscreen toggle item in `PresenterDockMenuWindow` More Options popup.
-   - Dynamic glyph and tooltip bound to `PresenterDockViewModel.FullscreenButtonGlyph` and `FullscreenButtonTooltip`.
-   - Button is enabled only when the Presentation Output window is open.
-
-5. **Multi-Monitor Handling & Coordinate Restoration**:
-   - Fullscreen is initiated on whichever monitor currently contains the Presentation Output window.
-   - Restores the previous normal window size, coordinates, and monitor placement when exiting fullscreen.
-
-6. **Keyboard Recovery & Lifecycle Integration**:
-   - Added `Escape` key handler in `PresentationWindow` when focused to exit fullscreen safely.
-   - Stop Presenting and window closing safely reset display mode state to Windowed.
-
-7. **Comprehensive Automated Testing**:
-   - Added [SwitchCast.Tests/Services/PresentationFullscreenTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PresentationFullscreenTests.cs) verifying display mode state synchronization, command execution, and window open/close lifecycle.
-   - **247 automated tests passing with 100% success rate**.
+4. **Comprehensive Automated Testing**:
+   - Updated [SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs) verifying video playback commands, seeking, scrubbing, and duration/timecode formatting.
+   - **247 automated unit tests passing with 100% success rate**.
 
 ---
 

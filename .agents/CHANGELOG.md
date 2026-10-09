@@ -7,6 +7,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Floating Presenter Dock Finalization] - 2026-10-09
+
+### Fixed / Added / Improved (fix / feat / UI / test / docs)
+- **Native Windows Caption Dragging**:
+  - Replaced legacy pointer routing and manual `SendMessage(WM_NCLBUTTONDOWN)` with genuine Windows App SDK `Microsoft.UI.Input.InputNonClientPointerSource` non-client regions in [Views/PresenterDockWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml.cs).
+  - Configured dock surface as `NonClientRegionKind.Caption` and interactive controls as `NonClientRegionKind.Passthrough`.
+  - Completely resolved sticky dragging / click-to-move bug without mouse-follow anomalies.
+- **Unified Permanent Dock Layout**:
+  - Removed dual Compact vs Expanded mode switching, toggle buttons, and legacy settings rows.
+  - Established permanent single-row layout baseline (680 DIPs width) with full presenter actions, fullscreen toggle, source selector, and switching mode dropdown.
+- **Adaptive Video Playback & Timeline Controls**:
+  - Added source-aware second row for video sources in [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml) with Restart (`00:00`), Seek Backward 10s (`\uEB9E`), Play/Pause (`\uE768`/`\uE769`), Seek Forward 10s (`\uEB9D`), timeline slider scrubber, and timecode progress (`00:00 / 00:00`).
+  - Height automatically transitions between 52 DIPs (standard sources) and 86 DIPs (video sources) with dynamic hit-test region updates.
+- **Automated Unit & Regression Tests**:
+  - Updated [SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs) covering video transport commands, seeking, duration, and scrubbing state.
+  - **247 automated unit tests passing with 100% success rate**.
+
+---
+
 ## [Phase 6.3: Fullscreen Presentation Output] - 2026-10-09
 
 ### Added / Improved (feat / UI / test / docs)
