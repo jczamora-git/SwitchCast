@@ -26,6 +26,7 @@ public partial class SourcesViewModel : ObservableObject
     private readonly List<SelectableSourceItem> _allWindows = [];
     private readonly List<SelectableSourceItem> _allDisplays = [];
     private readonly List<SelectableSourceItem> _allMedia = [];
+    private bool _isSyncingSelection;
 
     [ObservableProperty]
     private int _selectedCategoryIndex = 0; // 0 = Windows, 1 = Displays, 2 = Media Files
@@ -397,6 +398,11 @@ public partial class SourcesViewModel : ObservableObject
 
     private void OnItemSelectionChanged(SelectableSourceItem item, bool isSelected)
     {
+        if (_isSyncingSelection)
+        {
+            return;
+        }
+
         if (isSelected)
         {
             _presentationStateService.AddSelectedSource(item.Source);
@@ -415,14 +421,22 @@ public partial class SourcesViewModel : ObservableObject
             OnPropertyChanged(nameof(SelectedSourceCount));
             OnPropertyChanged(nameof(HasSelectedSources));
 
-            // Sync item selection states
-            foreach (var item in DisplayedSources)
+            _isSyncingSelection = true;
+            try
             {
-                var isSelected = _presentationStateService.IsSourceSelected(item.Id);
-                if (item.IsSelected != isSelected)
+                // Sync item selection states across all discovered collections so switching tabs shows accurate state
+                foreach (var item in _allWindows.Concat(_allDisplays).Concat(_allMedia))
                 {
-                    item.IsSelected = isSelected;
+                    var isSelected = _presentationStateService.IsSourceSelected(item.Id);
+                    if (item.IsSelected != isSelected)
+                    {
+                        item.IsSelected = isSelected;
+                    }
                 }
+            }
+            finally
+            {
+                _isSyncingSelection = false;
             }
         }
     }

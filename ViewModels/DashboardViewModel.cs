@@ -27,6 +27,8 @@ public partial class DashboardViewModel : ObservableObject
     [ObservableProperty]
     private CaptureSource? _selectedPresentationSource;
 
+    private bool _isSyncingPresentationSource;
+
     public DashboardViewModel(
         IPresentationStateService presentationStateService,
         INavigationService navigationService,
@@ -509,6 +511,11 @@ public partial class DashboardViewModel : ObservableObject
 
     partial void OnSelectedPresentationSourceChanged(CaptureSource? value)
     {
+        if (_isSyncingPresentationSource)
+        {
+            return;
+        }
+
         if (HasActivePresentation && value is not null && value.IsAvailable && value.Id != _presentationCoordinator.CurrentPresentationSource?.Id)
         {
             _ = SwitchPresentationSourceAsync(value);
@@ -583,9 +590,30 @@ public partial class DashboardViewModel : ObservableObject
                 SelectedPreviewSource = SelectedSources.FirstOrDefault(s => s.IsAvailable);
             }
 
-            if (SelectedPresentationSource is null || !SelectedSources.Any(s => s.Id == SelectedPresentationSource.Id))
+            if (!HasActivePresentation)
             {
-                SelectedPresentationSource = SelectedSources.FirstOrDefault(s => s.IsAvailable);
+                if (SelectedPresentationSource is null || !SelectedSources.Any(s => s.Id == SelectedPresentationSource.Id))
+                {
+                    SelectedPresentationSource = SelectedSources.FirstOrDefault(s => s.IsAvailable);
+                }
+            }
+            else
+            {
+                // While presenting, keep SelectedPresentationSource aligned with CurrentPresentationSource
+                // so unqueueing the active source does NOT trigger an unintended live switch.
+                if (_presentationCoordinator.CurrentPresentationSource is not null &&
+                    SelectedPresentationSource?.Id != _presentationCoordinator.CurrentPresentationSource.Id)
+                {
+                    _isSyncingPresentationSource = true;
+                    try
+                    {
+                        SelectedPresentationSource = _presentationCoordinator.CurrentPresentationSource;
+                    }
+                    finally
+                    {
+                        _isSyncingPresentationSource = false;
+                    }
+                }
             }
         }
     }

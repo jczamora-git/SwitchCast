@@ -30,6 +30,9 @@ public sealed partial class PresenterDockMenuWindow : Window
     private readonly PresenterDockViewModel _viewModel;
     private AppWindow? _appWindow;
     private bool _isClosing;
+    private FrameworkElement? _lastAnchorElement;
+    private IntPtr _lastOwnerHwnd;
+    private bool _isUnqueueing;
 
     public PresenterDockMenuWindow(PresenterDockViewModel viewModel)
     {
@@ -77,6 +80,8 @@ public sealed partial class PresenterDockMenuWindow : Window
     public void ShowMenu(PresenterDockMenuType menuType, FrameworkElement anchorElement, IntPtr ownerHwnd)
     {
         CurrentMenuType = menuType;
+        _lastAnchorElement = anchorElement;
+        _lastOwnerHwnd = ownerHwnd;
 
         // Set owner window
         if (ownerHwnd != IntPtr.Zero)
@@ -210,11 +215,65 @@ public sealed partial class PresenterDockMenuWindow : Window
 
     private void OnSourceListItemClicked(object sender, ItemClickEventArgs e)
     {
+        if (_isUnqueueing)
+        {
+            return;
+        }
+
         if (e.ClickedItem is CaptureSource source)
         {
             _ = _viewModel.SwitchSourceCommand.ExecuteAsync(source);
             CloseMenu();
         }
+    }
+
+    private void OnUnqueueCheckClicked(object sender, RoutedEventArgs e)
+    {
+        var source = (sender as FrameworkElement)?.DataContext as CaptureSource
+            ?? (sender as FrameworkElement)?.Tag as CaptureSource;
+
+        if (source is not null)
+        {
+            _isUnqueueing = true;
+            try
+            {
+                _viewModel.UnqueueSourceCommand.Execute(source);
+                RefreshQueuedSourcesMenu();
+            }
+            finally
+            {
+                _isUnqueueing = false;
+            }
+        }
+    }
+
+    public void RefreshQueuedSourcesMenu()
+    {
+        if (CurrentMenuType != PresenterDockMenuType.QueuedSources || _lastAnchorElement is null)
+        {
+            return;
+        }
+
+        var sources = _viewModel.SelectedSources;
+        SourceCountText.Text = $"({sources.Count})";
+
+        if (sources.Count == 0)
+        {
+            EmptySourcesPanel.Visibility = Visibility.Visible;
+            SourcesListView.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            EmptySourcesPanel.Visibility = Visibility.Collapsed;
+            SourcesListView.Visibility = Visibility.Visible;
+        }
+
+        double desiredWidthDip = 290.0;
+        double desiredHeightDip = sources.Count == 0
+            ? 110.0
+            : Math.Min(310.0, 48.0 + (sources.Count * 42.0));
+
+        PositionAndShow(_lastAnchorElement, _lastOwnerHwnd, desiredWidthDip, desiredHeightDip);
     }
 
     private void OnModeActiveAndLiveClicked(object sender, RoutedEventArgs e)

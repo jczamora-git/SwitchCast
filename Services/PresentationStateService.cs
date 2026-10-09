@@ -123,15 +123,32 @@ public partial class PresentationStateService : ObservableObject, IPresentationS
                 return false;
             }
 
+            int existingIndex = _selectedSources.IndexOf(existing);
             _selectedSources.Remove(existing);
-            if (ActiveSource?.Id == sourceId)
-            {
-                ActiveSource = null;
-            }
+
+            // Per Task Section 17:
+            // "Removing a source that IS currently On Air:
+            //  Do not unexpectedly stop or switch the presentation without explicit user intent.
+            //  Allow the current On Air content to remain visible until the presenter explicitly switches or stops."
+            // We intentionally do NOT clear ActiveSource here to preserve On-Air presentation continuity.
+
+            // Per Task Section 18:
+            // The selected cursor moves deterministically to the next available queued source,
+            // or to the previous item when removing the final entry.
+            // If the queue becomes empty, clear the queued-source selection cursor.
             if (SelectedSource?.Id == sourceId)
             {
-                SelectedSource = _selectedSources.FirstOrDefault(s => s.IsAvailable) ?? _selectedSources.FirstOrDefault();
+                if (_selectedSources.Count == 0)
+                {
+                    SelectedSource = null;
+                }
+                else
+                {
+                    int targetIndex = existingIndex < _selectedSources.Count ? existingIndex : existingIndex - 1;
+                    SelectedSource = _selectedSources[targetIndex];
+                }
             }
+
             if (ForegroundSource?.Id == sourceId)
             {
                 ForegroundSource = null;

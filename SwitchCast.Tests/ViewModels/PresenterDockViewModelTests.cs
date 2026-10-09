@@ -448,5 +448,22 @@ public class PresenterDockViewModelTests
         // Should NOT have run the callback or notified properties
         Assert.Equal(0, propertyChangeCount);
     }
+
+    [Fact]
+    public void UnqueueSourceCommand_CallsPresentationStateServiceRemoveSelectedSource()
+    {
+        var source = new WindowSource { Id = "win-test", Title = "Test Window" };
+
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object);
+
+        vm.UnqueueSourceCommand.Execute(source);
+
+        _mockStateService.Verify(s => s.RemoveSelectedSource("win-test"), Times.Once);
+    }
 }
 

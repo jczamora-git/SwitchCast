@@ -569,6 +569,23 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             }
         }
 
+        // If current was not found in the queue (e.g. unqueued while On-Air), check if SelectedSource is in queue
+        if (currentIndex < 0 && SelectedSource is not null)
+        {
+            for (int i = 0; i < queue.Count; i++)
+            {
+                if (queue[i].Id == SelectedSource.Id)
+                {
+                    currentIndex = i - 1;
+                    if (currentIndex < 0)
+                    {
+                        currentIndex = queue.Count - 1;
+                    }
+                    break;
+                }
+            }
+        }
+
         int nextIndex = (currentIndex + 1) % queue.Count;
         var nextSource = queue[nextIndex];
 
@@ -595,6 +612,19 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                 if (queue[i].Id == current.Id)
                 {
                     currentIndex = i;
+                    break;
+                }
+            }
+        }
+
+        // If current was not found in the queue (e.g. unqueued while On-Air), check if SelectedSource is in queue
+        if (currentIndex < 0 && SelectedSource is not null)
+        {
+            for (int i = 0; i < queue.Count; i++)
+            {
+                if (queue[i].Id == SelectedSource.Id)
+                {
+                    currentIndex = (i + 1) % queue.Count;
                     break;
                 }
             }

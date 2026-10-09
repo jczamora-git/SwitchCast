@@ -541,6 +541,15 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         _dockService.CloseDock();
     }
 
+    [RelayCommand]
+    private void UnqueueSource(CaptureSource? source)
+    {
+        if (source is not null)
+        {
+            _presentationStateService.RemoveSelectedSource(source.Id);
+        }
+    }
+
     private void OnStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(IPresentationStateService.Status) ||

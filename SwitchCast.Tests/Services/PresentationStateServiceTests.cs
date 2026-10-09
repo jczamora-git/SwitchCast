@@ -120,7 +120,7 @@ public class PresentationStateServiceTests
     }
 
     [Fact]
-    public void RemoveSelectedSource_ActiveSource_ClearsActiveSource()
+    public void RemoveSelectedSource_ActiveSource_PreservesActiveSourceForPresentationContinuity()
     {
         var service = new PresentationStateService();
         var source = new WindowSource { Id = "win-1", Title = "Window 1" };
@@ -129,7 +129,95 @@ public class PresentationStateServiceTests
 
         service.RemoveSelectedSource("win-1");
 
-        Assert.Null(service.ActiveSource);
+        // Per Task Section 17:
+        // Removing a source that is currently On Air must NOT unexpectedly stop the presentation.
+        // It remains On Air while being removed from the future navigation queue.
+        Assert.Equal(source, service.ActiveSource);
+        Assert.DoesNotContain(source, service.SelectedSources);
+    }
+
+    [Fact]
+    public void RemoveSelectedSource_SelectedCursor_AdvancesToNextQueuedSource()
+    {
+        var service = new PresentationStateService();
+        var a = new WindowSource { Id = "a", Title = "A" };
+        var b = new VideoMediaSource { Id = "b", Title = "B", FilePath = "b.mp4" };
+        var c = new ImageMediaSource { Id = "c", Title = "C", FilePath = "c.png" };
+        var d = new MonitorSource { Id = "d", Title = "D" };
+
+        service.AddSelectedSource(a);
+        service.AddSelectedSource(b);
+        service.AddSelectedSource(c);
+        service.AddSelectedSource(d);
+
+        service.SetSelectedSource(b);
+        Assert.Equal("b", service.SelectedSource?.Id);
+
+        // Remove B: cursor should move deterministically to C (item at old index 1)
+        service.RemoveSelectedSource("b");
+
+        Assert.Equal("c", service.SelectedSource?.Id);
+        Assert.Equal(3, service.SelectedSourceCount);
+    }
+
+    [Fact]
+    public void RemoveSelectedSource_LastItem_MovesToPreviousQueuedSource()
+    {
+        var service = new PresentationStateService();
+        var a = new WindowSource { Id = "a", Title = "A" };
+        var b = new VideoMediaSource { Id = "b", Title = "B", FilePath = "b.mp4" };
+        var c = new ImageMediaSource { Id = "c", Title = "C", FilePath = "c.png" };
+
+        service.AddSelectedSource(a);
+        service.AddSelectedSource(b);
+        service.AddSelectedSource(c);
+
+        service.SetSelectedSource(c);
+        Assert.Equal("c", service.SelectedSource?.Id);
+
+        // Remove C (last item): cursor should move deterministically to previous item (B)
+        service.RemoveSelectedSource("c");
+
+        Assert.Equal("b", service.SelectedSource?.Id);
+        Assert.Equal(2, service.SelectedSourceCount);
+    }
+
+    [Fact]
+    public void RemoveSelectedSource_NonSelectedSource_PreservesSelectedCursor()
+    {
+        var service = new PresentationStateService();
+        var a = new WindowSource { Id = "a", Title = "A" };
+        var b = new VideoMediaSource { Id = "b", Title = "B", FilePath = "b.mp4" };
+        var c = new ImageMediaSource { Id = "c", Title = "C", FilePath = "c.png" };
+
+        service.AddSelectedSource(a);
+        service.AddSelectedSource(b);
+        service.AddSelectedSource(c);
+
+        service.SetSelectedSource(b);
+
+        // Remove A: SelectedSource remains B
+        service.RemoveSelectedSource("a");
+
+        Assert.Equal("b", service.SelectedSource?.Id);
+        Assert.Equal(2, service.SelectedSourceCount);
+    }
+
+    [Fact]
+    public void RemoveSelectedSource_AllItems_ClearsSelectedCursorAndPreservesActiveSource()
+    {
+        var service = new PresentationStateService();
+        var a = new WindowSource { Id = "a", Title = "A" };
+
+        service.AddSelectedSource(a);
+        service.SetSelectedSource(a);
+        service.SetActiveSource(a);
+
+        service.RemoveSelectedSource("a");
+
+        Assert.Null(service.SelectedSource);
+        Assert.Equal(0, service.SelectedSourceCount);
+        Assert.Equal(a, service.ActiveSource);
     }
 
     [Fact]

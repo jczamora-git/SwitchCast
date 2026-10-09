@@ -81,8 +81,19 @@
                                                    MaxLines="1" />
                                     </StackPanel>
 
-                                    <!-- Available Indicator -->
-                                    <FontIcon Grid.Column="2" Glyph="&#xE73E;" FontSize="10" Foreground="{ThemeResource AppAccentBrush}" VerticalAlignment="Center" />
+                                    <!-- Interactive Queue Checkbox / Unqueue Action -->
+                                    <CheckBox Grid.Column="2"
+                                              IsChecked="True"
+                                              Click="OnUnqueueCheckClicked"
+                                              Tag="{x:Bind}"
+                                              MinWidth="24"
+                                              MinHeight="24"
+                                              Padding="0"
+                                              Margin="0"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Center"
+                                              ToolTipService.ToolTip="Remove from presentation queue"
+                                              AutomationProperties.Name="Remove from presentation queue" />
                                 </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>
