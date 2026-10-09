@@ -31,7 +31,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path ./releases -Force
-          $tagName = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { "v1.2.0" }
+          $tagName = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { "v1.2.1" }
           $zipName = "SwitchCast-$tagName-win-x64.zip"
           $shaName = "SwitchCast-$tagName-win-x64.sha256"
           Compress-Archive -Path ./publish/* -DestinationPath "./releases/$zipName" -Force
@@ -43,7 +43,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           name: SwitchCast ${{ github.ref_name }}
-          body_path: docs/releases/v1.2.0.md
+          body_path: docs/releases/${{ github.ref_name }}.md
           files: |
             releases/SwitchCast-*-win-x64.zip
             releases/SwitchCast-*-win-x64.sha256

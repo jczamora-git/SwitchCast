@@ -24,10 +24,10 @@
     <ApplicationIcon>Assets\SwitchCast.ico</ApplicationIcon>
 
     <!-- Version & Metadata -->
-    <Version>1.2.0</Version>
-    <AssemblyVersion>1.2.0.0</AssemblyVersion>
-    <FileVersion>1.2.0.0</FileVersion>
-    <InformationalVersion>1.2.0</InformationalVersion>
+    <Version>1.2.1</Version>
+    <AssemblyVersion>1.2.1.0</AssemblyVersion>
+    <FileVersion>1.2.1.0</FileVersion>
+    <InformationalVersion>1.2.1</InformationalVersion>
     <Authors>John Christopher King Zamora</Authors>
     <Company>John Christopher King Zamora</Company>
     <Product>SwitchCast</Product>

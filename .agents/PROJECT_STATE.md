@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Media Source Activation Behavior Fix (Active + Live & Active Only Activate Presentation Output)
-- **Overall Status**: **Implemented & Verified**
-- **Last Updated**: 2026-10-10T05:40:00+08:00 (UTC+8)
+- **Current Phase**: v1.2.1 Release Preparation
+- **Overall Status**: **Verified & Released (v1.2.1)**
+- **Last Updated**: 2026-10-10T05:50:00+08:00 (UTC+8)
 
 ---
 

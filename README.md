@@ -3,7 +3,7 @@
 > **Seamless Windows Screen Sharing & Presentation Management**  
 > Capture applications, displays, images, and videos, queue your presentation sources, and switch seamlessly in a single stable output window without interrupting your meeting stream.
 
-[![Release](https://img.shields.io/badge/Release-v1.2.0-FF7A59?style=flat-square)](https://github.com/jczamora-git/SwitchCast/releases)
+[![Release](https://img.shields.io/badge/Release-v1.2.1-FF7A59?style=flat-square)](https://github.com/jczamora-git/SwitchCast/releases)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20x64-blue?style=flat-square)](https://github.com/jczamora-git/SwitchCast)
 [![Framework](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square)](https://dotnet.microsoft.com/)
 [![UI](https://img.shields.io/badge/UI-WinUI%203%20%2F%20Windows%20App%20SDK-0078D7?style=flat-square)](https://learn.microsoft.com/en-us/windows/apps/winui/winui3/)
@@ -63,7 +63,7 @@ Presenters share one dedicated, stable **Presentation Output** window in their m
 
 ### Installation
 
-1. Download the latest `SwitchCast-v1.2.0-win-x64.zip` release from [Releases](https://github.com/jczamora-git/SwitchCast/releases).
+1. Download the latest `SwitchCast-v1.2.1-win-x64.zip` release from [Releases](https://github.com/jczamora-git/SwitchCast/releases).
 2. Extract the archive to any folder on your computer.
 3. Run `SwitchCast.exe`.
 

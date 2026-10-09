@@ -3,9 +3,9 @@
 ---
 
 ## Task Details
-- **Task**: Media Source Activation Behavior Fix & Native App Icon Update
-- **Date**: 2026-10-10T05:40:00+08:00 (UTC+8)
-- **Status**: Completed, Verified & Ready for Local Commit
+- **Task**: SwitchCast v1.2.1 Release Preparation, Git Push & Release Tagging
+- **Date**: 2026-10-10T05:50:00+08:00 (UTC+8)
+- **Status**: Completed, Verified & Released
 
 ---
 
