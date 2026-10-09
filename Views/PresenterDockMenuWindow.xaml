@@ -71,10 +71,14 @@
                                                    Foreground="{ThemeResource AppTextPrimaryBrush}"
                                                    TextTrimming="CharacterEllipsis"
                                                    TextWrapping="NoWrap"
-                                                   MaxLines="1" />
+                                                   MaxLines="1"
+                                                   ToolTipService.ToolTip="{x:Bind Title}" />
                                         <TextBlock Text="{x:Bind Type}"
                                                    FontSize="9"
-                                                   Foreground="{ThemeResource AppTextTertiaryBrush}" />
+                                                   Foreground="{ThemeResource AppTextTertiaryBrush}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   TextWrapping="NoWrap"
+                                                   MaxLines="1" />
                                     </StackPanel>
 
                                     <!-- Available Indicator -->

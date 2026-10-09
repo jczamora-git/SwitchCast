@@ -201,13 +201,16 @@
                                            FontWeight="SemiBold"
                                            Foreground="{ThemeResource AppTextPrimaryBrush}"
                                            TextTrimming="CharacterEllipsis"
+                                           TextWrapping="NoWrap"
                                            MaxLines="1"
                                            ToolTipService.ToolTip="{x:Bind Title}" />
                                 <TextBlock Text="{x:Bind Subtitle}"
                                            FontSize="11"
                                            Foreground="{ThemeResource AppTextSecondaryBrush}"
                                            TextTrimming="CharacterEllipsis"
-                                           MaxLines="1" />
+                                           TextWrapping="NoWrap"
+                                           MaxLines="1"
+                                           ToolTipService.ToolTip="{x:Bind Subtitle}" />
                             </StackPanel>
 
                             <!-- Unavailable Badge -->

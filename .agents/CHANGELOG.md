@@ -7,6 +7,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Global Text Truncation & Layout Overflow Fix] - 2026-10-09
+
+### Fixed / Improved (fix / UI / test / docs)
+- **Dashboard Source Dropdown Constraints & Ellipsis**:
+  - Replaced unconstrained string display in `ComboBox` with custom `ItemTemplate` across Target Source Selector, Live Preview switcher, and Ready-to-Preview switcher in [Views/DashboardPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/DashboardPage.xaml).
+  - Applied bounded max-widths (`MaxWidth="300"`, `MaxWidth="260"`, `MaxWidth="280"`), 2-column item grid layouts (`Auto, *`), `TextTrimming="CharacterEllipsis"`, `TextWrapping="NoWrap"`, `MaxLines="1"`, and complete title tooltips via `ToolTipService.ToolTip="{x:Bind Title}"`.
+  - Replaced unbounded horizontal `StackPanel` in Status Strip Active Source with a 2-column `Grid` (`ColumnDefinitions="Auto, *"`) ensuring proper single-line ellipsis and full title tooltip.
+  - Added tooltip and single-line trimming to Queued Presentation Sources mini-strip.
+- **Sources Page Row Trimming**:
+  - Added `TextWrapping="NoWrap"`, `TextTrimming="CharacterEllipsis"`, `MaxLines="1"`, and tooltips to Title and Subtitle in [Views/SourcesPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SourcesPage.xaml).
+  - Ensured flexible star-column layout never pushes the Queue checkbox outside the row or screen.
+- **Floating Presenter Dock Title Trimming**:
+  - Constrained `ExpandedSourceButton` text block with `MaxWidth="135"` and `CompactSourceButton` text block with `MaxWidth="85"` in [Views/PresenterDockWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockWindow.xaml).
+  - Added `ToolTipService.ToolTip="{x:Bind Title}"` and `ToolTipService.ToolTip="{x:Bind Type}"` to `ListView` items in [Views/PresenterDockMenuWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/PresenterDockMenuWindow.xaml).
+- **Source Identity & Model Integrity**:
+  - Preserved 100% of underlying full window titles, HWNDs, process IDs, and source queue identifiers in models (`WindowSource`, `MonitorSource`, `ImageMediaSource`, `VideoMediaSource`) and ViewModels.
+- **Automated Unit & Regression Tests**:
+  - Added [SwitchCast.Tests/ViewModels/SourceTitleTruncationTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/SourceTitleTruncationTests.cs) verifying short, long, extremely long, empty, and unicode/emoji titles, model preservation, and ViewModel tooltip integrity.
+  - Expanded test suite to **234 automated unit tests** (100% pass rate).
+
+---
+
 ## [Floating Presenter Dock Dragging & Stop Presentation Workflow] - 2026-10-09
 
 ### Added / Improved (feat / UI / test / docs)

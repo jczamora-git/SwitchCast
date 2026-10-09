@@ -7,16 +7,23 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Floating Dock Dragging & Stop Presentation Workflow (Usability Enhancement)
+- **Current Phase**: Global Text Truncation & Layout Overflow Fix (UI/UX Robustness)
 - **Overall Status**: **Completed & Tested**
-- **Last Updated**: 2026-10-09T14:50:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-09T15:00:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
-- [x] **Strict AI Development Harness (Phase 0)**: Standardized rules ([AGENTS.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/AGENTS.md)), 6 domain skills, architecture specifications, coding standards, and [.editorconfig](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.editorconfig).
+- [x] **Global Text Truncation & Dropdown Width Constraints**:
+  - Fixed horizontal expansion and clipping on Dashboard source selectors (`ComboBox` in Primary Control Bar, Live Preview switcher, and Ready-to-Preview switcher).
+  - Provided custom `ComboBox.ItemTemplate` with bounded max-widths, `TextTrimming="CharacterEllipsis"`, `TextWrapping="NoWrap"`, and `ToolTipService.ToolTip="{x:Bind Title}"`.
+  - Fixed Status Strip Active Source by replacing unbounded horizontal `StackPanel` with a 2-column `Grid` (`ColumnDefinitions="Auto, *"`) ensuring clean responsive ellipsis when window titles are long.
+  - Constrained `SourcesPage` source list rows with responsive star columns, `TextWrapping="NoWrap"`, single-line ellipsis, and tooltips on both Title and Subtitle, preventing long names from pushing Queue checkboxes off-screen.
+  - Constrained Floating Presenter Dock active source buttons with `MaxWidth="135"` (Expanded) and `MaxWidth="85"` (Compact) on the `TextBlock` inside horizontal button toolbars, with full tooltip strings.
+  - Added tooltips and single-line trimming on `PresenterDockMenuWindow` ListView items.
+  - Preserved 100% of underlying full window titles, HWNDs, process IDs, and source queue identifiers in models and ViewModels.
 - [x] **Floating Presenter Dock Dragging Refinement**:
   - Removed the dedicated visible drag handle icon (`\uE76F`) and its layout column/spacing from both Expanded (7 columns) and Compact (6 columns) dock modes.
   - Implemented native Windows window dragging (`ReleaseCapture` + `WM_NCLBUTTONDOWN` / `HTCAPTION`) from all non-interactive toolbar surfaces (card border, status badge pill, status dot, and padding).
@@ -52,7 +59,7 @@ This is the authoritative progress, state, and environmental tracking document f
 - [x] **Global Hotkeys & Floating Companion Dock**:
   - System-wide hotkeys and floating presenter toolbar supporting 3 switching modes (`A+L`, `A`, `L`).
 - [x] **Automated Unit & Regression Test Suite**:
-  - **223 comprehensive automated unit and regression tests** in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) with 100% pass rate.
+  - **234 comprehensive automated unit and regression tests** in [SwitchCast.Tests](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests) with 100% pass rate.
 
 ### Planned (Upcoming)
 - [ ] **Phase 7**: Advanced Presenter Features (Live thumbnail previews, smooth transitions).
@@ -87,7 +94,7 @@ This is the authoritative progress, state, and environmental tracking document f
 
 - **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (223 passed, 0 failed, 0 skipped in 7s).
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (234 passed, 0 failed, 0 skipped).
 
 ---
 
@@ -95,7 +102,3 @@ This is the authoritative progress, state, and environmental tracking document f
 
 **Task**: **Phase 7 — Advanced Presenter Features & Smoothing**
 - **Objective**: Live thumbnail preview rendering on dashboard cards, configurable smooth transitions, and presentation profiles.
-
-
-
-
