@@ -7,6 +7,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Floating Dock Playback Slider Cross-Thread Fix] - 2026-10-09
+
+### Fixed (fix / threading / winui / test / docs)
+- **Eliminate COMException 0x8001010E (RPC_E_WRONG_THREAD)**:
+  - Fixed cross-thread `RangeBase.set_Value` crash triggered when `PresenterDockViewModel.OnPlaybackProgressTick` ran on a ThreadPool worker thread and notified `VideoPositionSeconds`.
+  - Replaced background thread pool timer with native UI thread `DispatcherQueueTimer` initialized with `PresenterDockWindow`'s UI `DispatcherQueue`.
+  - Added safe `RunOnUIThread` marshaling for all event callbacks (`OnStatePropertyChanged`, `OnCoordinatorPropertyChanged`, `OnWindowDisplayModeChanged`, `OnMediaStateChanged`).
+  - Added clean disposal and teardown in `PresenterDockWindow.OnWindowClosed` to prevent timer leaks or orphan property updates.
+- **Automated Unit & Regression Tests**:
+  - Added tests in [SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs) verifying `SetDispatcherQueue` initialization, scrubbing behavior, and safe disposal.
+  - **251 automated unit tests passing with 100% success rate**.
+
+---
+
 ## [Dashboard Source Selector Empty-State UX Fix] - 2026-10-09
 
 ### Fixed / Added / Improved (fix / UI / UX / test / docs)

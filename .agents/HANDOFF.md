@@ -3,38 +3,33 @@
 ---
 
 ## Task Details
-- **Task**: Dashboard Source Selector Empty-State UX Fix
-- **Date**: 2026-10-09T19:59:00+08:00 (UTC+8)
+- **Task**: Runtime Bug Fix — Floating Dock Playback Slider Cross-Thread Update (COMException 0x8001010E)
+- **Date**: 2026-10-09T20:25:00+08:00 (UTC+8)
 - **Status**: Completed & Verified
 
 ---
 
 ## 1. Objectives Implemented
 
-1. **Dashboard Source Selector Empty-State Flyout**:
-   - Replaced the uninitialized blank gray box when zero sources are queued with an informative `DropDownButton` displaying `No queued sources`.
-   - Clicking/opening reveals a styled Flyout matching the Floating Presenter Dock with:
-     - Header: `Queued Sources (0)`
-     - Icon: `\uE7F4`
-     - Title: `No queued sources`
-     - Description: `Add application windows, displays, images, or videos from the Sources tab.`
-     - Button: `+ Add Presentation Source` (navigates to Sources).
+1. **Eliminate RPC_E_WRONG_THREAD COMException (0x8001010E)**:
+   - Diagnosed root cause: `PresenterDockViewModel` previously utilized a background `System.Threading.Timer` that invoked `OnPlaybackProgressTick` on a ThreadPool worker thread.
+   - Calling `OnPropertyChanged(nameof(VideoPositionSeconds))` triggered WinUI 3 compiled bindings (`RangeBase.set_Value`) in `PresenterDockWindow.g.cs` from outside the UI thread, causing single-threaded apartment (STA) thread-affinity violations.
 
-2. **Presentation Control Bar "+ Add Source" Button**:
-   - Added a compact `+ Add Source` button adjacent to the presentation source selector.
-   - Invokes `NavigateToSourcesCommand`, routing to `SourcesPage` and properly highlighting `NavView.SelectedItem`.
+2. **UI Dispatcher-Owned Progress Timer**:
+   - Replaced thread-pool timer with native UI thread `DispatcherQueueTimer` created on the UI thread's `DispatcherQueue`.
+   - Added `SetDispatcherQueue` to `PresenterDockViewModel`, invoked by `PresenterDockWindow` upon initialization.
+   - Ensured all recurring timeline slider and timecode ticks run natively on the owning UI thread.
 
-3. **Start Presenting Validation & Tooltip**:
-   - Disabled Start Presenting when 0 presentation sources are queued and presentation is inactive.
-   - Dynamic tooltip explains why button is disabled: `Add a presentation source first.`.
+3. **Event Notification Marshaling**:
+   - Wrapped `OnStatePropertyChanged`, `OnCoordinatorPropertyChanged`, `OnWindowDisplayModeChanged`, `OnMediaStateChanged`, and window open/closed handlers with `RunOnUIThread` using `DispatcherQueue.TryEnqueue` when called off the UI thread.
 
-4. **Preview Workspace Description Wrapping Fix**:
-   - Added `TextWrapping="Wrap"` and constrained `MaxWidth="420"` to ensure full paragraph is readable without truncation.
-   - Unified button label to `Add Presentation Sources`.
+4. **Timer & ViewModel Lifecycle Management**:
+   - Wired `PresenterDockWindow.Closed` to unsubscribe event handlers and dispose ViewModel timer immediately.
+   - Protected `Dispose()` against double disposal and stopped any active timers without leaks or orphan updates.
 
 5. **Automated Unit & Regression Tests**:
-   - Added unit tests in `DashboardViewModelTests.cs` for empty state properties, placeholder text, enablement rules, and queue count transitions.
-   - **250 automated tests passing with 100% success rate**.
+   - Added unit tests in `PresenterDockViewModelTests.cs` validating `SetDispatcherQueue`, scrubbing safety, and disposal lifecycle.
+   - **251 automated tests passing with 100% success rate**.
 
 ---
 

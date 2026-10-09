@@ -16,9 +16,12 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
     private readonly IPresentationWindowService _presentationWindowService;
     private readonly IPresenterDockService _dockService;
     private readonly IApplicationSettingsService _settingsService;
+    private object? _dispatcherQueue;
+    private object? _dispatcherTimer;
     private Timer? _playbackProgressTimer;
     private bool _isScrubbing;
     private double _scrubbingPositionSeconds;
+    private bool _disposed;
 
     public PresenterDockViewModel(
         IPresentationCoordinator presentationCoordinator,
@@ -36,27 +39,102 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         _presentationStateService.PropertyChanged += OnStatePropertyChanged;
         _presentationCoordinator.PropertyChanged += OnCoordinatorPropertyChanged;
         _presentationWindowService.DisplayModeChanged += OnWindowDisplayModeChanged;
-        _presentationWindowService.WindowOpened += (s, e) => NotifyFullscreenProperties();
-        _presentationWindowService.WindowClosed += (s, e) => NotifyFullscreenProperties();
+        _presentationWindowService.WindowOpened += OnWindowOpened;
+        _presentationWindowService.WindowClosed += OnWindowClosed;
 
         if (_presentationCoordinator.MediaPresentationService is not null)
         {
-            _presentationCoordinator.MediaPresentationService.MediaStateChanged += (s, e) =>
-            {
-                NotifyMediaProperties();
-            };
+            _presentationCoordinator.MediaPresentationService.MediaStateChanged += OnMediaStateChanged;
+        }
+
+        // Attempt to capture ambient Windows.System.DispatcherQueue if initialized on a UI thread
+        try
+        {
+            _dispatcherQueue = Windows.System.DispatcherQueue.GetForCurrentThread();
+        }
+        catch
+        {
+            // Non-WinUI / headless unit test fallback
         }
 
         SetupPlaybackProgressTimer();
     }
 
-    private void SetupPlaybackProgressTimer()
+    /// <summary>
+    /// Configures the UI thread DispatcherQueue for this ViewModel, instantiating a DispatcherQueueTimer for frame progress.
+    /// </summary>
+    public void SetDispatcherQueue(object? dispatcherQueue)
     {
-        _playbackProgressTimer = new Timer(OnPlaybackProgressTick, null, 250, 250);
+        if (_disposed)
+        {
+            return;
+        }
+
+        _dispatcherQueue = dispatcherQueue;
+        SetupPlaybackProgressTimer();
     }
 
-    private void OnPlaybackProgressTick(object? state)
+    private void SetupPlaybackProgressTimer()
     {
+        // Clean up previous timers if reconfiguring
+        StopDispatcherTimer();
+
+        if (_playbackProgressTimer is not null)
+        {
+            _playbackProgressTimer.Dispose();
+            _playbackProgressTimer = null;
+        }
+
+        if (_dispatcherQueue is not null)
+        {
+            try
+            {
+                dynamic dq = _dispatcherQueue;
+                dynamic timer = dq.CreateTimer();
+                timer.Interval = TimeSpan.FromMilliseconds(250);
+                timer.IsRepeating = true;
+                timer.Tick += (Windows.Foundation.TypedEventHandler<object, object>)((sender, args) =>
+                {
+                    OnDispatcherTimerTick();
+                });
+                timer.Start();
+                _dispatcherTimer = timer;
+                return;
+            }
+            catch
+            {
+                // Fallback to thread pool timer if DispatcherQueue or dynamic timer creation fails
+            }
+        }
+
+        // Fallback for non-UI/test environments
+        _playbackProgressTimer = new Timer(OnFallbackTimerTick, null, 250, 250);
+    }
+
+    private void StopDispatcherTimer()
+    {
+        if (_dispatcherTimer is not null)
+        {
+            try
+            {
+                dynamic timer = _dispatcherTimer;
+                timer.Stop();
+            }
+            catch
+            {
+                // Ignore disposal errors on timer
+            }
+            _dispatcherTimer = null;
+        }
+    }
+
+    private void OnDispatcherTimerTick()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
         if (IsActiveSourceVideo && IsVideoPlaying && !_isScrubbing)
         {
             OnPropertyChanged(nameof(VideoPositionSeconds));
@@ -64,11 +142,87 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         }
     }
 
+    private void OnFallbackTimerTick(object? state)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        RunOnUIThread(() =>
+        {
+            if (!_disposed && IsActiveSourceVideo && IsVideoPlaying && !_isScrubbing)
+            {
+                OnPropertyChanged(nameof(VideoPositionSeconds));
+                OnPropertyChanged(nameof(VideoPositionText));
+            }
+        });
+    }
+
+    private void RunOnUIThread(Action action)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (_dispatcherQueue is not null)
+        {
+            try
+            {
+                dynamic dq = _dispatcherQueue;
+                if (!(bool)dq.HasThreadAccess)
+                {
+                    dq.TryEnqueue(new Action(() =>
+                    {
+                        if (!_disposed)
+                        {
+                            action();
+                        }
+                    }));
+                    return;
+                }
+            }
+            catch
+            {
+                // Fallback if dispatcher call fails
+            }
+        }
+
+        action();
+    }
+
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        StopDispatcherTimer();
+
         _playbackProgressTimer?.Dispose();
         _playbackProgressTimer = null;
+
+        _presentationStateService.PropertyChanged -= OnStatePropertyChanged;
+        _presentationCoordinator.PropertyChanged -= OnCoordinatorPropertyChanged;
+        _presentationWindowService.DisplayModeChanged -= OnWindowDisplayModeChanged;
+        _presentationWindowService.WindowOpened -= OnWindowOpened;
+        _presentationWindowService.WindowClosed -= OnWindowClosed;
+
+        if (_presentationCoordinator.MediaPresentationService is not null)
+        {
+            _presentationCoordinator.MediaPresentationService.MediaStateChanged -= OnMediaStateChanged;
+        }
     }
+
+    private void OnWindowOpened(object? sender, EventArgs e) => RunOnUIThread(NotifyFullscreenProperties);
+
+    private void OnWindowClosed(object? sender, EventArgs e) => RunOnUIThread(NotifyFullscreenProperties);
+
+    private void OnMediaStateChanged(object? sender, EventArgs e) => RunOnUIThread(NotifyMediaProperties);
 
     public PresentationStatus Status => _presentationStateService.Status;
 
@@ -431,18 +585,18 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
             e.PropertyName == nameof(IPresentationStateService.SelectedSource) ||
             e.PropertyName == nameof(IPresentationStateService.ForegroundSource))
         {
-            NotifyAllProperties();
+            RunOnUIThread(NotifyAllProperties);
         }
     }
 
     private void OnCoordinatorPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        NotifyAllProperties();
+        RunOnUIThread(NotifyAllProperties);
     }
 
     private void OnWindowDisplayModeChanged(object? sender, PresentationDisplayMode mode)
     {
-        NotifyFullscreenProperties();
+        RunOnUIThread(NotifyFullscreenProperties);
     }
 
     private void NotifyFullscreenProperties()

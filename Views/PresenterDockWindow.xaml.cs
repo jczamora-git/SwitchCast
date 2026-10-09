@@ -35,6 +35,7 @@ public sealed partial class PresenterDockWindow : Window
     {
         InitializeComponent();
         ViewModel = App.Current.Services.GetRequiredService<PresenterDockViewModel>();
+        ViewModel.SetDispatcherQueue(DispatcherQueue);
 
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
         Closed += OnWindowClosed;
@@ -344,6 +345,8 @@ public sealed partial class PresenterDockWindow : Window
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
         CloseActiveMenu();
+        ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        ViewModel.Dispose();
     }
 
     [StructLayout(LayoutKind.Sequential)]

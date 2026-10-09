@@ -292,4 +292,25 @@ public class PresenterDockViewModelTests
 
         _mockDockService.Verify(d => d.ShowDashboard(), Times.Once);
     }
+
+    [Fact]
+    public void SetDispatcherQueue_And_Dispose_ManagesTimerLifecycleSafely()
+    {
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object);
+
+        // Safe to call SetDispatcherQueue with null or non-UI dispatcher in headless test
+        vm.SetDispatcherQueue(null);
+
+        // Safe to dispose multiple times
+        vm.Dispose();
+        vm.Dispose();
+
+        // Calling SetDispatcherQueue after dispose is a safe no-op
+        vm.SetDispatcherQueue(null);
+    }
 }
