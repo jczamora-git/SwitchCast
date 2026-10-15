@@ -123,15 +123,19 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
             {
                 if (!_isDisposed && !_isFrozen)
                 {
-                    if (bitmap.BitmapPixelFormat != BitmapPixelFormat.Bgra8 ||
-                        bitmap.BitmapAlphaMode != BitmapAlphaMode.Premultiplied)
+                    if (bitmap.BitmapPixelFormat == BitmapPixelFormat.Bgra8 &&
+                        bitmap.BitmapAlphaMode == BitmapAlphaMode.Premultiplied)
+                    {
+                        await _softwareBitmapSource.SetBitmapAsync(bitmap);
+                    }
+                    else if (bitmap.BitmapPixelFormat == BitmapPixelFormat.Bgra8)
                     {
                         using var converted = SoftwareBitmap.Convert(bitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
                         await _softwareBitmapSource.SetBitmapAsync(converted);
                     }
                     else
                     {
-                        await _softwareBitmapSource.SetBitmapAsync(bitmap);
+                        Debug.WriteLine($"[Direct3D11PresentationRenderer] Unexpected non-Bgra8 format rejected safely: {bitmap.BitmapPixelFormat}");
                     }
                 }
             }

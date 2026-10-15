@@ -7,6 +7,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Critical Camera Runtime Hotfix] - 2026-10-15
+
+### Fixed (fix / camera / winrt / direct3d / presentation-coordinator / test)
+- **Catch-22 Frame Rejection Deadlock Resolved**:
+  - Repaired `PresentationCoordinator.OnCameraFrameArrived` which previously rejected and discarded all incoming camera frames while `Status` was `Starting` (`Status != Active`).
+  - Allowed frame processing during both `Starting` and `Active` states.
+  - Defined explicit camera transition rules: when the first camera frame is rendered, `Status` transitions from `Starting` to `Active` (LIVE), and the floating dock immediately updates to `LIVE`.
+  - Added an 8-second bounded startup timeout (`ArmCameraStartupTimeout` via `CancellationTokenSource`) transitioning to `Error` if the camera stalls or fails to deliver frames.
+- **NV12 Format Conversion & COMException Fix**:
+  - Explicitly requested `MediaEncodingSubtypes.Bgra8` in `CameraCaptureService.StartCaptureAsync` via `CreateFrameReaderAsync(frameSource, MediaEncodingSubtypes.Bgra8)`, offloading color conversion to native Windows Media Foundation hardware transforms.
+  - Eliminated invalid `SoftwareBitmap.Convert(rawBitmap, Bgra8, Premultiplied)` calls on planar `BitmapPixelFormat.Nv12` frames (which threw 30 first-chance `COMException` events/sec in `WinRT.Runtime.dll`).
+  - Implemented managed CPU fallbacks (`ConvertNv12ToBgra8`, `ConvertYuy2ToBgra8`) using `CopyToBuffer` and ITU-R BT.601 math, guaranteeing 100% exception-free conversion even if native hardware conversion is unavailable.
+  - Added Direct3D surface fallback: if `SoftwareBitmap` is null and `Direct3DSurface` is present, safely copies via `SoftwareBitmap.CreateCopyFromSurfaceAsync(surface, BitmapAlphaMode.Premultiplied)`.
+  - In `Direct3D11PresentationRenderer.RenderBitmapAsync`, ensured format check guards prevent `SoftwareBitmap.Convert` from being invoked on non-BGRA8 formats on the UI thread.
+- **Duplicate Transition Storm & Idempotency**:
+  - Made `StartPresentationAsync`, `SwitchPresentationSourceAsync`, and `ExecuteSourceSwitchAsync` idempotent: if a presentation is already `Starting` or `Active` with the requested target source ID, duplicate start calls are ignored while ensuring the presentation output window remains visible.
+  - Unconditionally stopped camera capture and cancelled pending timeout watchers when switching away from camera to Window, Monitor, Media, or PowerPoint sources.
+- **Structured Unhandled Exception Diagnostics**:
+  - Wired `UnhandledException` in `App.xaml.cs` to log exact hex HRESULT (`0x{ex.HResult:X8}`), exception type, message, and stack trace via `SwitchCastDiagnostics.LogException`.
+- **Automated Regression Suite**:
+  - Added unit and regression tests in `PowerPointCameraHotfixRegressionTests.cs` verifying Camera Starting-to-Active transition on first rendered frame, duplicate start/switch idempotency, and switching from Camera to PowerPoint, bringing total test count to **310 passing automated tests** (0 failures, 0 skipped). Both Debug and Release builds compile with 0 errors and 0 warnings.
+
+---
+
 ## [PowerPoint & Camera Runtime Hotfix] - 2026-10-15
 
 ### Fixed (fix / powerpoint / camera / com-diagnostics / persistence / test)

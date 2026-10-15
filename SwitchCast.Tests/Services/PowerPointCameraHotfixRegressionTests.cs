@@ -345,4 +345,148 @@ public class PowerPointCameraHotfixRegressionTests
         // Verifies LogException executes without error
         SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.LogException("TestComponent", "TestOp", ex, "source_123", 42);
     }
+
+    [Fact]
+    public async Task Camera_StartsInStartingState_AndTransitionsToActiveOnFirstRenderedFrame()
+    {
+        var stateService = new PresentationStateService();
+        var mockWindowService = new Mock<IPresentationWindowService>();
+        var mockCaptureCoord = new Mock<ICaptureCoordinator>();
+        var mockOutputRenderer = new Mock<IPresentationOutputRenderer>();
+        var mockActivationService = new Mock<IWindowActivationService>();
+        var mockMediaService = new Mock<IMediaPresentationService>();
+        var mockCameraCapture = new Mock<ICameraCaptureService>();
+
+        mockCameraCapture.Setup(c => c.StartCaptureAsync(It.IsAny<CameraSource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var coordinator = new PresentationCoordinator(
+            stateService,
+            mockWindowService.Object,
+            mockCaptureCoord.Object,
+            mockOutputRenderer.Object,
+            mockActivationService.Object,
+            mockMediaService.Object,
+            cameraCaptureService: mockCameraCapture.Object);
+
+        var camera = new CameraSource
+        {
+            Id = "cam_01",
+            Title = "A4tech FHD 1080P PC Camera",
+            DeviceId = "device_a4tech_cam",
+            IsAvailable = true
+        };
+
+        stateService.AddSelectedSource(camera);
+
+        // Start presentation
+        await coordinator.StartPresentationAsync(camera);
+
+        // Before any frame arrives, status MUST be Starting (dock displays STARTING...)
+        Assert.Equal(PresentationStatus.Starting, coordinator.Status);
+        Assert.Equal(camera.Id, stateService.ActiveSource?.Id);
+
+        // Simulate first camera frame arrival
+        using var bitmap = new Windows.Graphics.Imaging.SoftwareBitmap(
+            Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8, 10, 10,
+            Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
+
+        mockCameraCapture.Raise(c => c.FrameArrived += null, mockCameraCapture.Object, bitmap);
+
+        // Frame submitted to renderer and status transitions to Active (LIVE)
+        mockOutputRenderer.Verify(r => r.RenderBitmapAsync(It.IsAny<Windows.Graphics.Imaging.SoftwareBitmap>()), Times.Once);
+        Assert.Equal(PresentationStatus.Active, coordinator.Status);
+    }
+
+    [Fact]
+    public async Task Camera_DuplicateStartOrSwitchRequests_AreIdempotent()
+    {
+        var stateService = new PresentationStateService();
+        var mockWindowService = new Mock<IPresentationWindowService>();
+        var mockCaptureCoord = new Mock<ICaptureCoordinator>();
+        var mockOutputRenderer = new Mock<IPresentationOutputRenderer>();
+        var mockActivationService = new Mock<IWindowActivationService>();
+        var mockMediaService = new Mock<IMediaPresentationService>();
+        var mockCameraCapture = new Mock<ICameraCaptureService>();
+
+        mockCameraCapture.Setup(c => c.StartCaptureAsync(It.IsAny<CameraSource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var coordinator = new PresentationCoordinator(
+            stateService,
+            mockWindowService.Object,
+            mockCaptureCoord.Object,
+            mockOutputRenderer.Object,
+            mockActivationService.Object,
+            mockMediaService.Object,
+            cameraCaptureService: mockCameraCapture.Object);
+
+        var camera = new CameraSource
+        {
+            Id = "cam_01",
+            Title = "A4tech FHD 1080P PC Camera",
+            DeviceId = "device_a4tech_cam",
+            IsAvailable = true
+        };
+
+        stateService.AddSelectedSource(camera);
+
+        // First start request
+        await coordinator.StartPresentationAsync(camera);
+        mockCameraCapture.Verify(c => c.StartCaptureAsync(camera, It.IsAny<CancellationToken>()), Times.Once);
+
+        // Duplicate start request while Starting
+        await coordinator.StartPresentationAsync(camera);
+        mockCameraCapture.Verify(c => c.StartCaptureAsync(camera, It.IsAny<CancellationToken>()), Times.Once);
+
+        // Duplicate execute switch request
+        await coordinator.ExecuteSourceSwitchAsync(camera);
+        mockCameraCapture.Verify(c => c.StartCaptureAsync(camera, It.IsAny<CancellationToken>()), Times.Once);
+
+        // Duplicate switch presentation request
+        await coordinator.SwitchPresentationSourceAsync(camera);
+        mockCameraCapture.Verify(c => c.StartCaptureAsync(camera, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Camera_SwitchToPowerPoint_StopsCameraCaptureAndLoadsPresentation()
+    {
+        var stateService = new PresentationStateService();
+        var mockWindowService = new Mock<IPresentationWindowService>();
+        var mockCaptureCoord = new Mock<ICaptureCoordinator>();
+        var mockOutputRenderer = new Mock<IPresentationOutputRenderer>();
+        var mockActivationService = new Mock<IWindowActivationService>();
+        var mockMediaService = new Mock<IMediaPresentationService>();
+        var mockCameraCapture = new Mock<ICameraCaptureService>();
+        var mockPptService = new Mock<IPowerPointPresentationService>();
+
+        mockCameraCapture.Setup(c => c.StartCaptureAsync(It.IsAny<CameraSource>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        mockPptService.Setup(p => p.LoadPresentationAsync(It.IsAny<PowerPointSource>()))
+            .Returns(Task.CompletedTask);
+
+        var coordinator = new PresentationCoordinator(
+            stateService,
+            mockWindowService.Object,
+            mockCaptureCoord.Object,
+            mockOutputRenderer.Object,
+            mockActivationService.Object,
+            mockMediaService.Object,
+            powerPointService: mockPptService.Object,
+            cameraCaptureService: mockCameraCapture.Object);
+
+        var camera = new CameraSource { Id = "cam_01", Title = "Camera", DeviceId = "dev_1", IsAvailable = true };
+        var ppt = new PowerPointSource { Id = "ppt_01", Title = "Slide Deck", FilePath = @"C:\deck.pptx", IsAvailable = true };
+
+        stateService.AddSelectedSource(camera);
+        stateService.AddSelectedSource(ppt);
+
+        await coordinator.StartPresentationAsync(camera);
+        mockCameraCapture.Verify(c => c.StartCaptureAsync(camera, It.IsAny<CancellationToken>()), Times.Once);
+
+        await coordinator.ExecuteSourceSwitchAsync(ppt);
+        mockCameraCapture.Verify(c => c.StopCaptureAsync(), Times.AtLeastOnce);
+        mockPptService.Verify(p => p.LoadPresentationAsync(ppt), Times.Once);
+        Assert.Equal(ppt.Id, stateService.ActiveSource?.Id);
+    }
 }

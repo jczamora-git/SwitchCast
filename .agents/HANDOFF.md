@@ -3,46 +3,37 @@
 ---
 
 ## Task Details
-- **Task**: PowerPoint and Camera Runtime Hotfix (Issues A, B, C, D)
-- **Date**: 2026-10-15T15:45:00+08:00 (UTC+8)
-- **Status**: Completed, Validated & Committed Locally (307 Tests Passing)
+- **Task**: Critical Camera Runtime Hotfix (Camera Starts but Does Not Render / COMException / Stuck STARTING)
+- **Date**: 2026-10-15T16:05:00+08:00 (UTC+8)
+- **Status**: Completed, Validated & Ready for Local Commit (310 Tests Passing)
 
 ---
 
 ## 1. Objectives & Confirmed Root Causes Resolved
 
-1. **Issue A — PowerPoint Slide Counter Synchronization**:
-   - **Root Cause**: `PresentationCoordinator.PowerPointProgressText` previously read `SlideProgressText` from `CurrentPresentationSource` (the static record assigned at presentation start), which was never updated when slides advanced. Furthermore, `PowerPointLiveService` spawned ad-hoc STA threads on every method call, causing COM apartment violations (`RPC_E_WRONG_THREAD` 0x8001010E) and failing to track external slide advances (mouse clicks, keyboard arrows, remote clickers).
+1. **Catch-22 Deadlock in Camera Presentation Output**:
+   - **Root Cause**: `PresentationCoordinator.OnCameraFrameArrived` contained `if (Status != PresentationStatus.Active || !IsActiveSourceCamera)`. When a camera source was started, `Status` was set to `Starting`. The arrival handler rejected and discarded all incoming camera frames because `Status != Active`. Because frames were discarded, no frame reached the renderer; because no frame reached the renderer, `Status` never became `Active`. Consequently, the dock remained permanently stuck at `STARTING...` and the presentation window showed the standby screen.
    - **Resolution**:
-     - `PresentationCoordinator.PowerPointProgressText` now reads directly from the authoritative service (`_powerPointService.CurrentSlideIndex` and `_powerPointService.TotalSlideCount`, or `_powerPointLiveService`).
-     - `_powerPointService.SlideChanged` now updates `_presentationStateService.ActiveSource` with the new `CurrentSlideIndex` on every step.
-     - `PowerPointLiveService` now maintains a single persistent STA worker thread with an action pump, polling `_slideShowWindow.View.CurrentShowPosition` (which changes only on slide transitions, not intra-slide animation clicks) and raising `SlidePositionChanged`.
+     - Updated `OnCameraFrameArrived` to permit frame processing during both `Starting` and `Active` states: `if ((Status != PresentationStatus.Active && Status != PresentationStatus.Starting) || !IsActiveSourceCamera)`.
+     - Added transition milestone: when the first camera frame is successfully submitted to the output renderer, `Status` transitions from `Starting` to `Active` (LIVE), and the floating dock immediately updates to `LIVE`.
+     - Added an 8-second bounded startup timeout (`ArmCameraStartupTimeout` via `CancellationTokenSource`). If camera hardware fails or freezes without delivering frames, status transitions to `Error` with a clear presenter message rather than hanging indefinitely.
 
-2. **Issue B — PowerPoint Source Disappearance**:
-   - **Root Cause**: `SourcesViewModel` was registered as `Transient` in DI, causing every tab switch away from Sources to destroy its collections. Decks were not saved to disk settings, and when `RefreshSourcesAsync()` executed, the missing PowerPoint IDs caused `ReconcileAvailability` to mark them unavailable. Unqueueing also risked conflating queue removal with source deletion.
+2. **NV12 Pixel Format Conversion & COMException (0x80004005)**:
+   - **Root Cause**: Physical webcams (such as the A4tech FHD 1080P PC Camera) stream in NV12 format. Calling WinRT's `SoftwareBitmap.Convert(rawBitmap, Bgra8, Premultiplied)` directly on planar NV12 CPU bitmaps is unsupported by WinRT and throws `COMException` (0x80004005 `E_FAIL` / invalid media type) on every frame (30 times/sec), flooding first-chance debugger exceptions and severely lagging the application.
    - **Resolution**:
-     - Added `ImportedPowerPointPaths` to `UserSettings`.
-     - Registered `SourcesViewModel` as `Singleton` in `App.xaml.cs`.
-     - Rehydrates imported PowerPoint decks on startup and refresh from `UserSettings.ImportedPowerPointPaths`.
-     - Strictly separates queue state from source library state: unqueueing unchecks `IsSelected = false` and removes from `SelectedSources`, keeping the deck in `_allPowerPoint`. Missing files are shown as `IsAvailable = false` rather than deleted.
+     - `CameraCaptureService.StartCaptureAsync` now explicitly requests `MediaEncodingSubtypes.Bgra8` via `CreateFrameReaderAsync(frameSource, MediaEncodingSubtypes.Bgra8)`, allowing Windows Media Foundation's native hardware/pipeline color converter to convert NV12 to BGRA8 natively.
+     - Implemented fully managed, exception-free CPU fallback converters (`ConvertNv12ToBgra8` and `ConvertYuy2ToBgra8`) using `CopyToBuffer` and ITU-R BT.601 color-space math, ensuring zero COMExceptions even if native conversion is unavailable.
+     - Handled GPU-backed frames: if `SoftwareBitmap` is null and `Direct3DSurface` is present, safely copies via `SoftwareBitmap.CreateCopyFromSurfaceAsync(surface, BitmapAlphaMode.Premultiplied)`.
+     - In `Direct3D11PresentationRenderer.RenderBitmapAsync`, added format check guards so `SoftwareBitmap.Convert` is never invoked on non-BGRA8 formats on the UI thread.
 
-3. **Issue C — Camera Display & UI Lag**:
-   - **Root Cause**: `CameraCaptureService.OnFrameArrived` used `using var frame = sender.TryAcquireLatestFrame();`, disposing the underlying Direct3D native frame before asynchronous WinUI rendering executed. Webcams delivered frames in NV12 or YUY2, which threw exceptions in `SoftwareBitmapSource.SetBitmapAsync` (which strictly requires `Bgra8` + `Premultiplied`). In addition, unthrottled frame arrivals flooded `DispatcherQueue.TryEnqueue`, lagging the UI.
+3. **Duplicate Transition Storm & Idempotency**:
+   - **Root Cause**: Rapid UI actions (e.g. clicking Start Presentation, dock state changes, or queue updates) triggered multiple simultaneous transition requests (`StartPresentation seq=1`, `seq=2`, `SwitchPresentation seq=3`) targeting the same camera source. Earlier sequences were superseded mid-startup, aborting status updates and creating reader restart loops.
    - **Resolution**:
-     - Introduced an atomic backpressure gate (`Interlocked.CompareExchange(ref _isProcessingFrame, 1, 0)`) in `CameraCaptureService` that drops stale frames when the downstream renderer is busy (latest-frame-wins).
-     - Converted raw webcam frames into independent `BitmapPixelFormat.Bgra8` + `BitmapAlphaMode.Premultiplied` `SoftwareBitmap` instances on background threads before passing to the UI thread.
-     - Added deterministic disposal of `SoftwareBitmap` in `Direct3D11PresentationRenderer.RenderBitmapAsync` and wired backpressure release (`FrameRenderCompleted`).
-     - Added format optimization (~720p/1080p @ 30fps) and resource teardown when stopping or switching.
+     - Made `StartPresentationAsync`, `SwitchPresentationSourceAsync`, and `ExecuteSourceSwitchAsync` idempotent: if a presentation is already `Starting` or `Active` with the requested target source ID, duplicate start calls are ignored while ensuring the presentation output window remains visible.
+     - Unconditionally stop camera capture and cancel pending timeout watchers when switching away from camera to Window, Monitor, Media, or PowerPoint sources.
 
-4. **Issue D — COM Exception Diagnostics & Threading**:
-   - **Root Cause**: `PowerPointPresentationService.UpdateSlideImageAsync()` created `new BitmapImage(new Uri(imagePath))` directly on background threads without UI thread dispatch, throwing `COMException` `0x8001010E`. `MediaPresentationService.ClearVideoInternal()` called `_player.Pause()` and `_player.Source = null` off-thread. Exception handlers logged only `ex.Message`, which was frequently empty.
-   - **Resolution**:
-     - Implemented `SwitchCastDiagnostics.LogException` formatting exception type, hex HRESULT (`0x{ex.HResult:X8}`), thread ID, message, and stack trace.
-     - Dispatched `BitmapImage` creation to the UI thread via `DispatcherQueue` in `PowerPointPresentationService`.
-     - Dispatched player cleanup in `MediaPresentationService.ClearVideoInternal` via `RunOnUIThread`.
-
-5. **Hotkey Warning (0x00000581)**:
-   - Confirmed Win32 error 1409 (`ERROR_HOTKEY_ALREADY_REGISTERED`) is safely recorded in `binding.RegistrationError` without throwing unhandled exceptions or killing other applications.
+4. **Structured Unhandled Exception Diagnostics**:
+   - **Resolution**: Wired `UnhandledException` in `App.xaml.cs` to log exact hex HRESULT (`0x{ex.HResult:X8}`), exception type, message, and stack trace via `SwitchCastDiagnostics.LogException`.
 
 ---
 
@@ -51,12 +42,15 @@
 - **Level 1 (Compilation - Debug)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> **PASS** (0 errors, 0 warnings).
 - **Level 1 (Compilation - Release)**: `dotnet build SwitchCast.csproj -c Release -p:Platform=x64` -> **PASS** (0 errors, 0 warnings).
 - **Level 2 (Static Analysis)**: Roslyn compiler diagnostics -> **PASS** (0 errors, 0 warnings).
-- **Level 3 (Unit & Integration Tests)**: `dotnet test SwitchCast.Tests/SwitchCast.Tests.csproj -c Debug` -> **PASS** (307 passed, 0 failed, 0 skipped).
-- **Level 4 (Native Verification)**: Automated mocked unit suite passed completely. Interactive hardware (physical webcam, physical multi-monitor, installed PowerPoint application) is categorized as `IMPLEMENTED — RUNTIME UNVERIFIED` until physically exercised on target Windows machines.
+- **Level 3 (Unit & Integration Tests)**: `dotnet test SwitchCast.Tests/SwitchCast.Tests.csproj -c Debug` -> **PASS** (310 passed, 0 failed, 0 skipped).
+- **Level 4 (Native Verification)**: Automated mocked unit suite passed completely. Interactive hardware validation with physical webcam (A4tech FHD 1080P PC Camera) is marked `IMPLEMENTED — RUNTIME UNVERIFIED` until physically exercised on target Windows host.
 
 ---
 
 ## 3. Recommended Next Steps
 
-1. Connect physical USB camera (e.g. A4tech FHD 1080P) and verify real-time video feed in Presentation Output.
-2. Open live 14-slide PowerPoint deck and advance slides using both Floating Dock and PowerPoint native window to verify real-time counter synchronization.
+1. Connect physical USB camera (A4tech FHD 1080P PC Camera).
+2. Queue Camera and click Start Presenting.
+3. Verify dock changes from `STARTING...` to `LIVE`.
+4. Verify live video feed renders in Presentation Output.
+5. Switch Camera -> Window -> Camera -> PowerPoint -> Stop Presenting.

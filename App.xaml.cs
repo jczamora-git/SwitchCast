@@ -16,7 +16,18 @@ public partial class App : Application
     public App()
     {
         InitializeComponent();
+        UnhandledException += OnUnhandledException;
         Services = ConfigureServices();
+    }
+
+    private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+    {
+        SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.LogException(
+            "App",
+            "UnhandledException",
+            e.Exception,
+            $"HResult=0x{e.Exception.HResult:X8}, Message={e.Message}");
+        System.Diagnostics.Debug.WriteLine($"[App.UnhandledException] HResult=0x{e.Exception.HResult:X8} - {e.Message}\n{e.Exception}");
     }
 
     public static new App Current => (App)Application.Current;

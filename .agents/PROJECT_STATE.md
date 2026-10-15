@@ -7,15 +7,33 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Local Presentation Expansion — PowerPoint & Camera Runtime Hotfix Complete
-- **Overall Status**: **Implemented & Validated (307 Automated Unit Tests Passing, Debug & Release Builds Clean)**
-- **Last Updated**: 2026-10-15T15:40:00+08:00 (UTC+8)
+- **Current Phase**: Local Presentation Expansion — Critical Camera Runtime Hotfix Complete
+- **Overall Status**: **Implemented & Validated (310 Automated Unit Tests Passing, Debug & Release Builds Clean, Native Hardware Verification Pending)**
+- **Last Updated**: 2026-10-15T16:05:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Critical Camera Runtime Hotfix (Camera Starts but Does Not Render / COMException / Stuck STARTING)**:
+  - **Catch-22 Frame Rejection Deadlock Resolved**:
+    - `PresentationCoordinator.OnCameraFrameArrived` previously checked `if (Status != PresentationStatus.Active || !IsActiveSourceCamera)` and discarded all incoming camera frames while `Status` was `Starting`. Because frames were discarded, no frame was ever rendered; because no frame was ever rendered, `Status` never became `Active`.
+    - Fixed `OnCameraFrameArrived` to accept frames during `Starting` and `Active`: `if ((Status != PresentationStatus.Active && Status != PresentationStatus.Starting) || !IsActiveSourceCamera)`.
+    - Defined clear transition rule: when the first camera frame is delivered to the renderer, `Status` transitions from `Starting` to `Active` (LIVE), and the floating dock immediately updates to `LIVE`.
+    - Added an 8-second bounded startup timeout (`ArmCameraStartupTimeout`) using `CancellationTokenSource`: if camera hardware fails or freezes without delivering frames, status transitions to `Error` with user-friendly feedback instead of remaining stuck at `STARTING...`.
+  - **NV12 Pixel Format & COMException Fix**:
+    - In `CameraCaptureService`, `CreateFrameReaderAsync(frameSource, MediaEncodingSubtypes.Bgra8)` is now explicitly requested, instructing Windows Media Foundation's native topology to perform hardware-accelerated color conversion to `Bgra8` directly.
+    - Eliminated invalid `SoftwareBitmap.Convert(rawBitmap, Bgra8, Premultiplied)` calls on planar `BitmapPixelFormat.Nv12` frames (which threw 30 first-chance `COMException` events/sec in `WinRT.Runtime.dll`).
+    - Implemented managed CPU fallbacks (`ConvertNv12ToBgra8`, `ConvertYuy2ToBgra8`) using `CopyToBuffer` and ITU-R BT.601 math, guaranteeing 100% exception-free conversion even if native hardware conversion is unavailable.
+    - Added Direct3D surface fallback: if `SoftwareBitmap` is null on GPU-backed frames, extracts bitmap via `SoftwareBitmap.CreateCopyFromSurfaceAsync(surface, BitmapAlphaMode.Premultiplied)`.
+    - In `Direct3D11PresentationRenderer.RenderBitmapAsync`, ensured format check guards prevent `SoftwareBitmap.Convert` from being invoked on non-BGRA8 formats on the UI thread.
+  - **Duplicate Transition Storm & Idempotency**:
+    - Guarded `StartPresentationAsync`, `SwitchPresentationSourceAsync`, and `ExecuteSourceSwitchAsync`: if the presentation is already `Starting` or `Active` with the requested target source ID, duplicate start requests are ignored as redundant while ensuring the presentation output window remains visible.
+    - Unconditionally stopped camera capture and cancelled pending timeout watchers when switching away to Window, Monitor, Media, or PowerPoint sources.
+  - **Structured Unhandled Exception Diagnostics**:
+    - Wired `UnhandledException` in `App.xaml.cs` to log exact hex HRESULT (`0x{ex.HResult:X8}`), exception type, message, and stack trace via `SwitchCastDiagnostics.LogException`.
+  - **Automated Regression Suite**: Expanded test suite to **310 automated unit tests** (100% pass rate). Both Debug and Release builds compile with 0 errors and 0 warnings.
 - [x] **PowerPoint & Camera Runtime Hotfix (Issues A–D Resolved)**:
   - **Issue A — PowerPoint Slide Counter Synchronization**:
     - `PresentationCoordinator.PowerPointProgressText` dynamically reads the authoritative current slide index and total slide count from `IPowerPointPresentationService` and `IPowerPointLiveService`.

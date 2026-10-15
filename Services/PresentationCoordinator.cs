@@ -33,6 +33,8 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     private long _presentationSequenceNumber;
     private PresentationStatus _previousStatusBeforeBlackout = PresentationStatus.Active;
     private volatile bool _isStoppingOrShuttingDown;
+    private int _firstCameraFrameRendered;
+    private CancellationTokenSource? _cameraStartupCts;
 
     [ObservableProperty]
     private string? _lastErrorMessage;
@@ -227,6 +229,14 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             throw new InvalidOperationException("No available presentation source selected.");
         }
 
+        if (_presentationStateService.ActiveSource?.Id == targetSource.Id &&
+            (Status == PresentationStatus.Active || Status == PresentationStatus.Starting))
+        {
+            Debug.WriteLine($"[PresentationCoordinator] StartPresentation redundant for {targetSource.Id} (Status={Status}); ensuring output window visible.");
+            _presentationWindowService.ShowPresentationWindow();
+            return;
+        }
+
         long sequence = Interlocked.Increment(ref _presentationSequenceNumber);
         Volatile.Write(ref _targetRequestedPresentationSource, targetSource);
 
@@ -319,10 +329,22 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                     await _powerPointLiveService.StopSlideshowAsync().ConfigureAwait(false);
                 }
 
+                _presentationStateService.SetActiveSource(cameraSource);
+                _presentationStateService.SetSelectedSource(cameraSource);
+                Interlocked.Exchange(ref _firstCameraFrameRendered, 0);
+
                 if (_cameraCaptureService is not null)
                 {
-                    await _cameraCaptureService.StartCaptureAsync(cameraSource).ConfigureAwait(false);
+                    bool started = await _cameraCaptureService.StartCaptureAsync(cameraSource).ConfigureAwait(false);
+                    if (!started)
+                    {
+                        LastErrorMessage = _cameraCaptureService.LastErrorMessage ?? "Failed to start camera capture.";
+                        _presentationStateService.SetStatus(PresentationStatus.Error);
+                        return;
+                    }
                 }
+
+                ArmCameraStartupTimeout();
             }
             else
             {
@@ -379,7 +401,10 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                     _presentationStateService.SetForegroundSource(null);
                 }
             }
-            _presentationStateService.SetStatus(PresentationStatus.Active);
+            if (targetSource is not CameraSource)
+            {
+                _presentationStateService.SetStatus(PresentationStatus.Active);
+            }
             Debug.WriteLine($"[PresentationCoordinator] StartPresentation completed seq={sequence} source={targetSource.Id}");
         }
         catch (Exception ex)
@@ -418,7 +443,10 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             }
             _powerPointService.ClearPresentation();
 
-            if (_cameraCaptureService is not null && _cameraCaptureService.IsCapturing)
+            _cameraStartupCts?.Cancel();
+            Interlocked.Exchange(ref _firstCameraFrameRendered, 0);
+
+            if (_cameraCaptureService is not null)
             {
                 await _cameraCaptureService.StopCaptureAsync().ConfigureAwait(false);
             }
@@ -474,8 +502,10 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                 throw new InvalidOperationException($"Source '{newSource.Title}' is marked unavailable.");
             }
 
-            if (_presentationStateService.ActiveSource?.Id == newSource.Id && Status == PresentationStatus.Active)
+            if (_presentationStateService.ActiveSource?.Id == newSource.Id &&
+                (Status == PresentationStatus.Active || Status == PresentationStatus.Starting))
             {
+                Debug.WriteLine($"[PresentationCoordinator] SwitchPresentation redundant for {newSource.Id} (Status={Status}); ignoring duplicate switch.");
                 return;
             }
 
@@ -493,7 +523,9 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                 {
                     await _powerPointLiveService.StopSlideshowAsync().ConfigureAwait(false);
                 }
-                if (_cameraCaptureService is not null && _cameraCaptureService.IsCapturing)
+                _cameraStartupCts?.Cancel();
+                Interlocked.Exchange(ref _firstCameraFrameRendered, 0);
+                if (_cameraCaptureService is not null)
                 {
                     await _cameraCaptureService.StopCaptureAsync().ConfigureAwait(false);
                 }
@@ -512,7 +544,9 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                 {
                     await _powerPointLiveService.StopSlideshowAsync().ConfigureAwait(false);
                 }
-                if (_cameraCaptureService is not null && _cameraCaptureService.IsCapturing)
+                _cameraStartupCts?.Cancel();
+                Interlocked.Exchange(ref _firstCameraFrameRendered, 0);
+                if (_cameraCaptureService is not null)
                 {
                     await _cameraCaptureService.StopCaptureAsync().ConfigureAwait(false);
                 }
@@ -527,7 +561,9 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                 }
                 await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
                 _mediaPresentationService.ClearImage();
-                if (_cameraCaptureService is not null && _cameraCaptureService.IsCapturing)
+                _cameraStartupCts?.Cancel();
+                Interlocked.Exchange(ref _firstCameraFrameRendered, 0);
+                if (_cameraCaptureService is not null)
                 {
                     await _cameraCaptureService.StopCaptureAsync().ConfigureAwait(false);
                 }
@@ -567,10 +603,23 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                     await _powerPointLiveService.StopSlideshowAsync().ConfigureAwait(false);
                 }
 
+                _presentationStateService.SetStatus(PresentationStatus.Starting);
+                _presentationStateService.SetActiveSource(cameraSource);
+                _presentationStateService.SetSelectedSource(cameraSource);
+                Interlocked.Exchange(ref _firstCameraFrameRendered, 0);
+
                 if (_cameraCaptureService is not null)
                 {
-                    await _cameraCaptureService.StartCaptureAsync(cameraSource).ConfigureAwait(false);
+                    bool started = await _cameraCaptureService.StartCaptureAsync(cameraSource).ConfigureAwait(false);
+                    if (!started)
+                    {
+                        LastErrorMessage = _cameraCaptureService.LastErrorMessage ?? "Failed to start camera capture.";
+                        _presentationStateService.SetStatus(PresentationStatus.Error);
+                        return;
+                    }
                 }
+
+                ArmCameraStartupTimeout();
             }
             else
             {
@@ -582,7 +631,9 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                 {
                     await _powerPointLiveService.StopSlideshowAsync().ConfigureAwait(false);
                 }
-                if (_cameraCaptureService is not null && _cameraCaptureService.IsCapturing)
+                _cameraStartupCts?.Cancel();
+                Interlocked.Exchange(ref _firstCameraFrameRendered, 0);
+                if (_cameraCaptureService is not null)
                 {
                     await _cameraCaptureService.StopCaptureAsync().ConfigureAwait(false);
                 }
@@ -615,7 +666,10 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             }
             else
             {
-                _presentationStateService.SetStatus(PresentationStatus.Active);
+                if (newSource is not CameraSource)
+                {
+                    _presentationStateService.SetStatus(PresentationStatus.Active);
+                }
             }
 
             if (SwitchMode == PresenterSwitchMode.ActiveAndLive && (newSource is ImageMediaSource or VideoMediaSource or CameraSource or PowerPointSource))
@@ -738,6 +792,14 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         ArgumentNullException.ThrowIfNull(targetSource);
 
         _presentationStateService.SetSelectedSource(targetSource);
+
+        if (_presentationStateService.ActiveSource?.Id == targetSource.Id &&
+            (Status == PresentationStatus.Active || Status == PresentationStatus.Starting))
+        {
+            Debug.WriteLine($"[PresentationCoordinator] ExecuteSourceSwitch redundant for {targetSource.Id} (Status={Status}); ensuring output visible.");
+            _presentationWindowService.ShowPresentationWindow();
+            return;
+        }
 
         var mode = SwitchMode;
         Debug.WriteLine($"[PresentationCoordinator] ExecuteSourceSwitch mode={mode} target={targetSource.Id} ({targetSource.Title})");
@@ -1050,7 +1112,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
     private void OnCameraFrameArrived(object? sender, SoftwareBitmap bitmap)
     {
-        if (Status != PresentationStatus.Active || !IsActiveSourceCamera)
+        if ((Status != PresentationStatus.Active && Status != PresentationStatus.Starting) || !IsActiveSourceCamera)
         {
             bitmap.Dispose();
             _cameraCaptureService?.NotifyFrameCompleted();
@@ -1060,6 +1122,18 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         try
         {
             _ = _outputRenderer.RenderBitmapAsync(bitmap);
+
+            // Once the first valid camera frame has been delivered to the renderer,
+            // transition presentation state from Starting to Active (LIVE).
+            if (Status == PresentationStatus.Starting && IsActiveSourceCamera)
+            {
+                if (Interlocked.CompareExchange(ref _firstCameraFrameRendered, 1, 0) == 0)
+                {
+                    _cameraStartupCts?.Cancel();
+                    Debug.WriteLine("[PresentationCoordinator] First camera frame delivered to renderer. Status transitioned to Active (LIVE).");
+                    _presentationStateService.SetStatus(PresentationStatus.Active);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -1067,6 +1141,42 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             _cameraCaptureService?.NotifyFrameCompleted();
             Diagnostics.SwitchCastDiagnostics.LogException(nameof(PresentationCoordinator), nameof(OnCameraFrameArrived), ex);
         }
+    }
+
+    private void ArmCameraStartupTimeout()
+    {
+        _cameraStartupCts?.Cancel();
+        _cameraStartupCts?.Dispose();
+        _cameraStartupCts = new CancellationTokenSource();
+        var token = _cameraStartupCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(8000, token).ConfigureAwait(false);
+                if (!token.IsCancellationRequested &&
+                    Status == PresentationStatus.Starting &&
+                    IsActiveSourceCamera)
+                {
+                    Debug.WriteLine("[PresentationCoordinator] Camera presentation startup timed out after 8s without receiving frames.");
+                    LastErrorMessage = "Camera presentation timed out waiting for video frames. Please check camera connection and privacy settings.";
+                    _presentationStateService.SetStatus(PresentationStatus.Error);
+                    if (_cameraCaptureService is not null)
+                    {
+                        await _cameraCaptureService.StopCaptureAsync().ConfigureAwait(false);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Normal cancellation when frame arrives or presentation stops
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[PresentationCoordinator] Camera startup timeout watcher exception: {ex.Message}");
+            }
+        }, token);
     }
 
     private void OnOutputRendererFrameRenderCompleted(object? sender, EventArgs e)
@@ -1084,6 +1194,9 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             _cameraCaptureService.FrameArrived -= OnCameraFrameArrived;
             _outputRenderer.FrameRenderCompleted -= OnOutputRendererFrameRenderCompleted;
         }
+
+        _cameraStartupCts?.Cancel();
+        _cameraStartupCts?.Dispose();
 
         _mediaPresentationService.Dispose();
         _outputRenderer.Dispose();

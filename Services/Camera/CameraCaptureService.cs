@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Graphics.Imaging;
 using Windows.Media.Capture;
 using Windows.Media.Capture.Frames;
+using Windows.Media.MediaProperties;
 using SwitchCast.Models;
 using SwitchCast.Services.Diagnostics;
 
@@ -19,6 +21,7 @@ public sealed class CameraCaptureService : ICameraCaptureService
     private MediaFrameReader? _frameReader;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private int _isProcessingFrame;
+    private int _firstFrameAcquiredLogged;
     private long _frameArrivalCount;
     private long _frameRenderSubmissionCount;
     private long _frameDropCount;
@@ -59,6 +62,7 @@ public sealed class CameraCaptureService : ICameraCaptureService
             Interlocked.Exchange(ref _frameRenderSubmissionCount, 0);
             Interlocked.Exchange(ref _frameDropCount, 0);
             Interlocked.Exchange(ref _isProcessingFrame, 0);
+            Interlocked.Exchange(ref _firstFrameAcquiredLogged, 0);
 
             var initSettings = new MediaCaptureInitializationSettings
             {
@@ -120,6 +124,9 @@ public sealed class CameraCaptureService : ICameraCaptureService
                     .OrderByDescending(f => f.VideoFormat.Width <= 1920 && f.VideoFormat.Height <= 1080)
                     .ThenBy(f => Math.Abs((int)f.VideoFormat.Width - 1280) + Math.Abs((int)f.VideoFormat.Height - 720))
                     .ThenByDescending(f => f.FrameRate.Numerator / Math.Max(1, f.FrameRate.Denominator) == 30)
+                    .ThenByDescending(f => f.Subtype.Equals(MediaEncodingSubtypes.Bgra8, StringComparison.OrdinalIgnoreCase) ||
+                                           f.Subtype.Equals(MediaEncodingSubtypes.Argb32, StringComparison.OrdinalIgnoreCase) ||
+                                           f.Subtype.Equals(MediaEncodingSubtypes.Rgb24, StringComparison.OrdinalIgnoreCase))
                     .FirstOrDefault();
 
                 if (preferredFormat is not null && preferredFormat != frameSource.CurrentFormat)
@@ -136,7 +143,18 @@ public sealed class CameraCaptureService : ICameraCaptureService
                 }
             }
 
-            _frameReader = await _mediaCapture.CreateFrameReaderAsync(frameSource).AsTask(cancellationToken).ConfigureAwait(false);
+            // Create frame reader: explicitly request Bgra8 conversion by Media Foundation pipeline if supported
+            try
+            {
+                _frameReader = await _mediaCapture.CreateFrameReaderAsync(frameSource, MediaEncodingSubtypes.Bgra8).AsTask(cancellationToken).ConfigureAwait(false);
+                Debug.WriteLine($"[CameraCaptureService] Created frame reader with requested subtype {MediaEncodingSubtypes.Bgra8}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[CameraCaptureService] CreateFrameReaderAsync with Bgra8 subtype failed (0x{ex.HResult:X8}), falling back to native subtype: {ex.Message}");
+                _frameReader = await _mediaCapture.CreateFrameReaderAsync(frameSource).AsTask(cancellationToken).ConfigureAwait(false);
+            }
+
             _frameReader.FrameArrived += OnFrameArrived;
 
             var status = await _frameReader.StartAsync().AsTask(cancellationToken).ConfigureAwait(false);
@@ -191,6 +209,7 @@ public sealed class CameraCaptureService : ICameraCaptureService
     private async Task StopCaptureInternalAsync()
     {
         Interlocked.Exchange(ref _isProcessingFrame, 0);
+        Interlocked.Exchange(ref _firstFrameAcquiredLogged, 0);
 
         if (_frameReader is not null)
         {
@@ -242,18 +261,55 @@ public sealed class CameraCaptureService : ICameraCaptureService
         try
         {
             using var frame = sender.TryAcquireLatestFrame();
-            if (frame?.VideoMediaFrame?.SoftwareBitmap is SoftwareBitmap rawBitmap)
+            if (frame?.VideoMediaFrame is VideoMediaFrame videoFrame)
             {
-                // CRITICAL: SoftwareBitmapSource strictly requires Bgra8 + Premultiplied.
-                // Convert on this background thread so the UI thread is never blocked doing pixel conversions.
-                if (rawBitmap.BitmapPixelFormat == BitmapPixelFormat.Bgra8 &&
-                    rawBitmap.BitmapAlphaMode == BitmapAlphaMode.Premultiplied)
+                var rawBitmap = videoFrame.SoftwareBitmap;
+                if (rawBitmap is null && videoFrame.Direct3DSurface is Windows.Graphics.DirectX.Direct3D11.IDirect3DSurface surface)
                 {
-                    converted = SoftwareBitmap.Copy(rawBitmap);
+                    try
+                    {
+                        rawBitmap = SoftwareBitmap.CreateCopyFromSurfaceAsync(surface, BitmapAlphaMode.Premultiplied).AsTask().GetAwaiter().GetResult();
+                    }
+                    catch (Exception ex)
+                    {
+                        SwitchCastDiagnostics.LogException(nameof(CameraCaptureService), "CreateCopyFromSurfaceAsync", ex);
+                    }
                 }
-                else
+
+                if (rawBitmap is not null)
                 {
-                    converted = SoftwareBitmap.Convert(rawBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+                    if (Interlocked.CompareExchange(ref _firstFrameAcquiredLogged, 1, 0) == 0)
+                    {
+                        Debug.WriteLine($"[CameraCaptureService] First valid camera frame acquired: {rawBitmap.PixelWidth}x{rawBitmap.PixelHeight} ({rawBitmap.BitmapPixelFormat}, {rawBitmap.BitmapAlphaMode})");
+                    }
+
+                    // SoftwareBitmapSource strictly requires Bgra8 + Premultiplied.
+                    // Convert on this background thread so the UI thread is never blocked doing pixel conversions.
+                    if (rawBitmap.BitmapPixelFormat == BitmapPixelFormat.Bgra8 &&
+                        rawBitmap.BitmapAlphaMode == BitmapAlphaMode.Premultiplied)
+                    {
+                        converted = SoftwareBitmap.Copy(rawBitmap);
+                    }
+                    else if (rawBitmap.BitmapPixelFormat == BitmapPixelFormat.Bgra8)
+                    {
+                        converted = SoftwareBitmap.Convert(rawBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+                    }
+                    else if (rawBitmap.BitmapPixelFormat == BitmapPixelFormat.Nv12)
+                    {
+                        converted = ConvertNv12ToBgra8(rawBitmap);
+                    }
+                    else if (rawBitmap.BitmapPixelFormat == BitmapPixelFormat.Yuy2)
+                    {
+                        converted = ConvertYuy2ToBgra8(rawBitmap);
+                    }
+                    else if (rawBitmap.BitmapPixelFormat == BitmapPixelFormat.Rgba8)
+                    {
+                        converted = SoftwareBitmap.Convert(rawBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"[CameraCaptureService] Unsupported camera frame format: {rawBitmap.BitmapPixelFormat}");
+                    }
                 }
             }
         }
@@ -272,6 +328,125 @@ public sealed class CameraCaptureService : ICameraCaptureService
         else
         {
             Interlocked.Exchange(ref _isProcessingFrame, 0);
+        }
+    }
+
+    /// <summary>
+    /// Converts a planar NV12 SoftwareBitmap to a packed Bgra8 Premultiplied SoftwareBitmap safely on CPU without COMExceptions.
+    /// </summary>
+    private static SoftwareBitmap? ConvertNv12ToBgra8(SoftwareBitmap nv12Bitmap)
+    {
+        try
+        {
+            int width = nv12Bitmap.PixelWidth;
+            int height = nv12Bitmap.PixelHeight;
+            int ySize = width * height;
+            int nv12Size = ySize * 3 / 2;
+
+            byte[] nv12Data = new byte[nv12Size];
+            nv12Bitmap.CopyToBuffer(nv12Data.AsBuffer());
+
+            byte[] bgraData = new byte[width * height * 4];
+
+            int uvOffset = ySize;
+            for (int y = 0; y < height; y++)
+            {
+                int yLine = y * width;
+                int uvLine = uvOffset + (y / 2) * width;
+
+                for (int x = 0; x < width; x++)
+                {
+                    int yIndex = yLine + x;
+                    int uvIndex = uvLine + (x & ~1);
+
+                    int yVal = nv12Data[yIndex];
+                    int uVal = nv12Data[uvIndex];
+                    int vVal = nv12Data[uvIndex + 1];
+
+                    int c = yVal - 16;
+                    int d = uVal - 128;
+                    int e = vVal - 128;
+
+                    int r = (298 * c + 409 * e + 128) >> 8;
+                    int g = (298 * c - 100 * d - 208 * e + 128) >> 8;
+                    int b = (298 * c + 516 * d + 128) >> 8;
+
+                    int bgraIndex = (yLine + x) * 4;
+                    bgraData[bgraIndex] = (byte)Math.Clamp(b, 0, 255);
+                    bgraData[bgraIndex + 1] = (byte)Math.Clamp(g, 0, 255);
+                    bgraData[bgraIndex + 2] = (byte)Math.Clamp(r, 0, 255);
+                    bgraData[bgraIndex + 3] = 255;
+                }
+            }
+
+            var resultBitmap = new SoftwareBitmap(BitmapPixelFormat.Bgra8, width, height, BitmapAlphaMode.Premultiplied);
+            resultBitmap.CopyFromBuffer(bgraData.AsBuffer());
+            return resultBitmap;
+        }
+        catch (Exception ex)
+        {
+            SwitchCastDiagnostics.LogException(nameof(CameraCaptureService), nameof(ConvertNv12ToBgra8), ex);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Converts a packed YUY2 SoftwareBitmap to a packed Bgra8 Premultiplied SoftwareBitmap safely on CPU without COMExceptions.
+    /// </summary>
+    private static SoftwareBitmap? ConvertYuy2ToBgra8(SoftwareBitmap yuy2Bitmap)
+    {
+        try
+        {
+            int width = yuy2Bitmap.PixelWidth;
+            int height = yuy2Bitmap.PixelHeight;
+            int yuy2Size = width * height * 2;
+
+            byte[] yuy2Data = new byte[yuy2Size];
+            yuy2Bitmap.CopyToBuffer(yuy2Data.AsBuffer());
+
+            byte[] bgraData = new byte[width * height * 4];
+
+            for (int i = 0, j = 0; i < yuy2Size; i += 4, j += 8)
+            {
+                int y0 = yuy2Data[i];
+                int u = yuy2Data[i + 1];
+                int y1 = yuy2Data[i + 2];
+                int v = yuy2Data[i + 3];
+
+                int d = u - 128;
+                int e = v - 128;
+
+                // Pixel 0
+                int c0 = y0 - 16;
+                int r0 = (298 * c0 + 409 * e + 128) >> 8;
+                int g0 = (298 * c0 - 100 * d - 208 * e + 128) >> 8;
+                int b0 = (298 * c0 + 516 * d + 128) >> 8;
+
+                bgraData[j] = (byte)Math.Clamp(b0, 0, 255);
+                bgraData[j + 1] = (byte)Math.Clamp(g0, 0, 255);
+                bgraData[j + 2] = (byte)Math.Clamp(r0, 0, 255);
+                bgraData[j + 3] = 255;
+
+                // Pixel 1
+                int c1 = y1 - 16;
+                int r1 = (298 * c1 + 409 * e + 128) >> 8;
+                int g1 = (298 * c1 - 100 * d - 208 * e + 128) >> 8;
+                int b1 = (298 * c1 + 516 * d + 128) >> 8;
+
+                bgraData[j + 4] = (byte)Math.Clamp(b1, 0, 255);
+                bgraData[j + 5] = (byte)Math.Clamp(g1, 0, 255);
+                bgraData[j + 6] = (byte)Math.Clamp(r1, 0, 255);
+                bgraData[j + 7] = 255;
+            }
+
+            var resultBitmap = new SoftwareBitmap(BitmapPixelFormat.Bgra8, width, height, BitmapAlphaMode.Premultiplied);
+            resultBitmap.CopyFromBuffer(bgraData.AsBuffer());
+            return resultBitmap;
+        }
+        catch (Exception ex)
+        {
+            SwitchCastDiagnostics.LogException(nameof(CameraCaptureService), nameof(ConvertYuy2ToBgra8), ex);
+            return null;
         }
     }
 
