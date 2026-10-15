@@ -7,6 +7,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [PowerPoint & Camera Runtime Hotfix] - 2026-10-15
+
+### Fixed (fix / powerpoint / camera / com-diagnostics / persistence / test)
+- **PowerPoint Slide Counter Synchronization (Issue A)**:
+  - Repaired `PresentationCoordinator.PowerPointProgressText` to read directly from authoritative services (`IPowerPointPresentationService` and `IPowerPointLiveService`).
+  - Wired `_powerPointService.SlideChanged` to update `_presentationStateService.ActiveSource` with the new slide index, keeping the Floating Presenter Dock synchronized.
+  - Rebuilt `PowerPointLiveService` using a single persistent STA worker thread with an action pump, polling `SlideShowWindow.View.CurrentShowPosition` to capture external slideshow navigation (clicks, keys, remotes) without false advances on animations.
+- **PowerPoint Source Persistence (Issue B)**:
+  - Added `ImportedPowerPointPaths` to `UserSettings` and registered `SourcesViewModel` as `Singleton` in `App.xaml.cs`.
+  - Rehydrated imported PowerPoint decks on startup and refresh from `UserSettings`.
+  - Disentangled source library membership from queue state so unqueueing does not delete imported presentations, and missing files are marked as unavailable rather than removed.
+- **Camera Display & Pipeline Stabilization (Issue C)**:
+  - Eliminated blank output and application freezing by introducing an atomic backpressure gate (`Interlocked.CompareExchange`) in `CameraCaptureService`, preventing queue flooding and UI dispatcher saturation.
+  - Moved pixel format conversion off the UI thread: converted webcam frames (NV12, YUY2) into independent `BitmapPixelFormat.Bgra8` + `BitmapAlphaMode.Premultiplied` `SoftwareBitmap` instances on background threads before passing to `Direct3D11PresentationRenderer`.
+  - Enforced deterministic disposal of `SoftwareBitmap` in `Direct3D11PresentationRenderer.RenderBitmapAsync` and wired backpressure release (`FrameRenderCompleted`).
+  - Added format optimization (~720p/1080p @ 30fps) and resource teardown when stopping or switching.
+- **COM Exception Diagnostics & Threading Corrections (Issue D)**:
+  - Implemented `SwitchCastDiagnostics.LogException` providing structured logging of exception type, exact hex HRESULT (`0x{ex.HResult:X8}`), thread ID, message, and stack trace across all COM and hardware operations.
+  - Resolved `RPC_E_WRONG_THREAD` (0x8001010E) in `PowerPointPresentationService` by dispatching `BitmapImage` creation onto the WinUI UI thread via `DispatcherQueue`.
+  - Resolved `RPC_E_WRONG_THREAD` in `MediaPresentationService.ClearVideoInternal` by executing player pause and source cleanup via `RunOnUIThread`.
+- **Automated Regression Suite**:
+  - Added `PowerPointCameraHotfixRegressionTests.cs` bringing total test count to **307 passing automated tests** (0 failures, 0 skipped). Both Debug and Release builds compile with 0 errors and 0 warnings.
+
+---
+
 ## [Local Presentation Expansion] - 2026-10-15
 
 ### Added (feat / architecture / multi-monitor / powerpoint / camera / presenter-controls / test)

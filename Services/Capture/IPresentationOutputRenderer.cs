@@ -48,4 +48,9 @@ public interface IPresentationOutputRenderer : IDisposable
     /// Clears the presentation output image.
     /// </summary>
     void Clear();
+
+    /// <summary>
+    /// Raised when a frame or bitmap finishes rendering to the output surface.
+    /// </summary>
+    event EventHandler? FrameRenderCompleted;
 }

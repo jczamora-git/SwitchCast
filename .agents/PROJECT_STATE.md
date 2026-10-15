@@ -7,15 +7,35 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Local Presentation Expansion — Phases P0 through P5 Complete
-- **Overall Status**: **Implemented & Validated (299 Automated Unit Tests Passing, Debug & Release Builds Clean)**
-- **Last Updated**: 2026-10-15T14:46:00+08:00 (UTC+8)
+- **Current Phase**: Local Presentation Expansion — PowerPoint & Camera Runtime Hotfix Complete
+- **Overall Status**: **Implemented & Validated (307 Automated Unit Tests Passing, Debug & Release Builds Clean)**
+- **Last Updated**: 2026-10-15T15:40:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **PowerPoint & Camera Runtime Hotfix (Issues A–D Resolved)**:
+  - **Issue A — PowerPoint Slide Counter Synchronization**:
+    - `PresentationCoordinator.PowerPointProgressText` dynamically reads the authoritative current slide index and total slide count from `IPowerPointPresentationService` and `IPowerPointLiveService`.
+    - Wired `_powerPointService.SlideChanged` to update `_presentationStateService.ActiveSource` with the latest `CurrentSlideIndex` on every slide advance (`NextSlideAsync`, `PreviousSlideAsync`, `GoToSlideAsync`).
+    - Fixed `PowerPointLiveService` to maintain a single persistent STA worker thread and poll `SlideShowWindow.View.CurrentShowPosition`, capturing external slide transitions (keyboard, mouse clicks, remote controls) without advancing on intra-slide animations.
+  - **Issue B — PowerPoint Source Persistence**:
+    - Added `ImportedPowerPointPaths` to `UserSettings` to store imported `.pptx` decks persistently across application sessions.
+    - Registered `SourcesViewModel` as `Singleton` in `App.xaml.cs` to prevent destruction of imported collections upon tab navigation.
+    - Rehydrates imported PowerPoint files on startup and refresh; marks non-existent decks as `IsAvailable = false` rather than silently deleting them.
+    - Preserved separation of states: unqueueing removes a deck from the presentation queue while strictly keeping it in the imported source library.
+  - **Issue C — Camera Display & Pipeline Stabilization**:
+    - Eliminated blank output and application freezing by introducing an atomic backpressure gate (`Interlocked.CompareExchange`) in `CameraCaptureService`, preventing queue flooding and UI dispatcher saturation.
+    - Moved pixel format conversion off the UI thread: converted webcam frames (NV12, YUY2) into independent `BitmapPixelFormat.Bgra8` + `BitmapAlphaMode.Premultiplied` `SoftwareBitmap` instances on background threads before passing to `Direct3D11PresentationRenderer`.
+    - Enforced deterministic disposal of `SoftwareBitmap` in `Direct3D11PresentationRenderer.RenderBitmapAsync` and wired backpressure release (`FrameRenderCompleted`).
+    - Handled camera format negotiation (preferred ~720p/1080p @ 30fps) and resource teardown when switching away or stopping.
+  - **Issue D — COM Diagnostics & Threading Corrections**:
+    - Created `SwitchCastDiagnostics` providing structured logging of exception type, exact hex HRESULT (`0x{ex.HResult:X8}`), thread ID, message, and stack trace across all COM and hardware operations.
+    - Resolved `RPC_E_WRONG_THREAD` (0x8001010E) in `PowerPointPresentationService` by dispatching `BitmapImage` creation onto the WinUI UI thread via `DispatcherQueue`.
+    - Resolved `RPC_E_WRONG_THREAD` in `MediaPresentationService.ClearVideoInternal` by executing player pause and source cleanup via `RunOnUIThread`.
+  - **Automated Regression Suite**: Expanded test suite to **307 automated unit tests** (100% pass rate). Both Debug and Release builds compile with 0 errors and 0 warnings.
 - [x] **Local Presentation Expansion (Phases P0 - P5 Complete)**:
   - **P1 — Smart External Display Mode & Configurable Automation**:
     - Multi-monitor topology discovery via Win32 `MONITORINFOEX` geometry.
@@ -235,9 +255,11 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ## 6. VERIFICATION RECORD
 
-- **Level 1 (Compilation)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors).
+- **Level 1 (Compilation - Debug)**: `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> PASS (0 warnings, 0 errors).
+- **Level 1 (Compilation - Release)**: `dotnet build SwitchCast.csproj -c Release -p:Platform=x64` -> PASS (0 warnings, 0 errors).
 - **Level 2 (Static Analysis)**: Nullable reference checks and analyzer validation -> PASS (0 warnings).
-- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (263 passed, 0 failed, 0 skipped).
+- **Level 3 (Unit Tests)**: `dotnet test SwitchCast.Tests\SwitchCast.Tests.csproj -c Debug` -> PASS (307 passed, 0 failed, 0 skipped).
+- **Level 4 (Native Verification)**: Automated mocked unit suite passed completely. Interactive hardware (physical webcam, physical multi-monitor, installed PowerPoint application) is categorized as `IMPLEMENTED — RUNTIME UNVERIFIED` until physically exercised on target Windows machines.
 
 ---
 

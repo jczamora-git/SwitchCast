@@ -4,11 +4,13 @@ using Windows.Graphics.Imaging;
 using Windows.Media.Capture;
 using Windows.Media.Capture.Frames;
 using SwitchCast.Models;
+using SwitchCast.Services.Diagnostics;
 
 namespace SwitchCast.Services.Camera;
 
 /// <summary>
 /// Service managing live camera video frame acquisition via Windows.Media.Capture and MediaFrameReader.
+/// Enforces bounded backpressure, off-UI-thread pixel format conversion, and strict resource disposal.
 /// Releases hardware resources immediately upon capture stop or presentation switch.
 /// </summary>
 public sealed class CameraCaptureService : ICameraCaptureService
@@ -16,6 +18,10 @@ public sealed class CameraCaptureService : ICameraCaptureService
     private MediaCapture? _mediaCapture;
     private MediaFrameReader? _frameReader;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
+    private int _isProcessingFrame;
+    private long _frameArrivalCount;
+    private long _frameRenderSubmissionCount;
+    private long _frameDropCount;
     private bool _disposed;
 
     public bool IsCapturing => _mediaCapture is not null && _frameReader is not null;
@@ -23,6 +29,12 @@ public sealed class CameraCaptureService : ICameraCaptureService
     public CameraSource? ActiveCamera { get; private set; }
 
     public string? LastErrorMessage { get; private set; }
+
+    public long FrameArrivalCount => Interlocked.Read(ref _frameArrivalCount);
+
+    public long FrameRenderSubmissionCount => Interlocked.Read(ref _frameRenderSubmissionCount);
+
+    public long FrameDropCount => Interlocked.Read(ref _frameDropCount);
 
     public event EventHandler<SoftwareBitmap>? FrameArrived;
     public event EventHandler? CaptureStopped;
@@ -34,6 +46,8 @@ public sealed class CameraCaptureService : ICameraCaptureService
             throw new ArgumentNullException(nameof(camera));
         }
 
+        var sw = Stopwatch.StartNew();
+
         await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -41,6 +55,10 @@ public sealed class CameraCaptureService : ICameraCaptureService
 
             LastErrorMessage = null;
             ActiveCamera = camera;
+            Interlocked.Exchange(ref _frameArrivalCount, 0);
+            Interlocked.Exchange(ref _frameRenderSubmissionCount, 0);
+            Interlocked.Exchange(ref _frameDropCount, 0);
+            Interlocked.Exchange(ref _isProcessingFrame, 0);
 
             var initSettings = new MediaCaptureInitializationSettings
             {
@@ -54,10 +72,10 @@ public sealed class CameraCaptureService : ICameraCaptureService
             {
                 await mediaCapture.InitializeAsync(initSettings).AsTask(cancellationToken).ConfigureAwait(false);
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException uex)
             {
                 LastErrorMessage = "Camera access is blocked by Windows privacy settings. Please allow camera access in Windows Settings > Privacy & security > Camera.";
-                Debug.WriteLine($"[CameraCaptureService] Privacy access denied: {LastErrorMessage}");
+                SwitchCastDiagnostics.LogException(nameof(CameraCaptureService), "InitializeAsync (Privacy Access Denied)", uex, camera.Id, sw.ElapsedMilliseconds);
                 mediaCapture.Dispose();
                 ActiveCamera = null;
                 return false;
@@ -65,15 +83,15 @@ public sealed class CameraCaptureService : ICameraCaptureService
             catch (COMException comEx) when (comEx.ErrorCode == unchecked((int)0xC00D3704) || comEx.ErrorCode == unchecked((int)0x80070005))
             {
                 LastErrorMessage = "Camera is currently in use by another application or unavailable.";
-                Debug.WriteLine($"[CameraCaptureService] Device busy (0x{comEx.ErrorCode:X8}): {LastErrorMessage}");
+                SwitchCastDiagnostics.LogException(nameof(CameraCaptureService), "InitializeAsync (Device Busy)", comEx, camera.Id, sw.ElapsedMilliseconds);
                 mediaCapture.Dispose();
                 ActiveCamera = null;
                 return false;
             }
             catch (Exception ex)
             {
-                LastErrorMessage = $"Failed to initialize camera: {ex.Message}";
-                Debug.WriteLine($"[CameraCaptureService] Init error: {ex.Message}");
+                LastErrorMessage = $"Failed to initialize camera (0x{ex.HResult:X8}): {ex.Message}";
+                SwitchCastDiagnostics.LogException(nameof(CameraCaptureService), "InitializeAsync", ex, camera.Id, sw.ElapsedMilliseconds);
                 mediaCapture.Dispose();
                 ActiveCamera = null;
                 return false;
@@ -90,8 +108,32 @@ public sealed class CameraCaptureService : ICameraCaptureService
             if (frameSource is null)
             {
                 LastErrorMessage = "No suitable color video stream found on this camera.";
+                Debug.WriteLine($"[CameraCaptureService] No color frame source available for {camera.Title}");
                 await StopCaptureInternalAsync().ConfigureAwait(false);
                 return false;
+            }
+
+            // Inspect and optimize capture format for preview performance (prefer ~720p or 1080p @ 30 FPS)
+            if (frameSource.SupportedFormats.Any())
+            {
+                var preferredFormat = frameSource.SupportedFormats
+                    .OrderByDescending(f => f.VideoFormat.Width <= 1920 && f.VideoFormat.Height <= 1080)
+                    .ThenBy(f => Math.Abs((int)f.VideoFormat.Width - 1280) + Math.Abs((int)f.VideoFormat.Height - 720))
+                    .ThenByDescending(f => f.FrameRate.Numerator / Math.Max(1, f.FrameRate.Denominator) == 30)
+                    .FirstOrDefault();
+
+                if (preferredFormat is not null && preferredFormat != frameSource.CurrentFormat)
+                {
+                    try
+                    {
+                        await frameSource.SetFormatAsync(preferredFormat).AsTask(cancellationToken).ConfigureAwait(false);
+                        Debug.WriteLine($"[CameraCaptureService] Selected format: {preferredFormat.VideoFormat.Width}x{preferredFormat.VideoFormat.Height} @ {preferredFormat.FrameRate.Numerator}/{preferredFormat.FrameRate.Denominator} ({preferredFormat.Subtype})");
+                    }
+                    catch (Exception ex)
+                    {
+                        SwitchCastDiagnostics.LogException(nameof(CameraCaptureService), "SetFormatAsync", ex, camera.Id);
+                    }
+                }
             }
 
             _frameReader = await _mediaCapture.CreateFrameReaderAsync(frameSource).AsTask(cancellationToken).ConfigureAwait(false);
@@ -101,10 +143,13 @@ public sealed class CameraCaptureService : ICameraCaptureService
             if (status != MediaFrameReaderStartStatus.Success)
             {
                 LastErrorMessage = $"Failed to start frame reader: {status}";
+                Debug.WriteLine($"[CameraCaptureService] MediaFrameReaderStartStatus={status}");
                 await StopCaptureInternalAsync().ConfigureAwait(false);
                 return false;
             }
 
+            sw.Stop();
+            Debug.WriteLine($"[CameraCaptureService] Started capture for '{camera.Title}' in {sw.ElapsedMilliseconds}ms");
             return true;
         }
         catch (OperationCanceledException)
@@ -114,8 +159,8 @@ public sealed class CameraCaptureService : ICameraCaptureService
         }
         catch (Exception ex)
         {
-            LastErrorMessage = $"Unexpected error starting camera: {ex.Message}";
-            Debug.WriteLine($"[CameraCaptureService] Start error: {ex.Message}");
+            LastErrorMessage = $"Unexpected error starting camera (0x{ex.HResult:X8}): {ex.Message}";
+            SwitchCastDiagnostics.LogException(nameof(CameraCaptureService), nameof(StartCaptureAsync), ex, camera.Id, sw.ElapsedMilliseconds);
             await StopCaptureInternalAsync().ConfigureAwait(false);
             return false;
         }
@@ -138,8 +183,15 @@ public sealed class CameraCaptureService : ICameraCaptureService
         }
     }
 
+    public void NotifyFrameCompleted()
+    {
+        Interlocked.Exchange(ref _isProcessingFrame, 0);
+    }
+
     private async Task StopCaptureInternalAsync()
     {
+        Interlocked.Exchange(ref _isProcessingFrame, 0);
+
         if (_frameReader is not null)
         {
             try
@@ -147,7 +199,10 @@ public sealed class CameraCaptureService : ICameraCaptureService
                 _frameReader.FrameArrived -= OnFrameArrived;
                 await _frameReader.StopAsync().AsTask().ConfigureAwait(false);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                SwitchCastDiagnostics.LogException(nameof(CameraCaptureService), "StopFrameReader", ex);
+            }
             _frameReader.Dispose();
             _frameReader = null;
         }
@@ -174,17 +229,49 @@ public sealed class CameraCaptureService : ICameraCaptureService
             return;
         }
 
+        Interlocked.Increment(ref _frameArrivalCount);
+
+        // Bounded backpressure: drop frame if downstream renderer is currently processing a frame
+        if (Interlocked.CompareExchange(ref _isProcessingFrame, 1, 0) != 0)
+        {
+            Interlocked.Increment(ref _frameDropCount);
+            return;
+        }
+
+        SoftwareBitmap? converted = null;
         try
         {
             using var frame = sender.TryAcquireLatestFrame();
-            if (frame?.VideoMediaFrame?.SoftwareBitmap is SoftwareBitmap bitmap)
+            if (frame?.VideoMediaFrame?.SoftwareBitmap is SoftwareBitmap rawBitmap)
             {
-                FrameArrived?.Invoke(this, bitmap);
+                // CRITICAL: SoftwareBitmapSource strictly requires Bgra8 + Premultiplied.
+                // Convert on this background thread so the UI thread is never blocked doing pixel conversions.
+                if (rawBitmap.BitmapPixelFormat == BitmapPixelFormat.Bgra8 &&
+                    rawBitmap.BitmapAlphaMode == BitmapAlphaMode.Premultiplied)
+                {
+                    converted = SoftwareBitmap.Copy(rawBitmap);
+                }
+                else
+                {
+                    converted = SoftwareBitmap.Convert(rawBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+                }
             }
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[CameraCaptureService] OnFrameArrived error: {ex.Message}");
+            SwitchCastDiagnostics.LogException(nameof(CameraCaptureService), nameof(OnFrameArrived), ex);
+            Interlocked.Exchange(ref _isProcessingFrame, 0);
+            return;
+        }
+
+        if (converted is not null)
+        {
+            Interlocked.Increment(ref _frameRenderSubmissionCount);
+            FrameArrived?.Invoke(this, converted);
+        }
+        else
+        {
+            Interlocked.Exchange(ref _isProcessingFrame, 0);
         }
     }
 

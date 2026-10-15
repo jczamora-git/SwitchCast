@@ -42,4 +42,9 @@ public interface ICameraCaptureService : IAsyncDisposable
     /// Stops live camera capture and releases camera hardware resources immediately.
     /// </summary>
     Task StopCaptureAsync();
+
+    /// <summary>
+    /// Signals that downstream processing or rendering of the current frame has completed.
+    /// </summary>
+    void NotifyFrameCompleted();
 }

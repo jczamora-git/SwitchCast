@@ -31,6 +31,8 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
 
     public bool IsFrozen => _isFrozen;
 
+    public event EventHandler? FrameRenderCompleted;
+
     /// <summary>
     /// Renders a thread-safe ref-counted bitmap to the presentation output surface with non-blocking UI dispatch and generation validation.
     /// </summary>
@@ -95,7 +97,7 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
     }
 
     /// <summary>
-    /// Standalone fallback bitmap renderer.
+    /// Standalone fallback bitmap renderer with deterministic memory disposal.
     /// </summary>
     public Task RenderBitmapAsync(SoftwareBitmap bitmap)
     {
@@ -103,11 +105,15 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
 
         if (_isDisposed || _isFrozen)
         {
+            bitmap.Dispose();
+            FrameRenderCompleted?.Invoke(this, EventArgs.Empty);
             return Task.CompletedTask;
         }
 
         if (Interlocked.CompareExchange(ref _isProcessingFrame, 1, 0) != 0)
         {
+            bitmap.Dispose();
+            FrameRenderCompleted?.Invoke(this, EventArgs.Empty);
             return Task.CompletedTask;
         }
 
@@ -117,22 +123,35 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
             {
                 if (!_isDisposed && !_isFrozen)
                 {
-                    await _softwareBitmapSource.SetBitmapAsync(bitmap);
+                    if (bitmap.BitmapPixelFormat != BitmapPixelFormat.Bgra8 ||
+                        bitmap.BitmapAlphaMode != BitmapAlphaMode.Premultiplied)
+                    {
+                        using var converted = SoftwareBitmap.Convert(bitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+                        await _softwareBitmapSource.SetBitmapAsync(converted);
+                    }
+                    else
+                    {
+                        await _softwareBitmapSource.SetBitmapAsync(bitmap);
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[Direct3D11PresentationRenderer] Fallback render exception: {ex.Message}");
+                Diagnostics.SwitchCastDiagnostics.LogException(nameof(Direct3D11PresentationRenderer), nameof(RenderBitmapAsync), ex);
             }
             finally
             {
+                bitmap.Dispose();
                 Interlocked.Exchange(ref _isProcessingFrame, 0);
+                FrameRenderCompleted?.Invoke(this, EventArgs.Empty);
             }
         });
 
         if (!enqueued)
         {
+            bitmap.Dispose();
             Interlocked.Exchange(ref _isProcessingFrame, 0);
+            FrameRenderCompleted?.Invoke(this, EventArgs.Empty);
         }
 
         return Task.CompletedTask;
