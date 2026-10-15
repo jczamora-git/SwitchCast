@@ -31,6 +31,8 @@
     <Compile Include="..\Services\IWindowDiscoveryService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IMonitorDiscoveryService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IPresentationWindowService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\IExternalDisplayService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\ExternalDisplayService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IPresenterDockService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\PresenterDockMenuPositioner.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IWindowActivationService.cs" Link="Linked\Services\%(Filename)%(Extension)" />

@@ -255,6 +255,56 @@ public sealed partial class PresentationWindow : Window
             : PresentationDisplayMode.Fullscreen);
     }
 
+    /// <summary>
+    /// Relocates the Presentation Output Window to the specified monitor, and optionally applies fullscreen mode.
+    /// Preserves existing HWND, content layers, and capture/media states.
+    /// </summary>
+    public void MoveToMonitor(MonitorSource monitor, bool andFullscreen = false)
+    {
+        if (_appWindow is null)
+        {
+            return;
+        }
+
+        if (andFullscreen)
+        {
+            // Position on target monitor bounds first
+            _appWindow.MoveAndResize(new RectInt32(monitor.Left, monitor.Top, monitor.Width, monitor.Height));
+            SetDisplayMode(PresentationDisplayMode.Fullscreen);
+        }
+        else
+        {
+            SetDisplayMode(PresentationDisplayMode.Windowed);
+            var (x, y, width, height) = WindowPositioningHelper.CalculateCenteredPosition(
+                monitor.WorkAreaLeft,
+                monitor.WorkAreaTop,
+                monitor.WorkAreaWidth,
+                monitor.WorkAreaHeight,
+                Math.Min(1280, monitor.WorkAreaWidth),
+                Math.Min(720, monitor.WorkAreaHeight));
+
+            _appWindow.MoveAndResize(new RectInt32(x, y, width, height));
+        }
+    }
+
+    /// <summary>
+    /// Restores the presentation output window to the primary monitor work area in windowed mode.
+    /// </summary>
+    public void RestoreToPrimaryMonitor(bool windowed = true)
+    {
+        if (_appWindow is null)
+        {
+            return;
+        }
+
+        if (windowed)
+        {
+            SetDisplayMode(PresentationDisplayMode.Windowed);
+        }
+
+        CenterPresentationWindow();
+    }
+
     private void OnRootGridKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
     {
         if (e.Key == Windows.System.VirtualKey.Escape && DisplayMode == PresentationDisplayMode.Fullscreen)

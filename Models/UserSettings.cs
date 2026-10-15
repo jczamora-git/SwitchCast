@@ -66,6 +66,21 @@ public class UserSettings
     public PresenterSwitchMode SwitchMode { get; set; } = PresenterSwitchMode.LiveOnly;
 
     /// <summary>
+    /// Whether to automatically detect external extended displays and direct presentation output to them.
+    /// </summary>
+    public bool AutoDetectExternalDisplay { get; set; } = true;
+
+    /// <summary>
+    /// Whether to automatically enter fullscreen mode on the external display.
+    /// </summary>
+    public bool AutoFullscreenOnExternalDisplay { get; set; } = true;
+
+    /// <summary>
+    /// Device name of user-preferred presentation monitor, or null for automatic selection.
+    /// </summary>
+    public string? PreferredDisplayDeviceName { get; set; } = null;
+
+    /// <summary>
     /// Default normalized media audio playback volume (0.0 to 1.0).
     /// </summary>
     public double MediaVolume { get; set; } = 1.0;

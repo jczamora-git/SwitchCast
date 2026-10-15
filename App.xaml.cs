@@ -76,6 +76,7 @@ public partial class App : Application
         // Presentation Output & Orchestration Services
         services.AddSingleton<IWindowActivationService, Win32WindowActivationService>();
         services.AddSingleton<IPresentationWindowService, PresentationWindowService>();
+        services.AddSingleton<IExternalDisplayService, ExternalDisplayService>();
         services.AddSingleton<IPresentationOutputRenderer, Direct3D11PresentationRenderer>();
         services.AddSingleton<IPresentationCoordinator, PresentationCoordinator>();
         services.AddSingleton<IPresenterDockService, PresenterDockService>();

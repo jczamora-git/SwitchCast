@@ -34,4 +34,34 @@ public record MonitorSource : CaptureSource
     /// Whether this monitor is the primary Windows desktop display.
     /// </summary>
     public bool IsPrimary { get; init; }
+
+    /// <summary>
+    /// Monitor rectangle virtual desktop Left coordinate in physical pixels.
+    /// </summary>
+    public int Left { get; init; }
+
+    /// <summary>
+    /// Monitor rectangle virtual desktop Top coordinate in physical pixels.
+    /// </summary>
+    public int Top { get; init; }
+
+    /// <summary>
+    /// Usable work area virtual desktop Left coordinate in physical pixels.
+    /// </summary>
+    public int WorkAreaLeft { get; init; }
+
+    /// <summary>
+    /// Usable work area virtual desktop Top coordinate in physical pixels.
+    /// </summary>
+    public int WorkAreaTop { get; init; }
+
+    /// <summary>
+    /// Usable work area width in physical pixels.
+    /// </summary>
+    public int WorkAreaWidth { get; init; }
+
+    /// <summary>
+    /// Usable work area height in physical pixels.
+    /// </summary>
+    public int WorkAreaHeight { get; init; }
 }

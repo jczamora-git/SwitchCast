@@ -7,15 +7,23 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: v1.2.1 Release Preparation
-- **Overall Status**: **Verified & Released (v1.2.1)**
-- **Last Updated**: 2026-10-10T05:50:00+08:00 (UTC+8)
+- **Current Phase**: Local Presentation Expansion — Phase P1 Complete
+- **Overall Status**: **In Progress (P0 & P1 Implemented & Validated)**
+- **Last Updated**: 2026-10-15T14:18:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Phase P1 — Smart External Display Mode & Configurable Automation**:
+  - **Multi-Monitor Topology Discovery**: `IExternalDisplayService` and `ExternalDisplayService` automatically analyze physical desktop layout, identifying primary display, extended non-primary displays, and distinguishing clone/mirrored configurations (shared geometry).
+  - **Single Presentation Output Window HWND Preservation**: When an eligible extended TV/projector is detected, automatically moves the existing `PresentationWindow` to the external display's work area bounds without destroying, recreating, or flickering the HWND.
+  - **Configurable Automatic Fullscreen**: Enters borderless fullscreen mode automatically when `AutoFullscreenOnExternalDisplay` is enabled; respects user override when disabled or when presentation output is windowed.
+  - **Projector Disconnect Recovery Policy**: If the assigned external monitor is unplugged or disconnected, recovers the `PresentationWindow` back to the primary monitor in safe `Windowed` mode. Never emergency-fullscreens on the presenter's private laptop monitor.
+  - **Presenter Workspace Isolation**: The `MainWindow` Control Dashboard and `PresenterDockWindow` floating toolbar stay on the presenter's primary workspace, never moving unexpectedly to the audience screen.
+  - **Persistent Settings Integration**: Added `AutoDetectExternalDisplay` (default: true), `AutoFullscreenOnExternalDisplay` (default: true), and `PreferredDisplayDeviceName` (default: null/Auto) in `UserSettings`, with interactive UI controls in `SettingsPage.xaml` under Presenter Controls.
+  - **Automated Regression Suite**: Expanded test suite to **289 automated unit tests** (100% pass rate) with full multi-monitor topology matrix in `ExternalDisplayServiceTests.cs`.
 - [x] **Media Source Activation Behavior Fix (Active + Live & Active Only Activate Presentation Output)**:
   - **Active + Live for Media**:
     - When an Image or Video media source is switched live in `ActiveAndLive` mode, SwitchCast starts rendering the image or playing the video and activates the existing `PresentationWindow` (restoring if minimized and bringing to the foreground via `IWindowActivationService.ActivateWindow`).

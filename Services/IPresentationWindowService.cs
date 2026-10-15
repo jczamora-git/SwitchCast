@@ -56,4 +56,15 @@ public interface IPresentationWindowService
     /// Toggles the presentation output window between Windowed and Fullscreen mode.
     /// </summary>
     void ToggleDisplayMode();
+
+    /// <summary>
+    /// Positions the presentation output window on the specified monitor and optionally enters fullscreen mode.
+    /// Preserves the existing HWND without recreation.
+    /// </summary>
+    void MoveToMonitor(MonitorSource monitor, bool andFullscreen = false);
+
+    /// <summary>
+    /// Safely restores the presentation output window to the primary monitor, defaulting to windowed mode.
+    /// </summary>
+    void RestoreToPrimaryMonitor(bool windowed = true);
 }

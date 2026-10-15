@@ -41,15 +41,33 @@ public partial class SettingsViewModel : ObservableObject
     private int _selectedSwitchModeIndex;
 
     [ObservableProperty]
+    private bool _autoDetectExternalDisplay;
+
+    [ObservableProperty]
+    private bool _autoFullscreenOnExternalDisplay;
+
+    [ObservableProperty]
+    private int _selectedPreferredDisplayIndex;
+
+    [ObservableProperty]
     private string _shortcutSearchQuery = string.Empty;
 
     [ObservableProperty]
     private IReadOnlyList<HotkeyBinding> _hotkeyBindings;
 
-    public SettingsViewModel(IApplicationSettingsService settingsService, IHotkeyService? hotkeyService = null)
+    private readonly IMonitorDiscoveryService? _monitorDiscoveryService;
+    private readonly List<MonitorSource> _discoveredMonitors = [];
+
+    public System.Collections.ObjectModel.ObservableCollection<string> AvailableDisplays { get; } = [];
+
+    public SettingsViewModel(
+        IApplicationSettingsService settingsService,
+        IHotkeyService? hotkeyService = null,
+        IMonitorDiscoveryService? monitorDiscoveryService = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _hotkeyService = hotkeyService;
+        _monitorDiscoveryService = monitorDiscoveryService;
 
         var current = _settingsService.CurrentSettings;
         _selectedThemeIndex = (int)current.Theme;
@@ -59,7 +77,46 @@ public partial class SettingsViewModel : ObservableObject
         _dockAlwaysOnTop = current.DockAlwaysOnTop;
         _startDockInCompactMode = current.StartDockInCompactMode;
         _selectedSwitchModeIndex = (int)current.SwitchMode;
+        _autoDetectExternalDisplay = current.AutoDetectExternalDisplay;
+        _autoFullscreenOnExternalDisplay = current.AutoFullscreenOnExternalDisplay;
         _hotkeyBindings = current.HotkeyBindings.ToList();
+
+        InitializeDisplayOptions(current.PreferredDisplayDeviceName);
+    }
+
+    private async void InitializeDisplayOptions(string? preferredDeviceName)
+    {
+        AvailableDisplays.Clear();
+        AvailableDisplays.Add("Auto (Recommended)");
+
+        if (_monitorDiscoveryService is not null)
+        {
+            try
+            {
+                var monitors = await _monitorDiscoveryService.EnumerateMonitorsAsync();
+                _discoveredMonitors.Clear();
+                _discoveredMonitors.AddRange(monitors);
+
+                int selectedIdx = 0;
+                for (int i = 0; i < monitors.Count; i++)
+                {
+                    var mon = monitors[i];
+                    AvailableDisplays.Add(mon.Title);
+                    if (!string.IsNullOrEmpty(preferredDeviceName) &&
+                        (string.Equals(mon.DeviceName, preferredDeviceName, StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(mon.Id, preferredDeviceName, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        selectedIdx = i + 1;
+                    }
+                }
+
+                SelectedPreferredDisplayIndex = selectedIdx;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] InitializeDisplayOptions error: {ex.Message}");
+            }
+        }
     }
 
     public string AppName => "SwitchCast";
@@ -179,6 +236,31 @@ public partial class SettingsViewModel : ObservableObject
     {
         var mode = (PresenterSwitchMode)value;
         _settingsService.CurrentSettings.SwitchMode = mode;
+        await _settingsService.SaveSettingsAsync();
+    }
+
+    async partial void OnAutoDetectExternalDisplayChanged(bool value)
+    {
+        _settingsService.CurrentSettings.AutoDetectExternalDisplay = value;
+        await _settingsService.SaveSettingsAsync();
+    }
+
+    async partial void OnAutoFullscreenOnExternalDisplayChanged(bool value)
+    {
+        _settingsService.CurrentSettings.AutoFullscreenOnExternalDisplay = value;
+        await _settingsService.SaveSettingsAsync();
+    }
+
+    async partial void OnSelectedPreferredDisplayIndexChanged(int value)
+    {
+        if (value <= 0 || value > _discoveredMonitors.Count)
+        {
+            _settingsService.CurrentSettings.PreferredDisplayDeviceName = null;
+        }
+        else
+        {
+            _settingsService.CurrentSettings.PreferredDisplayDeviceName = _discoveredMonitors[value - 1].DeviceName;
+        }
         await _settingsService.SaveSettingsAsync();
     }
 

@@ -92,6 +92,32 @@ public sealed class PresentationWindowService : IPresentationWindowService
         }
     }
 
+    public void MoveToMonitor(MonitorSource monitor, bool andFullscreen = false)
+    {
+        if (_window is not null)
+        {
+            _window.MoveToMonitor(monitor, andFullscreen);
+            _displayMode = _window.DisplayMode;
+        }
+        else if (andFullscreen)
+        {
+            _displayMode = PresentationDisplayMode.Fullscreen;
+        }
+    }
+
+    public void RestoreToPrimaryMonitor(bool windowed = true)
+    {
+        if (_window is not null)
+        {
+            _window.RestoreToPrimaryMonitor(windowed);
+            _displayMode = _window.DisplayMode;
+        }
+        else if (windowed)
+        {
+            _displayMode = PresentationDisplayMode.Windowed;
+        }
+    }
+
     private void OnWindowDisplayModeChanged(object? sender, PresentationDisplayMode mode)
     {
         _displayMode = mode;

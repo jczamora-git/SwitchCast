@@ -38,6 +38,9 @@ public class Win32MonitorDiscoveryService : IMonitorDiscoveryService
                         ? $"Display {displayIndex} — Primary ({width} × {height})"
                         : $"Display {displayIndex} ({width} × {height})";
 
+                    var workAreaWidth = Math.Abs(info.rcWork.Right - info.rcWork.Left);
+                    var workAreaHeight = Math.Abs(info.rcWork.Bottom - info.rcWork.Top);
+
                     var source = new MonitorSource
                     {
                         Id = $"mon_{hMonitor}_{deviceName.TrimStart('\\', '.')}",
@@ -47,7 +50,13 @@ public class Win32MonitorDiscoveryService : IMonitorDiscoveryService
                         Width = width,
                         Height = height,
                         IsPrimary = isPrimary,
-                        IsAvailable = true
+                        IsAvailable = true,
+                        Left = info.rcMonitor.Left,
+                        Top = info.rcMonitor.Top,
+                        WorkAreaLeft = info.rcWork.Left,
+                        WorkAreaTop = info.rcWork.Top,
+                        WorkAreaWidth = workAreaWidth,
+                        WorkAreaHeight = workAreaHeight
                     };
 
                     monitors.Add(source);

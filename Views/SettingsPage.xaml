@@ -406,6 +406,80 @@
                                     <RadioButton Content="Live Only (L) — Switch live output stream without activating application window" Tag="2" FontSize="11" />
                                 </RadioButtons>
                             </StackPanel>
+
+                            <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                            <!-- Row 5: Auto-Detect External Display -->
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <TextBlock Text="Auto-Detect External Display" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                    <TextBlock Text="Automatically detect connected TVs or projectors and direct Presentation Output to them."
+                                               FontSize="11"
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <ToggleSwitch Grid.Column="1"
+                                              IsOn="{x:Bind ViewModel.AutoDetectExternalDisplay, Mode=TwoWay}"
+                                              OnContent="Enabled"
+                                              OffContent="Disabled"
+                                              VerticalAlignment="Center" />
+                            </Grid>
+
+                            <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                            <!-- Row 6: Auto-Fullscreen on External Display -->
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <TextBlock Text="Automatically Fullscreen on External Display" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                    <TextBlock Text="Enter fullscreen presentation mode automatically when directed to an external display."
+                                               FontSize="11"
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <ToggleSwitch Grid.Column="1"
+                                              IsOn="{x:Bind ViewModel.AutoFullscreenOnExternalDisplay, Mode=TwoWay}"
+                                              IsEnabled="{x:Bind ViewModel.AutoDetectExternalDisplay, Mode=OneWay}"
+                                              OnContent="Enabled"
+                                              OffContent="Disabled"
+                                              VerticalAlignment="Center" />
+                            </Grid>
+
+                            <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                            <!-- Row 7: Preferred Presentation Display -->
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <TextBlock Text="Preferred Presentation Display" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                    <TextBlock Text="Select a specific monitor for audience presentation output, or use automatic detection."
+                                               FontSize="11"
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <ComboBox Grid.Column="1"
+                                          ItemsSource="{x:Bind ViewModel.AvailableDisplays, Mode=OneWay}"
+                                          SelectedIndex="{x:Bind ViewModel.SelectedPreferredDisplayIndex, Mode=TwoWay}"
+                                          MinWidth="180"
+                                          Height="34"
+                                          VerticalAlignment="Center" />
+                            </Grid>
                         </StackPanel>
                     </Border>
 

@@ -68,8 +68,28 @@ public sealed partial class MainWindow : Window
             ApplyStartupWindowPlacement();
             _appWindow.Closing += OnAppWindowClosing;
 
+            _subclassProc = MainWindowSubclassProc;
+            SetWindowSubclass(WindowHandle, _subclassProc, new UIntPtr(1002), IntPtr.Zero);
+
             UpdateTitleBarColors(_viewModel.CurrentTheme);
         }
+    }
+
+    private const uint WM_DISPLAYCHANGE = 0x007E;
+    private SubclassProc? _subclassProc;
+
+    private IntPtr MainWindowSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, IntPtr dwRefData)
+    {
+        if (uMsg == WM_DISPLAYCHANGE)
+        {
+            var displayService = App.Current.Services.GetService<IExternalDisplayService>();
+            if (displayService is not null)
+            {
+                _ = displayService.HandleDisplayTopologyChangedAsync();
+            }
+        }
+
+        return DefSubclassProc(hWnd, uMsg, wParam, lParam);
     }
 
     private void ApplyAppIcon()
@@ -415,6 +435,14 @@ public sealed partial class MainWindow : Window
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    private delegate IntPtr SubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, IntPtr dwRefData);
+
+    [DllImport("comctl32.dll", SetLastError = true)]
+    private static extern bool SetWindowSubclass(IntPtr hWnd, SubclassProc pfnSubclass, UIntPtr uIdSubclass, IntPtr dwRefData);
+
+    [DllImport("comctl32.dll", SetLastError = true)]
+    private static extern IntPtr DefSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
 
     #endregion
 }

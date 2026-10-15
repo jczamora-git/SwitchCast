@@ -20,6 +20,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     private readonly IWindowActivationService _windowActivationService;
     private readonly IMediaPresentationService _mediaPresentationService;
     private readonly INavigationService? _navigationService;
+    private readonly IExternalDisplayService? _externalDisplayService;
     private readonly SemaphoreSlim _transitionSemaphore = new(1, 1);
 
     private CaptureSource? _targetRequestedPresentationSource;
@@ -37,7 +38,8 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         IPresentationOutputRenderer outputRenderer,
         IWindowActivationService windowActivationService,
         IMediaPresentationService? mediaPresentationService = null,
-        INavigationService? navigationService = null)
+        INavigationService? navigationService = null,
+        IExternalDisplayService? externalDisplayService = null)
     {
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
         _presentationWindowService = presentationWindowService ?? throw new ArgumentNullException(nameof(presentationWindowService));
@@ -46,6 +48,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         _windowActivationService = windowActivationService ?? throw new ArgumentNullException(nameof(windowActivationService));
         _mediaPresentationService = mediaPresentationService ?? new MediaPresentationService();
         _navigationService = navigationService;
+        _externalDisplayService = externalDisplayService;
 
         _presentationStateService.PropertyChanged += (s, e) =>
         {
@@ -122,11 +125,15 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
     public Windows.Media.Playback.MediaPlayer? MediaPlayer => _mediaPresentationService.Player;
 
-    public Task OpenOutputWindowAsync()
+    public async Task OpenOutputWindowAsync()
     {
         _presentationWindowService.ShowPresentationWindow();
         OnPropertyChanged(nameof(IsOutputWindowOpen));
-        return Task.CompletedTask;
+
+        if (_externalDisplayService is not null)
+        {
+            await _externalDisplayService.ApplyDisplayAutomationAsync(isStartingPresentation: false).ConfigureAwait(false);
+        }
     }
 
     public async Task CloseOutputWindowAsync()
@@ -171,6 +178,11 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             // Ensure presentation output window is visible
             _presentationWindowService.ShowPresentationWindow();
             OnPropertyChanged(nameof(IsOutputWindowOpen));
+
+            if (_externalDisplayService is not null)
+            {
+                await _externalDisplayService.ApplyDisplayAutomationAsync(isStartingPresentation: true).ConfigureAwait(false);
+            }
 
             if (targetSource is ImageMediaSource imageSource)
             {
