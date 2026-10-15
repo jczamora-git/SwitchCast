@@ -3,36 +3,52 @@
 ---
 
 ## Task Details
-- **Task**: P0 Critical Native Crash Recovery — AccessViolationException After Stop Presenting Fixed
-- **Date**: 2026-10-16T00:15:00+08:00 (UTC+8)
-- **Status**: Completed, Validated & Ready for Local Commit (372 Tests Passing, 0 Build Warnings/Errors)
+- **Task**: Critical Dock Close & Application Exit Hotfix (AccessViolationException on Window.Close Resolved, Single Dashboard Activation Verified, MainWindow Lifetime Preserved)
+- **Date**: 2026-10-16T01:18:00+08:00 (UTC+8)
+- **Status**: Completed, Validated & Ready for Local Commit (379 Tests Passing, 0 Build Warnings/Errors)
 
 ---
 
 ## 1. Objectives & Confirmed Root Causes Resolved
 
-1. **AccessViolationException in Microsoft.WinUI.dll After Stop Presenting**:
-   - **Confirmed Root Cause**:
-     - `Direct3D11PresentationRenderer.Clear()` previously enqueued an asynchronous delegate `await _softwareBitmapSource.SetBitmapAsync(emptyBitmap)` onto the UI thread.
-     - Meanwhile, `PresentationCoordinator.StopPresentationAsync()` called `PresentationWindowService.ClosePresentationWindow()` -> `target.Close()`.
-     - `PresentationWindow.xaml` had `Image Source="{x:Bind ViewModel.PresentationImageSource}"` bound to the singleton `_softwareBitmapSource`.
-     - Because `PresentationOutputImage.Source` was never cleared before window close, when `SetBitmapAsync` updated the DirectX composition surface on the destroyed native XAML island, `Microsoft.WinUI.dll` crashed with native `AccessViolationException` (`0xC0000005: Attempted to read or write protected memory`).
-     - Furthermore, `PresentationVideoPlayer.SetMediaPlayer(null)` was never called, leaving native MediaPlayer swapchains bound to a destroyed control, and `PresentationViewModel` was never disposed on window close.
+1. **AccessViolationException on Presenter Dock Stop & Close**:
+   - **Confirmed Root Causes**:
+     - Synchronous Continuation Execution: `PresenterDockConfirmationWindow.Dismiss(bool confirmed)` called `_tcs.TrySetResult(confirmed)` before calling `Close()`. Since `_tcs` ran continuations synchronously on the UI thread, `CloseDockAsync` immediately ran `StopPresentationAsync` and `PresenterDockService.CloseDock()`.
+     - Win32 `GWLP_HWNDPARENT` Ownership Tearing: `PresenterDockConfirmationWindow` was set as an owned child of `PresenterDockWindow` via `SetWindowLongPtr(GWLP_HWNDPARENT, ownerHwnd)`. When `PresenterDockWindow` closed, Win32 recursively destroyed owned windows. When the call stack unwound to `Dismiss()` and called `Close()`, WinUI 3 attempted to dismantle an already-destroyed XAML Island / HWND, causing `System.AccessViolationException` in `Microsoft.WinUI.dll` on `Window.Close()`.
+     - Unintended Application Exit: The unhandled native access violation crashed `SwitchCast.exe`, giving the user the impression that Stop & Close exited the app.
+     - Duplicate Activation: `PresenterDockViewModel.CloseDockAsync` called `_dockService.ShowDashboard()` after `StopPresentationAsync` had already activated `MainWindow` and navigated to the Dashboard.
    - **Remediation**:
-     - **Explicit Window Teardown**: Added `Cleanup()` to `PresentationWindow.xaml.cs` (called idempotently on `ClosePresentationWindow` and `Closed`). Detaches `PresentationOutputImage.Source = null`, `PresentationDirectImage.Source = null`, and `PresentationVideoPlayer.SetMediaPlayer(null)`. Unsubscribes `ViewModel.PropertyChanged` and `_settingsService.ThemeChanged`, calls `Bindings.StopTracking()`, and disposes `ViewModel`.
-     - **Safe Atomic Generation Clear**: Rewrote `Direct3D11PresentationRenderer.Clear()` to atomically increment `_currentGeneration` and reset `_isProcessingFrame = 0` without queuing asynchronous `SetBitmapAsync(emptyBitmap)` calls into tearing-down visual trees.
-     - **Reordered Stop Lifecycle**: In `PresentationCoordinator.ExecuteStopPresentationAsync`:
-       1. Cancel camera startup timeout and drain pending camera frames -> stop Camera capture.
-       2. Stop Windows Graphics Capture (`StopPreviewAsync`).
-       3. Stop PowerPoint live slideshow and clear presentation.
-       4. Stop Video and clear Image.
-       5. Invalidate render generations (`Clear()`).
-       6. Transition presentation status to `Idle`.
-       7. Close and clean up `PresentationWindow`.
-       8. Activate MainWindow and navigate to Dashboard.
-     - **Stop Idempotency**: Guarded `StopPresentationAsync` with `_stopLock` and `_activeStopTask` deduplication. Concurrent calls from Dashboard, Dock, hotkeys, or manual window close await the same single task.
-     - **Expected TaskCanceledException Classification**: Explicitly caught `OperationCanceledException` (including `TaskCanceledException`) in `Direct3D11PresentationRenderer` and `Direct3D11PreviewRenderer`, logging as normal lifecycle cancellation without generating error incidents.
-     - **Eliminated Duplicate Dashboard Activation**: Fixed Presenter Dock close to only invoke secondary `ShowDashboard()` when closing while idle; when closing while presenting, `StopPresentationAsync` acts as the single authoritative dashboard activator.
+     - Decoupled `PresenterDockConfirmationWindow` by removing `GWLP_HWNDPARENT`. It operates as an independent topmost tool window (`OverlappedPresenter.IsAlwaysOnTop = true`, `WS_EX_TOOLWINDOW`).
+     - In `Dismiss()`, the window calls `Close()` immediately. On `OnWindowClosed`, it resolves `_tcs` using `TaskCreationOptions.RunContinuationsAsynchronously`, ensuring the confirmation window is 100% destroyed before presentation stop or dock closure starts.
+     - Removed redundant `_dockService.ShowDashboard()` call from `CloseDockAsync` when stopping an active presentation.
+     - Added `IsClosingProgrammatically` flag to `PresenterDockWindow` to prevent `AppWindow.Closing` reentrancy.
+     - Added window lifecycle diagnostic logging across all windows.
+
+---
+
+## 2. Verification Performed
+
+- **Automated Tests**: 379 passing tests (0 failures, 0 skipped) across all test fixtures.
+  - Added `DockCloseLifecycleHotfixTests.cs` (7 comprehensive lifecycle tests).
+- **Compiler Gates**:
+  - `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> 0 Errors, 0 Warnings.
+  - `dotnet build SwitchCast.csproj -c Release -p:Platform=x64` -> 0 Errors, 0 Warnings.
+  - `dotnet test SwitchCast.Tests/SwitchCast.Tests.csproj -c Debug` -> 379 Passed, 0 Failed.
+- **Runtime Verification Note**: NATIVE RUNTIME UNVERIFIED (Headless CLI session; automated mocks verified state, events, and concurrency; manual interactive desktop validation is required on physical Windows desktop).
+
+---
+
+## 3. Important Files Modified
+
+- `SwitchCast/Views/PresenterDockConfirmationWindow.xaml.cs`: Decoupled Win32 HWND parent, self-closes before asynchronous task completion, added lifecycle logging.
+- `SwitchCast/ViewModels/PresenterDockViewModel.cs`: Removed duplicate `ShowDashboard()` call during active presentation stop in `CloseDockAsync()`.
+- `SwitchCast/Views/PresenterDockWindow.xaml.cs`: Added `IsClosingProgrammatically` guard and lifecycle diagnostics.
+- `SwitchCast/Services/PresenterDockService.cs`: Sets programmatic closing flag and logs close requests.
+- `SwitchCast/Services/PresentationWindowService.cs`: Added close requested logging.
+- `SwitchCast/Views/PresentationWindow.xaml.cs`: Added closed event logging.
+- `SwitchCast/MainWindow.xaml.cs`: Added initialization, closing, and closed lifecycle logging.
+- `SwitchCast/Services/PresentationCoordinator.cs`: Added structured sequence and lifecycle logging.
+- `SwitchCast.Tests/Services/DockCloseLifecycleHotfixTests.cs` *(New)*: Comprehensive regression tests for the 7 lifecycle domains.
 
 ---
 

@@ -39,6 +39,7 @@ public sealed partial class MainWindow : Window
 
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _navigationService.Navigated += OnNavigationServiceNavigated;
+        Closed += OnMainWindowClosed;
 
         InitializeAppWindow();
         ApplyTheme(_viewModel.CurrentTheme);
@@ -72,6 +73,10 @@ public sealed partial class MainWindow : Window
             SetWindowSubclass(WindowHandle, _subclassProc, new UIntPtr(1002), IntPtr.Zero);
 
             UpdateTitleBarColors(_viewModel.CurrentTheme);
+
+            Services.Diagnostics.SwitchCastDiagnostics.LogInfo(
+                nameof(MainWindow),
+                $"Initialized | HWND=0x{WindowHandle:X} | PID={Environment.ProcessId}");
         }
     }
 
@@ -306,6 +311,10 @@ public sealed partial class MainWindow : Window
 
     private async void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
+        Services.Diagnostics.SwitchCastDiagnostics.LogInfo(
+            nameof(MainWindow),
+            $"Closing event received | HWND=0x{WindowHandle:X} | PID={Environment.ProcessId} | ShutdownApproved={_lifecycleService.IsShutdownApproved} | IsShuttingDown={_lifecycleService.IsShuttingDown} | PresentationStatus={_presentationCoordinator.Status}");
+
         if (_lifecycleService.IsShutdownApproved)
         {
             // Shutdown has already been confirmed and authorized; allow closure to complete.
@@ -392,6 +401,13 @@ public sealed partial class MainWindow : Window
         {
             _lifecycleService.IsExitConfirmationOpen = false;
         }
+    }
+
+    private void OnMainWindowClosed(object sender, WindowEventArgs args)
+    {
+        Services.Diagnostics.SwitchCastDiagnostics.LogInfo(
+            nameof(MainWindow),
+            $"Closed event received | HWND=0x{WindowHandle:X} | PID={Environment.ProcessId} | ShutdownApproved={_lifecycleService.IsShutdownApproved}");
     }
 
     #region Win32 P/Invoke

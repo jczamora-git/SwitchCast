@@ -210,11 +210,20 @@ Triggered from Dashboard, Floating Presenter Dock, global hotkey, or direct wind
     - Options: `Cancel` and `Stop & Close`.
   - Hosted in a dedicated modal window (`PresenterDockConfirmationWindow`) centered on the active presentation control monitor, completely decoupled from the Floating Dock's compact surface to prevent caption drag interference, clipping, and z-order conflicts.
   - Temporarily disables owner dock input via Win32 `EnableWindow(dockHwnd, false)` to prevent duplicate actions.
-  - `Cancel` (or Escape key): Dismisses dialog, re-enables dock, keeps Floating Dock open, keeps presentation live, and leaves output unaffected.
-  - `Stop & Close`: Calls authoritative `StopPresentationAsync`, closes Presentation Output, closes Floating Dock, and activates Control Dashboard. Does not terminate application.
+  - **Lifetime & Teardown Boundary**: `PresenterDockConfirmationWindow` operates as an independent top-level tool window (`OverlappedPresenter.IsAlwaysOnTop = true`, `WS_EX_TOOLWINDOW`) without Win32 `GWLP_HWNDPARENT` coupling. This decoupling prevents native Win32 window manager destruction of child HWNDs when the owner dock closes, which previously caused `AccessViolationException` (`0xC0000005`) in `Microsoft.WinUI.dll` during `Window.Close()`.
+  - **Sequential Close Order**:
+    1. User clicks `Stop & Close`.
+    2. `PresenterDockConfirmationWindow` logs the click, closes itself cleanly via `Window.Close()`, and awaits its `Closed` event.
+    3. `ShowConfirmationAsync` resolves with `true` asynchronously (`TaskCreationOptions.RunContinuationsAsynchronously`).
+    4. Authoritative `StopPresentationAsync` runs: stops all sources, clears renderers, closes `PresentationWindow` (with full DComp/MediaPlayer cleanup), activates `MainWindow`, and navigates to the Control Dashboard.
+    5. `PresenterDockService.CloseDock()` marks `IsClosingProgrammatically = true` and closes `PresenterDockWindow`.
+    6. `MainWindow` and the SwitchCast process remain alive and active on the Control Dashboard with unchanged PID and HWND.
+  - `Cancel` (or Escape key): Dismisses confirmation modal, re-enables dock, restores foreground to dock, keeps Floating Dock open, keeps presentation live, and leaves output unaffected.
+  - `Stop & Close`: Executes the authoritative sequential stop and close contract above without terminating the application process.
 - **No Active Presentation (Idle)**:
   - Closes Floating Dock immediately with zero confirmation prompt.
-  - Activates Control Dashboard.
+  - Activates Control Dashboard via `PresenterDockService.ShowDashboard()`.
+  - Process remains running.
 
 ### Action C — Full Application Exit
 - Initiated via `MainWindow` close button.

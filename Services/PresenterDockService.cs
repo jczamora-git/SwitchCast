@@ -64,6 +64,11 @@ public sealed class PresenterDockService : IPresenterDockService
         {
             var target = _window;
             _window = null;
+            Diagnostics.SwitchCastDiagnostics.LogInfo(
+                nameof(PresenterDockService),
+                $"Close requested | HWND=0x{target.WindowHandle:X} | PID={Environment.ProcessId}");
+
+            target.IsClosingProgrammatically = true;
             target.Closed -= OnWindowClosed;
             target.Close();
             DockClosed?.Invoke(this, EventArgs.Empty);

@@ -7,15 +7,28 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: P0 Native Crash Recovery (AccessViolationException After Stop Presenting Fixed)
-- **Overall Status**: **Implemented & Validated (372 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
-- **Last Updated**: 2026-10-16T00:10:00+08:00 (UTC+8)
+- **Current Phase**: Critical Dock Close & Application Exit Hotfix (AccessViolationException on Window.Close Resolved, Single Dashboard Activation Verified, MainWindow Lifetime Preserved)
+- **Overall Status**: **Implemented & Validated (379 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
+- **Last Updated**: 2026-10-16T01:15:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Critical Dock Close & Application Exit Hotfix (MainWindow Preservation & AccessViolationException Fix)**:
+  - **Confirmed Root Causes**:
+    1. **Synchronous Task Continuation Reentrancy & Window Destruction Order Inversion**: In `PresenterDockConfirmationWindow.xaml.cs`, `Dismiss(bool confirmed)` called `_tcs?.TrySetResult(confirmed)` before `Close()`. Because `_tcs` was instantiated without `TaskCreationOptions.RunContinuationsAsynchronously`, setting the result executed continuations inline synchronously on the UI thread. The awaiting method `CloseDockAsync` immediately called `StopPresentationAsync` and then `PresenterDockService.CloseDock()`, which destroyed `PresenterDockWindow`.
+    2. **Win32 GWLP_HWNDPARENT Cross-Window Ownership Tearing**: `PresenterDockConfirmationWindow` was parented/owned by `PresenterDockWindow` via `SetWindowLongPtr(GWLP_HWNDPARENT, ownerHwnd)`. In Win32, destroying an owner window causes Windows to automatically destroy all owned child windows. When the call stack unwound back to `Dismiss()` in `PresenterDockConfirmationWindow` and called `Close()`, WinUI 3 attempted to dismantle an already-destroyed XAML Island / HWND, throwing native `AccessViolationException` (`0xC0000005`) in `Microsoft.WinUI.dll` on `Window.Close()`.
+    3. **Process Crash Appeared as Unintended Application Exit**: Because `AccessViolationException` in .NET 8 is a corrupted process state exception, it bypassed standard `try { Close(); } catch {}` blocks and immediately crashed `SwitchCast.exe`, creating the perception that clicking "Stop & Close" closed the entire application.
+    4. **Duplicate MainWindow Activations**: `StopPresentationAsync` authoritatively activated `MainWindow` and navigated to Dashboard. Right after, `PresenterDockViewModel.CloseDockAsync` invoked `_dockService.ShowDashboard()`, which triggered a second, redundant `ActivateMainWindow()` call on `App.xaml.cs`.
+  - **Remediation**:
+    - **Removed Win32 `GWLP_HWNDPARENT`**: Decoupled `PresenterDockConfirmationWindow` from native window ownership coupling. Topmost z-order is safely and independently maintained via `OverlappedPresenter.IsAlwaysOnTop = true` and `WS_EX_TOOLWINDOW`.
+    - **Clean Dialog Self-Closing Before Task Resolution**: In `Dismiss(bool confirmed)`, the confirmation window immediately logs the request and calls `Close()`. On the `Closed` event, `_tcs.TrySetResult(_userConfirmed)` is signaled with `TaskCreationOptions.RunContinuationsAsynchronously`, guaranteeing the confirmation window is completely closed and dismantled before `StopPresentationAsync` or `CloseDock` commences.
+    - **Single Authoritative Dashboard Activation**: Removed the redundant `_dockService.ShowDashboard()` call from `PresenterDockViewModel.CloseDockAsync` when an active presentation is being stopped. `StopPresentationAsync` authoritatively activates `MainWindow` and navigates to the Dashboard. When closing an idle dock, `ShowDashboard()` is preserved.
+    - **Programmatic Close Guard**: Added `IsClosingProgrammatically` flag to `PresenterDockWindow` and set it in `PresenterDockService.CloseDock()` to prevent `AppWindow.Closing` from intercepting programmatic dock closures.
+    - **Window Lifecycle Diagnostics**: Added detailed logging with HWND, PID, event name, and stop sequence ID across `MainWindow`, `PresentationWindow`, `PresenterDockWindow`, `PresenterDockConfirmationWindow`, `PresentationCoordinator`, and `PresentationWindowService`.
+    - **Regression Test Coverage**: Added `DockCloseLifecycleHotfixTests.cs` (7 tests covering active cancel, stop & close, dashboard stop, idle dock close, 25-cycle repeated stress, native HWND validity checks, and shutdown bypass). Total test suite expanded to 379 passing tests.
 - [x] **P0 Native Crash Recovery — AccessViolationException After Stop Presenting Fixed**:
   - **Confirmed Root Cause**:
     1. **Asynchronous `SetBitmapAsync` Racing Window Destruction**: In `PresentationCoordinator.StopPresentationAsync`, `_outputRenderer.Clear()` was enqueuing an asynchronous delegate to the WinUI UI thread that created a 1x1 `SoftwareBitmap` and called `await _softwareBitmapSource.SetBitmapAsync(emptyBitmap)`. Meanwhile, `_presentationWindowService.ClosePresentationWindow()` invoked `target.Close()`, destroying the `PresentationWindow`'s native HWND and XAML visual tree. `SoftwareBitmapSource` is a singleton COM object whose underlying WinUI DComp visual connection held references into the destroyed `Image` element. When `SetBitmapAsync` completed its composition update on freed visual memory, `Microsoft.WinUI.dll` crashed with `AccessViolationException` (`0xC0000005: Attempted to read or write protected memory`).

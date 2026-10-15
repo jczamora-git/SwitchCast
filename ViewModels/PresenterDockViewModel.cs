@@ -673,13 +673,11 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
                     return;
                 }
 
-                // Stop & Close: stop presentation, wait for cleanup, close dock, show dashboard
+                // Stop & Close: stop presentation, wait for cleanup, close dock.
+                // Note: StopPresentationAsync authoritatively activates MainWindow and navigates to Dashboard.
+                // We must not trigger a redundant ShowDashboard call here to prevent duplicate window activation.
                 await _presentationCoordinator.StopPresentationAsync().ConfigureAwait(true);
                 _dockService.CloseDock();
-                if (_lifecycleService is null || (!_lifecycleService.IsShuttingDown && !_lifecycleService.IsShutdownApproved))
-                {
-                    _dockService.ShowDashboard();
-                }
             }
             else
             {

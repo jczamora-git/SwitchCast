@@ -118,3 +118,12 @@ Every pull request and release gate MUST verify the following 5 contract domains
 - **Window Teardown Boundary**: `PresentationWindow.Cleanup()` explicitly severs `PresentationOutputImage.Source = null`, `PresentationDirectImage.Source = null`, and `PresentationVideoPlayer.SetMediaPlayer(null)` before native HWND destruction, preventing `AccessViolationException` (`0xC0000005`) in `Microsoft.WinUI.dll`.
 - **Stop Idempotency**: Multiple concurrent Stop requests are deduplicated through `_activeStopTask` so that exactly one authoritative cleanup execution occurs.
 - **Expected Cancellation Handling**: `OperationCanceledException` (and `TaskCanceledException`) during source switching or window teardown is caught and logged at debug level as normal lifecycle cancellation rather than reported as an error incident.
+
+### Domain G: Presenter Dock Close & Application Exit Hotfix
+- **Dock Confirmation Cancel (Test A)**: When an active presentation is running, clicking Dock X invokes confirmation; clicking Cancel keeps presentation live, keeps output and dock open, and never stops presentation (`DockCloseLifecycleHotfixTests.TestA`).
+- **Dock Stop & Close (Test B)**: Clicking Stop & Close invokes authoritative `StopPresentationAsync`, closes output window, closes dock, activates MainWindow once on Dashboard, and keeps MainWindow and process alive (`DockCloseLifecycleHotfixTests.TestB`).
+- **Stop from Dashboard (Test C)**: Clicking Stop Presenting closes output window, clears renderers, activates MainWindow once, and leaves application alive (`DockCloseLifecycleHotfixTests.TestC`).
+- **Idle Dock Close (Test D)**: Closing dock while idle skips confirmation, closes dock, and restores Dashboard (`DockCloseLifecycleHotfixTests.TestD`).
+- **Repeated Stop & Close Cycles (Test E)**: 25 rapid Start -> Stop & Close -> Start cycles across sources execute with zero exceptions and single MainWindow activation (`DockCloseLifecycleHotfixTests.TestE`).
+- **Native Window Lifetime (Test F)**: `Win32WindowActivationService` verifies window validity via `IsWindow`; invalid or null HWNDs are rejected without crashing (`DockCloseLifecycleHotfixTests.TestF`).
+- **Application Shutdown Bypass (Test G)**: Full application exit bypasses dock confirmation and avoids duplicate Dashboard reactivation (`DockCloseLifecycleHotfixTests.TestG`).

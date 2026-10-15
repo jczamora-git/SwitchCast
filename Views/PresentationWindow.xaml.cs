@@ -372,6 +372,10 @@ public sealed partial class PresentationWindow : Window
 
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
+        Services.Diagnostics.SwitchCastDiagnostics.LogInfo(
+            nameof(PresentationWindow),
+            $"Closed | HWND=0x{WindowHandle:X} | PID={Environment.ProcessId}");
+
         Cleanup();
     }
 

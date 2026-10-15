@@ -56,6 +56,10 @@ public sealed class PresentationWindowService : IPresentationWindowService
         {
             var target = _window;
             _window = null;
+            Diagnostics.SwitchCastDiagnostics.LogInfo(
+                nameof(PresentationWindowService),
+                $"Close requested | HWND=0x{target.WindowHandle:X} | PID={Environment.ProcessId}");
+
             target.Closed -= OnWindowClosed;
             target.DisplayModeChanged -= OnWindowDisplayModeChanged;
             target.Cleanup();

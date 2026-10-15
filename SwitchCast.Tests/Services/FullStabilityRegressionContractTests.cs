@@ -134,7 +134,7 @@ public class FullStabilityRegressionContractTests
         Assert.True(dialogShown, "Confirmation dialog must be requested when presentation is active.");
         mockCoord.Verify(c => c.StopPresentationAsync(false), Times.Once);
         mockDock.Verify(d => d.CloseDock(), Times.Once);
-        mockDock.Verify(d => d.ShowDashboard(), Times.Once);
+        mockDock.Verify(d => d.ShowDashboard(), Times.Never); // StopPresentationAsync authoritatively activates Dashboard; duplicate dock activation prevented
     }
 
     [Fact]

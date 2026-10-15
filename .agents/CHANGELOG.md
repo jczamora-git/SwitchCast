@@ -7,6 +7,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Critical Dock Close & Application Exit Hotfix] - 2026-10-16
+
+### Fixed (fix / presenter-dock / window-lifetime / access-violation / winui / activation / test)
+- **Eliminated Native `AccessViolationException` (`0xC0000005`) on Presenter Dock Stop & Close**:
+  - **Decoupled Win32 HWND Ownership**: Removed `SetWindowLongPtr(GWLP_HWNDPARENT, ownerHwnd)` from `PresenterDockConfirmationWindow.xaml.cs`. Topmost z-order is cleanly and independently maintained via `OverlappedPresenter.IsAlwaysOnTop = true` and `WS_EX_TOOLWINDOW` without Win32 child/owner tearing during dock window destruction.
+  - **Sequential Confirmation Window Teardown**: Updated `Dismiss(bool confirmed)` to close the confirmation window immediately and resolve the task completion source on `Closed` using `TaskCreationOptions.RunContinuationsAsynchronously`. This guarantees the confirmation window is completely closed and dismantled before `StopPresentationAsync` or `CloseDock` starts.
+  - **Preserved `MainWindow` and `SwitchCast.exe` Process**: Verified that `MainWindow` receives no close requests during dock closure and stays running on the Control Dashboard.
+- **Prevented Duplicate `MainWindow` Activation**:
+  - Removed redundant `_dockService.ShowDashboard()` call from `PresenterDockViewModel.CloseDockAsync()` when an active presentation is being stopped.
+  - `StopPresentationAsync` acts as the single authoritative activator of `MainWindow` and navigates to the Dashboard.
+- **Added Window Lifecycle Diagnostics**:
+  - Added structured diagnostic logging with HWND, PID, and lifecycle states across `MainWindow`, `PresentationWindow`, `PresenterDockWindow`, and `PresenterDockConfirmationWindow`.
+- **Regression Test Coverage**:
+  - Added `DockCloseLifecycleHotfixTests.cs` (7 tests covering active cancel, stop & close, dashboard stop, idle dock close, repeated stress cycles, native HWND validity, and shutdown bypass).
+  - Total test suite expanded to 379 passing tests (0 failures).
+
+---
+
 ## [P0 Native Crash Recovery — AccessViolationException After Stop Presenting] - 2026-10-16
 
 ### Fixed (fix / native-crash / winui / direct3d / lifetime / cleanup / concurrency / test)

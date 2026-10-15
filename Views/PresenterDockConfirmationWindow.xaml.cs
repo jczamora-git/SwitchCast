@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -17,14 +18,14 @@ public sealed partial class PresenterDockConfirmationWindow : Window
 {
     private const uint MONITOR_DEFAULTTONEAREST = 2;
     private const int GWL_EXSTYLE = -20;
-    private const int GWLP_HWNDPARENT = -8;
     private const long WS_EX_TOOLWINDOW = 0x00000080L;
 
     private static bool _isConfirmationOpen;
 
     private AppWindow? _appWindow;
     private TaskCompletionSource<bool>? _tcs;
-    private IntPtr _ownerHwnd;
+    private bool _isDismissed;
+    private bool _userConfirmed;
 
     public PresenterDockConfirmationWindow()
     {
@@ -33,6 +34,7 @@ public sealed partial class PresenterDockConfirmationWindow : Window
 
         RootGrid.KeyDown += OnRootGridKeyDown;
         Activated += OnWindowActivated;
+        Closed += OnWindowClosed;
     }
 
     public IntPtr WindowHandle { get; private set; }
@@ -83,30 +85,64 @@ public sealed partial class PresenterDockConfirmationWindow : Window
 
     private void OnCancelClick(object sender, RoutedEventArgs e)
     {
+        Services.Diagnostics.SwitchCastDiagnostics.LogInfo(
+            nameof(PresenterDockConfirmationWindow),
+            $"Cancel clicked | HWND=0x{WindowHandle:X} | PID={Environment.ProcessId}");
         Dismiss(confirmed: false);
     }
 
     private void OnStopCloseClick(object sender, RoutedEventArgs e)
     {
+        Services.Diagnostics.SwitchCastDiagnostics.LogInfo(
+            nameof(PresenterDockConfirmationWindow),
+            $"Stop & Close clicked | HWND=0x{WindowHandle:X} | PID={Environment.ProcessId}");
         Dismiss(confirmed: true);
     }
 
     private void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
         // Treat window closing via Alt+F4 as cancel
-        _tcs?.TrySetResult(false);
+        if (!_isDismissed)
+        {
+            _isDismissed = true;
+            _userConfirmed = false;
+        }
+    }
+
+    private void OnWindowClosed(object sender, WindowEventArgs args)
+    {
+        Services.Diagnostics.SwitchCastDiagnostics.LogInfo(
+            nameof(PresenterDockConfirmationWindow),
+            $"Closed | HWND=0x{WindowHandle:X} | PID={Environment.ProcessId} | confirmed={_userConfirmed}");
+
+        _tcs?.TrySetResult(_userConfirmed);
     }
 
     private void Dismiss(bool confirmed)
     {
-        _tcs?.TrySetResult(confirmed);
+        if (_isDismissed)
+        {
+            return;
+        }
+
+        _isDismissed = true;
+        _userConfirmed = confirmed;
+
+        Services.Diagnostics.SwitchCastDiagnostics.LogInfo(
+            nameof(PresenterDockConfirmationWindow),
+            $"Close requested | confirmed={confirmed} | HWND=0x{WindowHandle:X} | PID={Environment.ProcessId}");
+
         try
         {
             Close();
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore close issues
+            Services.Diagnostics.SwitchCastDiagnostics.LogException(
+                nameof(PresenterDockConfirmationWindow),
+                nameof(Dismiss),
+                ex);
+            _tcs?.TrySetResult(confirmed);
         }
     }
 
@@ -121,33 +157,40 @@ public sealed partial class PresenterDockConfirmationWindow : Window
             return false;
         }
 
+        var lifecycle = App.Current.Services.GetService<Services.IApplicationLifecycleService>();
+        if (lifecycle is not null && (lifecycle.IsShuttingDown || lifecycle.IsShutdownApproved))
+        {
+            return false;
+        }
+
         _isConfirmationOpen = true;
         PresenterDockConfirmationWindow? window = null;
+        bool result = false;
 
         try
         {
             window = new PresenterDockConfirmationWindow();
-            window._ownerHwnd = ownerHwnd;
 
-            if (ownerHwnd != IntPtr.Zero)
-            {
-                SetWindowLongPtr(window.WindowHandle, GWLP_HWNDPARENT, ownerHwnd);
-            }
+            // Note: DO NOT set GWLP_HWNDPARENT.
+            // WinUI 3 windows manage independent XAML island hierarchies. Setting Win32 HWNDPARENT
+            // creates cross-window ownership that destroys the confirmation window prematurely when
+            // the parent closes, causing native AccessViolationException in Microsoft.WinUI.dll.
+            // Topmost z-order is already maintained via OverlappedPresenter.IsAlwaysOnTop.
 
             window.PositionWindow(ownerHwnd);
 
             // Temporarily disable owner window to prevent input conflicts and duplicate clicks
-            if (ownerHwnd != IntPtr.Zero)
+            if (ownerHwnd != IntPtr.Zero && IsWindow(ownerHwnd))
             {
                 EnableWindow(ownerHwnd, false);
             }
 
-            var tcs = new TaskCompletionSource<bool>();
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             window._tcs = tcs;
 
             window.Activate();
 
-            bool result = await tcs.Task;
+            result = await tcs.Task;
             return result;
         }
         catch (Exception ex)
@@ -160,10 +203,13 @@ public sealed partial class PresenterDockConfirmationWindow : Window
         }
         finally
         {
-            if (ownerHwnd != IntPtr.Zero)
+            if (ownerHwnd != IntPtr.Zero && IsWindow(ownerHwnd))
             {
                 EnableWindow(ownerHwnd, true);
-                SetForegroundWindow(ownerHwnd);
+                if (!result)
+                {
+                    SetForegroundWindow(ownerHwnd);
+                }
             }
 
             _isConfirmationOpen = false;
@@ -227,6 +273,10 @@ public sealed partial class PresenterDockConfirmationWindow : Window
         public RECT rcWork;
         public uint dwFlags;
     }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindow(IntPtr hWnd);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

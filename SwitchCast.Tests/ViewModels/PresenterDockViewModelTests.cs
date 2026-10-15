@@ -343,7 +343,7 @@ public class PresenterDockViewModelTests
         Assert.True(confirmationRequested);
         _mockCoordinator.Verify(c => c.StopPresentationAsync(false), Times.Once);
         _mockDockService.Verify(d => d.CloseDock(), Times.Once);
-        _mockDockService.Verify(d => d.ShowDashboard(), Times.Once);
+        _mockDockService.Verify(d => d.ShowDashboard(), Times.Never); // StopPresentationAsync authoritatively activates Dashboard; dock avoids duplicate call
     }
 
     [Fact]

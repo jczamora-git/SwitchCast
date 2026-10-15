@@ -54,6 +54,8 @@ public sealed partial class PresenterDockWindow : Window
 
     public IntPtr WindowHandle { get; private set; }
 
+    internal bool IsClosingProgrammatically { get; set; }
+
     /// <summary>
     /// Helper method for XAML compiled binding: maps boolean to Visibility.
     /// </summary>
@@ -385,6 +387,15 @@ public sealed partial class PresenterDockWindow : Window
 
     private async void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
     {
+        Services.Diagnostics.SwitchCastDiagnostics.LogInfo(
+            nameof(PresenterDockWindow),
+            $"Closing event received | HWND=0x{WindowHandle:X} | PID={Environment.ProcessId} | Programmatic={IsClosingProgrammatically} | HasActivePresentation={ViewModel.HasActivePresentation}");
+
+        if (IsClosingProgrammatically)
+        {
+            return;
+        }
+
         var lifecycle = App.Current.Services.GetService<Services.IApplicationLifecycleService>();
         if (lifecycle is not null && (lifecycle.IsShuttingDown || lifecycle.IsShutdownApproved))
         {
@@ -413,6 +424,10 @@ public sealed partial class PresenterDockWindow : Window
 
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
+        Services.Diagnostics.SwitchCastDiagnostics.LogInfo(
+            nameof(PresenterDockWindow),
+            $"Closed | HWND=0x{WindowHandle:X} | PID={Environment.ProcessId}");
+
         CloseActiveMenu();
         if (_appWindow is not null)
         {

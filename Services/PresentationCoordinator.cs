@@ -480,6 +480,9 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         Volatile.Write(ref _targetRequestedPresentationSource, null);
 
         Debug.WriteLine($"[PresentationCoordinator] StopPresentation requested seq={sequence} isShuttingDown={isShuttingDown}");
+        Diagnostics.SwitchCastDiagnostics.LogInfo(
+            nameof(PresentationCoordinator),
+            $"StopPresentation requested seq={sequence} | isShuttingDown={isShuttingDown} | Status={_presentationStateService.Status} | PID={Environment.ProcessId}");
 
         _isStoppingOrShuttingDown = true;
 
@@ -536,6 +539,9 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             }
 
             Debug.WriteLine($"[PresentationCoordinator] StopPresentation completed seq={sequence}");
+            Diagnostics.SwitchCastDiagnostics.LogInfo(
+                nameof(PresentationCoordinator),
+                $"StopPresentation completed seq={sequence} | PID={Environment.ProcessId}");
         }
         catch (Exception ex)
         {
