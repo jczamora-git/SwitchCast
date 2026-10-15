@@ -77,16 +77,18 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public void AboutMetadata_ContainsCreatorAndRepositoryUrl()
+    public void AboutMetadata_ContainsCreatorAndWebsiteUrl()
     {
         var vm = new SettingsViewModel(_mockSettingsService.Object);
 
         Assert.Equal("John Christopher King Zamora", vm.Creator);
-        Assert.Equal("https://github.com/jczamora-git/SwitchCast", vm.RepositoryUrl);
+        Assert.Equal("https://switchcast.wasmer.app/", vm.WebsiteUrl);
+        Assert.Equal("https://switchcast.wasmer.app/", vm.RepositoryUrl);
         Assert.Equal("Screen Sharing & Presentation Manager", vm.AppSubtitle);
         Assert.Contains(".NET 8", vm.BuiltWith);
         Assert.Contains("WinUI 3", vm.BuiltWith);
         Assert.Contains("Zero Telemetry", vm.PrivacyStatement);
         Assert.False(string.IsNullOrWhiteSpace(vm.AppVersion));
+        Assert.NotNull(vm.OpenWebsiteCommand);
     }
 }

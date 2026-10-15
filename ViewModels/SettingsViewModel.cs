@@ -154,7 +154,9 @@ public partial class SettingsViewModel : ObservableObject
 
     public string Creator => "John Christopher King Zamora";
 
-    public string RepositoryUrl => "https://github.com/jczamora-git/SwitchCast";
+    public string WebsiteUrl => "https://switchcast.wasmer.app/";
+
+    public string RepositoryUrl => WebsiteUrl;
 
     public string BuiltWith => "C# / .NET 8 / WinUI 3 / Windows App SDK";
 
@@ -363,16 +365,19 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public async Task OpenRepositoryAsync()
+    public async Task OpenWebsiteAsync()
     {
         try
         {
-            var uri = new Uri(RepositoryUrl);
+            var uri = new Uri(WebsiteUrl);
             await Windows.System.Launcher.LaunchUriAsync(uri);
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Failed to open repository link: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Failed to open website link: {ex.Message}");
         }
     }
+
+    [RelayCommand]
+    public Task OpenRepositoryAsync() => OpenWebsiteAsync();
 }

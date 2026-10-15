@@ -215,17 +215,18 @@
                                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Operating System" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
                                 <TextBlock Grid.Row="2" Grid.Column="1" Text="{x:Bind ViewModel.PlatformDescription, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" TextWrapping="Wrap" />
 
-                                <!-- Repository Link -->
-                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Repository" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                <!-- Official Website Link -->
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Website" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
                                 <Button Grid.Row="3" Grid.Column="1"
-                                        Command="{x:Bind ViewModel.OpenRepositoryCommand}"
+                                        Command="{x:Bind ViewModel.OpenWebsiteCommand}"
                                         Style="{ThemeResource SubtleButtonStyle}"
                                         Padding="0"
                                         HorizontalAlignment="Left"
-                                        VerticalAlignment="Center">
+                                        VerticalAlignment="Center"
+                                        ToolTipService.ToolTip="Open official SwitchCast website (https://switchcast.wasmer.app/)">
                                     <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <FontIcon Glyph="&#xE71B;" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" />
-                                        <TextBlock Text="github.com/jczamora-git/SwitchCast" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" TextDecorations="Underline" />
+                                        <FontIcon Glyph="&#xE774;" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" />
+                                        <TextBlock Text="https://switchcast.wasmer.app/" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" TextDecorations="Underline" />
                                     </StackPanel>
                                 </Button>
 
