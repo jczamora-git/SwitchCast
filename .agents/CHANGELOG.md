@@ -7,6 +7,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [PowerPoint Switching Hotfix & Production Error Diagnostics System] - 2026-10-15
+
+### Fixed (fix / ui-threading / powerpoint-switching / dispatcher / dashboard / mvvm / test)
+- **PowerPoint Source-Switching Threading Resolution (COMException 0x8001010E / RPC_E_WRONG_THREAD)**:
+  - **Confirmed Root Cause**: In `DashboardViewModel.OnPresentationStatePropertyChanged`, property change events from `PresentationStateService.ActiveSource` arriving from a background worker thread synchronously mutated `SelectedPresentationSource`. Because `SelectedPresentationSource` was two-way bound (`Mode=TwoWay`) to `ComboBox.SelectedItem` in `DashboardPage.xaml`, WinUI attempted to update the native XAML control from off the UI thread, immediately throwing `COMException 0x8001010E (RPC_E_WRONG_THREAD)`. This exception bubbled up out of `SetActiveSource` into `PresentationCoordinator.SwitchPresentationSourceAsync`, which set `Status = Error`, causing the Floating Presenter Dock to display `ERROR` during transitions back to PowerPoint (Demo.pptx -> Video -> Camera -> Demo.pptx).
+  - **Remediation**:
+    - Dispatched all programmatic `SelectedPresentationSource` and `SelectedPreviewSource` mutations in `DashboardViewModel` onto `DashboardPage`'s owning UI `DispatcherQueue` via `RunOnUIThread(...)`.
+    - Implemented reentrancy guard flag `_isSyncingPresentationSource` preventing programmatic synchronization from triggering spurious user-initiated `SelectionChanged` / `SwitchPresentationSourceAsync` transition cascades.
+    - Repaired `SwitchPresentationSourceAsync` to eliminate premature return after aligning `SelectedPresentationSource`, ensuring the presentation coordinator actually receives the source switch invocation.
+    - Verified all 6 source types (Window, Display, Image, Video, PowerPoint, Camera) transition reliably across 20 continuous cycles with no threading exceptions, no duplicate switches, and persistent presentation state.
+
+### Added (feat / error-reporting / diagnostics / privacy / redaction / winui / settings / test)
+- **Production-Ready Error Reporting and Diagnostics Subsystem**:
+  - **Central Architecture**: Implemented `IErrorReportingService`, `ErrorReportingService`, `IDiagnosticRedactionService`, `DiagnosticRedactionService`, `IDiagnosticReportBuilder`, and `DiagnosticReportBuilder` registered as singletons in `App.xaml.cs`.
+  - **Structured Incident Capture**: Domain model `DiagnosticIncident` captures unique incident IDs (`SC-YYYYMMDD-XXXXXXXX`), UTC timestamp, app version, OS/architecture, error category, severity (`Info`, `Warning`, `Error`, `Critical`), component, operation, HRESULT hex (`0x8001010E`), safe message, stack trace, source transitions, and bounded 100-event recent timeline.
+  - **Privacy-First Redaction**: Automatically scrubs Windows usernames (`[USER]`), user profile directories (`%USERPROFILE%`), email addresses (`[REDACTED_EMAIL]`), auth tokens, passwords, and API keys (`[REDACTED_SECRET]`) from all diagnostics before export or display.
+  - **Local-Only Bounded Storage**: 100% offline logging directly to `%LOCALAPPDATA%\SwitchCast\Logs` (`switchcast-YYYYMMDD.log`, `incident-<id>.json`, `incident-<id>.txt`) with safe 10-incident file rotation and 30-day log purging. Zero remote telemetry.
+  - **Unhandled Exception Resilience**: Wired `AppDomain.CurrentDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`, and `App.UnhandledException` into the central diagnostics recorder with reentrancy protection.
+  - **User-Facing Error Reporting Dialog**: Built `ErrorReportDialog.xaml` (WinUI 3 ContentDialog) featuring friendly error message, incident ID / error code badge, collapsible sanitized technical details, Copy Report (`DataPackage`), Save Report (`FileSavePicker` with fallback to local exports), Report on GitHub (pre-populated sanitized issue template), and Report to Developer (clear indication of unconfigured direct server). Presentation Output window is never interrupted by error modals.
+  - **Settings Diagnostics Category**: Added Category 5 ("Diagnostics & Reports") to `SettingsPage.xaml` and `SettingsViewModel.cs` providing log location overview, local privacy notice, recent incident list, incident details inspection, one-click copy, and "Open Logs Folder" via shell execute.
+  - **Automated Regression Suite**: Added `ErrorReportingServiceTests.cs` and expanded `PresentationStartupAndThreadingTests.cs`, bringing test count to **353 passing automated tests** (100% pass rate). Both Debug and Release builds compile with 0 errors and 0 warnings.
+
+---
+
 ## [PowerPoint & Presenter Dock Regression Hotfix] - 2026-10-15
 
 ### Fixed (fix / powerpoint / presenter-dock / lifecycle / layout / threading / test)

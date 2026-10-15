@@ -1,23 +1,29 @@
+using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml;
 using SwitchCast.Models;
+using SwitchCast.Models.Diagnostics;
 using SwitchCast.Services;
+using SwitchCast.Services.Diagnostics;
 
 namespace SwitchCast.ViewModels;
 
 /// <summary>
-/// ViewModel managing application theme configuration, preferences, presenter settings, shortcuts, and version metadata.
+/// ViewModel managing application theme configuration, preferences, presenter settings, shortcuts, version metadata, and diagnostics.
 /// </summary>
 public partial class SettingsViewModel : ObservableObject
 {
     private readonly IApplicationSettingsService _settingsService;
     private readonly IHotkeyService? _hotkeyService;
+    private readonly IErrorReportingService? _errorReportingService;
+    private readonly IDiagnosticReportBuilder? _reportBuilder;
 
     [ObservableProperty]
-    private int _selectedCategoryIndex = 0; // 0=General, 1=Appearance, 2=Window, 3=Presenter, 4=Shortcuts
+    private int _selectedCategoryIndex = 0; // 0=General, 1=Appearance, 2=Window, 3=Presenter, 4=Shortcuts, 5=Diagnostics
 
     [ObservableProperty]
     private int _selectedThemeIndex;
@@ -58,16 +64,24 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IMonitorDiscoveryService? _monitorDiscoveryService;
     private readonly List<MonitorSource> _discoveredMonitors = [];
 
-    public System.Collections.ObjectModel.ObservableCollection<string> AvailableDisplays { get; } = [];
+    public ObservableCollection<string> AvailableDisplays { get; } = [];
+
+    public ObservableCollection<DiagnosticIncident> RecentIncidents { get; } = [];
+
+    public string LogsDirectoryPath => _errorReportingService?.LogsDirectory ?? string.Empty;
 
     public SettingsViewModel(
         IApplicationSettingsService settingsService,
         IHotkeyService? hotkeyService = null,
-        IMonitorDiscoveryService? monitorDiscoveryService = null)
+        IMonitorDiscoveryService? monitorDiscoveryService = null,
+        IErrorReportingService? errorReportingService = null,
+        IDiagnosticReportBuilder? reportBuilder = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _hotkeyService = hotkeyService;
         _monitorDiscoveryService = monitorDiscoveryService;
+        _errorReportingService = errorReportingService;
+        _reportBuilder = reportBuilder;
 
         var current = _settingsService.CurrentSettings;
         _selectedThemeIndex = (int)current.Theme;
@@ -82,6 +96,7 @@ public partial class SettingsViewModel : ObservableObject
         _hotkeyBindings = current.HotkeyBindings.ToList();
 
         InitializeDisplayOptions(current.PreferredDisplayDeviceName);
+        RefreshIncidents();
     }
 
     private async void InitializeDisplayOptions(string? preferredDeviceName)
@@ -159,6 +174,8 @@ public partial class SettingsViewModel : ObservableObject
     public Visibility WindowCategoryVisibility => SelectedCategoryIndex == 2 ? Visibility.Visible : Visibility.Collapsed;
     public Visibility PresenterCategoryVisibility => SelectedCategoryIndex == 3 ? Visibility.Visible : Visibility.Collapsed;
     public Visibility ShortcutsCategoryVisibility => SelectedCategoryIndex == 4 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility DiagnosticsCategoryVisibility => SelectedCategoryIndex == 5 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility NoIncidentsVisibility => RecentIncidents.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
     public IEnumerable<HotkeyBinding> FilteredHotkeyBindings
     {
@@ -183,6 +200,12 @@ public partial class SettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(WindowCategoryVisibility));
         OnPropertyChanged(nameof(PresenterCategoryVisibility));
         OnPropertyChanged(nameof(ShortcutsCategoryVisibility));
+        OnPropertyChanged(nameof(DiagnosticsCategoryVisibility));
+
+        if (value == 5)
+        {
+            RefreshIncidents();
+        }
     }
 
     partial void OnShortcutSearchQueryChanged(string value)
@@ -294,6 +317,49 @@ public partial class SettingsViewModel : ObservableObject
 
         HotkeyBindings = _settingsService.CurrentSettings.HotkeyBindings.ToList();
         await _settingsService.SaveSettingsAsync();
+    }
+
+    [RelayCommand]
+    public void OpenLogsFolder()
+    {
+        if (_errorReportingService is null) return;
+        try
+        {
+            Directory.CreateDirectory(_errorReportingService.LogsDirectory);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = _errorReportingService.LogsDirectory,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SettingsViewModel] OpenLogsFolder failed: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    public void RefreshIncidents()
+    {
+        RecentIncidents.Clear();
+        if (_errorReportingService is not null)
+        {
+            foreach (var inc in _errorReportingService.GetRecentIncidents())
+            {
+                RecentIncidents.Add(inc);
+            }
+        }
+        OnPropertyChanged(nameof(NoIncidentsVisibility));
+    }
+
+    [RelayCommand]
+    public async Task ClearDiagnosticsHistoryAsync()
+    {
+        if (_errorReportingService is not null)
+        {
+            await _errorReportingService.ClearIncidentHistoryAsync();
+            RefreshIncidents();
+        }
     }
 
     [RelayCommand]

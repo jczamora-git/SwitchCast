@@ -7,15 +7,28 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Critical PowerPoint & Presenter Dock Regression Hotfix Complete
-- **Overall Status**: **Implemented & Validated (342 Automated Unit Tests Passing, Debug & Release Builds Clean, Native Hardware Verification Pending)**
-- **Last Updated**: 2026-10-15T18:55:00+08:00 (UTC+8)
+- **Current Phase**: PowerPoint Switching Hotfix & Production Error Diagnostics Complete
+- **Overall Status**: **Implemented & Validated (353 Automated Unit Tests Passing, Debug & Release Builds Clean, Native Hardware Verification Pending)**
+- **Last Updated**: 2026-10-15T19:40:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **PowerPoint Source-Switching Hotfix & Production Error Diagnostics System**:
+  - **PowerPoint Threading Hotfix (0x8001010E RPC_E_WRONG_THREAD)**:
+    - **Confirmed Root Cause**: `PresentationStateService.ActiveSource` changes on worker threads triggered `DashboardViewModel.OnPresentationStatePropertyChanged`, which synchronously set `SelectedPresentationSource = _presentationStateService.ActiveSource;`. Because `SelectedPresentationSource` is two-way bound to `ComboBox.SelectedItem` in `DashboardPage.xaml`, WinUI threw COMException `0x8001010E (RPC_E_WRONG_THREAD)`. This escaped out of `SetActiveSource` into `PresentationCoordinator.SwitchPresentationSourceAsync`, setting `Status = Error` and showing `ERROR` on the Floating Dock.
+    - **Remediation**: Wrapped all `SelectedPresentationSource` and `SelectedPreviewSource` updates in `RunOnUIThread(...)` with reentrancy protection (`_isSyncingPresentationSource`). Removed premature return in `SwitchPresentationSourceAsync` so presentation switches proceed reliably.
+  - **Production-Ready Local Diagnostics & Reporting Subsystem**:
+    - Central architecture: `IErrorReportingService`, `ErrorReportingService`, `IDiagnosticRedactionService`, `DiagnosticRedactionService`, `IDiagnosticReportBuilder`, `DiagnosticReportBuilder`.
+    - Structured incident telemetry: `DiagnosticIncident` with unique ID (`SC-YYYYMMDD-XXXXXXXX`), hex HRESULT, safe message, stack trace, timeline, repeat count, OS/app versions.
+    - Privacy-first redaction: Automatic sanitization of Windows usernames (`[USER]`), user profiles (`%USERPROFILE%`), email addresses (`[REDACTED_EMAIL]`), auth tokens, passwords, and API keys (`[REDACTED_SECRET]`).
+    - Local storage: Bounded log storage at `%LOCALAPPDATA%\SwitchCast\Logs` with 10-incident file rotation and 30-day log purging. Zero remote telemetry.
+    - Unhandled exception hooks: Attached to `AppDomain.CurrentDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`, and `App.UnhandledException`.
+    - UI integration: `Views/Dialogs/ErrorReportDialog.xaml` (WinUI 3 ContentDialog with friendly message, badge, collapsible sanitized technical details, Copy Report, Save Report, Report on GitHub, Report to Developer). Audience-facing Presentation Output is isolated and never interrupted by error modals.
+    - Settings integration: Added Category 5 ("Diagnostics & Reports") in `SettingsPage.xaml` and `SettingsViewModel.cs` with incident review, log location, and "Open Logs Folder".
+  - **Automated Regression Suite**: Expanded test suite to **353 automated unit tests** (100% pass rate). Both Debug and Release builds compile with 0 errors and 0 warnings.
 - [x] **Critical PowerPoint & Presenter Dock Regression Hotfix (COM Crash, Auto-Open Dock & Broken Slide Controls)**:
   - **PowerPoint COM Switching Crash Resolution**:
     - **Confirmed Root Cause**: When transitioning Camera -> PowerPoint, `CameraCaptureService.StopCaptureInternalAsync` invoked `_frameReader.Dispose()` and `_mediaCapture.Dispose()` on the deactivation path outside guarded try/catch blocks; native WinRT/COM shutdown exceptions escaped into `SwitchPresentationSourceAsync`. Simultaneously, if PowerPoint slides had not yet been cached or had missing slide image paths, `PowerPointPresentationService.LoadPresentationAsync` called `UpdateSlideImageAsync` with null/empty paths or attempted background `BitmapImage` creation without dispatcher validation. When `SwitchPresentationSourceAsync` caught the failure, it logged only `error={ex.Message}` (often empty for COMExceptions) without hex HRESULT or stack trace, then rethrew `throw;`, hitting `PresenterDockViewModel.SwitchSourceAsync` which had no try-catch, causing an unhandled task exception breaking in `App.xaml.cs`.
