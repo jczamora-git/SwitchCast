@@ -188,10 +188,18 @@ SwitchCast incorporates a dedicated, production-grade local diagnostics and erro
 SwitchCast enforces an authoritative 4-action lifecycle contract governing presentation teardown and window management:
 
 ### Action A — Stop Presenting
-Triggered from Dashboard, Floating Presenter Dock, or global hotkey:
-- Stops active capture, media playback, PowerPoint slideshow, and camera reader.
-- Clears visual renderers and closes the Presentation Output window (`PresentationWindow`).
-- Restores and activates `MainWindow` and navigates to the Control Dashboard.
+Triggered from Dashboard, Floating Presenter Dock, global hotkey, or direct window closure:
+- **Strict Teardown Sequence**:
+  1. Invalidate camera startup & drain camera frames (`_cameraStartupCts?.Cancel()`, `_pendingCameraFrame?.Dispose()`, `_cameraCaptureService.StopCaptureAsync()`).
+  2. Stop Windows Graphics Capture (`_captureCoordinator.StopPreviewAsync()`).
+  3. Stop PowerPoint live slideshow & clear presentation (`_powerPointLiveService.StopSlideshowAsync()`, `_powerPointService.ClearPresentation()`).
+  4. Stop Video and clear Image (`_mediaPresentationService.ClearImage()`, `_mediaPresentationService.StopVideoAsync()`).
+  5. Invalidate render generations (`_outputRenderer.Clear()`).
+  6. Transition presentation status to `Idle`.
+  7. Close and clean up Presentation Output window (`PresentationWindowService.ClosePresentationWindow()` -> `PresentationWindow.Cleanup()`).
+  8. Restore and activate `MainWindow` and navigate to the Control Dashboard.
+- **Idempotency Guarantees**: `StopPresentationAsync` is synchronized with `_stopLock` and deduplicated via `_activeStopTask`, ensuring multiple concurrent stop triggers (e.g. Dashboard button + Dock close + hotkey) observe and await the exact same single execution without duplicate teardowns or double-close side effects.
+- **Native Teardown Boundary**: `PresentationWindow.Cleanup()` explicitly detaches `PresentationOutputImage.Source = null`, `PresentationDirectImage.Source = null`, and `PresentationVideoPlayer.SetMediaPlayer(null)` before native HWND destruction, severing DirectX DirectComposition and MediaPlayer references to prevent `AccessViolationException` (`0xC0000005`) in `Microsoft.WinUI.dll`. Unsubscribes `ViewModel.PropertyChanged` and `ThemeChanged`, calls `Bindings.StopTracking()`, and disposes `PresentationViewModel`.
 - Preserves the application process, source library, and queued source items intact without creating duplicate window instances.
 
 ### Action B — Presenter Dock X Button (User Close Request)

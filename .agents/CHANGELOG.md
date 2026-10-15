@@ -7,6 +7,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [P0 Native Crash Recovery — AccessViolationException After Stop Presenting] - 2026-10-16
+
+### Fixed (fix / native-crash / winui / direct3d / lifetime / cleanup / concurrency / test)
+- **Eliminated Native `AccessViolationException` (`0xC0000005`) in `Microsoft.WinUI.dll`**:
+  - **Asynchronous `SetBitmapAsync` Racing Window Destruction**: `Direct3D11PresentationRenderer.Clear()` previously queued an asynchronous delegate `await _softwareBitmapSource.SetBitmapAsync(emptyBitmap)` onto the UI thread while `PresentationWindowService.ClosePresentationWindow()` invoked `Window.Close()`. When native composition executed against the torn-down visual tree of `PresentationWindow`, `Microsoft.WinUI.dll` crashed attempting to write to freed memory.
+  - **Explicit Visual Tree Teardown**: Added `Cleanup()` to `PresentationWindow.xaml.cs` (called idempotently on `ClosePresentationWindow` and `Closed`). Detaches `PresentationOutputImage.Source = null`, `PresentationDirectImage.Source = null`, and `PresentationVideoPlayer.SetMediaPlayer(null)` to sever native DComp and MediaPlayer swapchain connections before destroying the window HWND. Unsubscribes `ViewModel.PropertyChanged` and `ThemeChanged`, calls `Bindings.StopTracking()`, and disposes `ViewModel`.
+  - **Safe Atomic Generation Clear**: Rewrote `Direct3D11PresentationRenderer.Clear()` to atomically increment `_currentGeneration` and reset `_isProcessingFrame = 0` without queuing asynchronous `SetBitmapAsync(emptyBitmap)` calls into tearing-down visual trees.
+  - **Reordered Stop Lifecycle**: In `PresentationCoordinator.ExecuteStopPresentationAsync`:
+    1. Cancel camera startup timeout and drain pending camera frames -> stop Camera capture.
+    2. Stop Windows Graphics Capture (`StopPreviewAsync`).
+    3. Stop PowerPoint live slideshow and clear presentation.
+    4. Stop Video and clear Image.
+    5. Invalidate render generations (`Clear()`).
+    6. Transition presentation status to `Idle`.
+    7. Close and clean up `PresentationWindow`.
+    8. Activate MainWindow and navigate to Dashboard.
+  - **Stop Idempotency**: Guarded `StopPresentationAsync` with `_stopLock` and `_activeStopTask` deduplication. Concurrent calls from Dashboard, Dock, hotkeys, or manual window close await the same single task.
+  - **Expected TaskCanceledException Classification**: Explicitly caught `OperationCanceledException` (including `TaskCanceledException`) in `Direct3D11PresentationRenderer` and `Direct3D11PreviewRenderer`, logging as normal lifecycle cancellation without generating false error incidents.
+  - **Eliminated Duplicate Dashboard Activation**: Fixed Presenter Dock close to only invoke secondary `ShowDashboard()` when closing while idle; when closing while presenting, `StopPresentationAsync` acts as the single authoritative dashboard activator.
+  - **Regression Test Coverage**: Added `StopLifecycleNativeCrashRecoveryTests.cs` (6 targeted tests verifying source stop order, camera/video/PowerPoint/WGC drainage before window close, and concurrent Stop deduplication). Total test suite expanded to 372 automated tests (100% pass rate).
+
+---
+
 ## [Dock Modal & UI Consistency Hotfix] - 2026-10-15
 
 ### Fixed (fix / presenter-dock / modal-hosting / win32 / windowing / layout / responsive)

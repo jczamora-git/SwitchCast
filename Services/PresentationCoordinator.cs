@@ -40,6 +40,8 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     private readonly object _cameraFrameLock = new();
     private SoftwareBitmap? _pendingCameraFrame;
     private bool _isRenderingCameraFrame;
+    private Task? _activeStopTask;
+    private readonly object _stopLock = new();
 
     [ObservableProperty]
     private string? _lastErrorMessage;
@@ -457,7 +459,22 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         }
     }
 
-    public async Task StopPresentationAsync(bool isShuttingDown = false)
+    public Task StopPresentationAsync(bool isShuttingDown = false)
+    {
+        lock (_stopLock)
+        {
+            if (_activeStopTask is not null && !_activeStopTask.IsCompleted)
+            {
+                Debug.WriteLine("[PresentationCoordinator] StopPresentation already in progress; returning active task.");
+                return _activeStopTask;
+            }
+
+            _activeStopTask = ExecuteStopPresentationAsync(isShuttingDown);
+            return _activeStopTask;
+        }
+    }
+
+    private async Task ExecuteStopPresentationAsync(bool isShuttingDown)
     {
         long sequence = Interlocked.Increment(ref _presentationSequenceNumber);
         Volatile.Write(ref _targetRequestedPresentationSource, null);
@@ -469,16 +486,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         await _transitionSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
-            _outputRenderer.Clear();
-            _mediaPresentationService.ClearImage();
-            await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
-
-            if (_powerPointLiveService is not null && _powerPointLiveService.IsLiveSlideshowRunning)
-            {
-                await _powerPointLiveService.StopSlideshowAsync().ConfigureAwait(false);
-            }
-            _powerPointService.ClearPresentation();
-
+            // 1. Invalidate camera startup & drain camera frames
             _cameraStartupCts?.Cancel();
             Interlocked.Exchange(ref _firstCameraFrameRendered, 0);
 
@@ -494,23 +502,46 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                 await _cameraCaptureService.StopCaptureAsync().ConfigureAwait(false);
             }
 
+            // 2. Stop WGC capture preview
+            await _captureCoordinator.StopPreviewAsync().ConfigureAwait(false);
+
+            // 3. Stop PowerPoint live slideshow & presentation
+            if (_powerPointLiveService is not null && _powerPointLiveService.IsLiveSlideshowRunning)
+            {
+                await _powerPointLiveService.StopSlideshowAsync().ConfigureAwait(false);
+            }
+            _powerPointService.ClearPresentation();
+
+            // 4. Stop Video and clear Image
+            _mediaPresentationService.ClearImage();
+            await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
+
+            // 5. Invalidate render generations & clear output renderer
+            _outputRenderer.Clear();
+
+            // 6. Update presentation state to Idle
             _presentationStateService.SetActiveSource(null);
             _presentationStateService.SetForegroundSource(null);
             _presentationStateService.SetStatus(PresentationStatus.Idle);
             LastErrorMessage = null;
-            await _captureCoordinator.StopPreviewAsync().ConfigureAwait(false);
 
-            // Close the presentation output window on stop
+            // 7. Close the presentation output window on stop (triggers PresentationWindow.Cleanup)
             _presentationWindowService.ClosePresentationWindow();
 
+            // 8. Restore MainWindow and navigate to Dashboard if not shutting down
             if (!isShuttingDown)
             {
-                // Bring Main Control Dashboard to front and navigate to Dashboard page
                 _windowActivationService.ActivateMainWindow();
                 _navigationService?.NavigateToDashboard();
             }
 
             Debug.WriteLine($"[PresentationCoordinator] StopPresentation completed seq={sequence}");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[PresentationCoordinator] StopPresentation error seq={sequence}: {ex.Message}");
+            Diagnostics.SwitchCastDiagnostics.LogException(nameof(PresentationCoordinator), nameof(StopPresentationAsync), ex);
+            throw;
         }
         finally
         {

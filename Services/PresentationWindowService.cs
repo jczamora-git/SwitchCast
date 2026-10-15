@@ -58,6 +58,7 @@ public sealed class PresentationWindowService : IPresentationWindowService
             _window = null;
             target.Closed -= OnWindowClosed;
             target.DisplayModeChanged -= OnWindowDisplayModeChanged;
+            target.Cleanup();
             target.Close();
             _displayMode = PresentationDisplayMode.Windowed;
             WindowClosed?.Invoke(this, EventArgs.Empty);
@@ -126,6 +127,10 @@ public sealed class PresentationWindowService : IPresentationWindowService
 
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
+        if (sender is PresentationWindow pw)
+        {
+            pw.Cleanup();
+        }
         _window = null;
         _displayMode = PresentationDisplayMode.Windowed;
         WindowClosed?.Invoke(this, EventArgs.Empty);

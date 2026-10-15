@@ -112,3 +112,9 @@ Every pull request and release gate MUST verify the following 5 contract domains
 ### Domain E: Diagnostics & Hang Watchdog
 - **Synchronous Critical Flush**: Critical and terminating exceptions (`IsTerminating == true`) bypass thread-pool queues and write incident files synchronously to disk prior to process exit (`Contract_E1`).
 - **UI Hang Watchdog Lifecycle**: Background watchdog safely tracks UI message loop heartbeat and records diagnostic incidents upon detecting dispatcher starvation (`Contract_E2`).
+
+### Domain F: Native Teardown & Stop Lifecycle Contract
+- **Stop Order & Drainage**: When Stop Presenting is requested, Camera capture is stopped and pending frames drained, WGC capture is stopped, PowerPoint slideshow is closed, and Video/Image presentation is stopped prior to clearing renderer generations or destroying the window (`StopLifecycleNativeCrashRecoveryTests`).
+- **Window Teardown Boundary**: `PresentationWindow.Cleanup()` explicitly severs `PresentationOutputImage.Source = null`, `PresentationDirectImage.Source = null`, and `PresentationVideoPlayer.SetMediaPlayer(null)` before native HWND destruction, preventing `AccessViolationException` (`0xC0000005`) in `Microsoft.WinUI.dll`.
+- **Stop Idempotency**: Multiple concurrent Stop requests are deduplicated through `_activeStopTask` so that exactly one authoritative cleanup execution occurs.
+- **Expected Cancellation Handling**: `OperationCanceledException` (and `TaskCanceledException`) during source switching or window teardown is caught and logged at debug level as normal lifecycle cancellation rather than reported as an error incident.

@@ -89,6 +89,11 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
                     await _softwareBitmapSource.SetBitmapAsync(sharedBitmap.Bitmap);
                 }
             }
+            catch (OperationCanceledException)
+            {
+                // Expected during source switching cancellation or dispatcher shutdown
+                Debug.WriteLine("[Direct3D11PreviewRenderer] Render task canceled during normal lifecycle switch.");
+            }
             catch (Exception ex)
             {
                 // Transient render errors during window resize or navigation safely observed
@@ -135,6 +140,11 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
                 {
                     await _softwareBitmapSource.SetBitmapAsync(bitmap);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected during normal source switching cancellation
+                Debug.WriteLine("[Direct3D11PreviewRenderer] Fallback render task canceled during normal lifecycle switch.");
             }
             catch (Exception ex)
             {
@@ -240,6 +250,10 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
                     using var emptyBitmap = new SoftwareBitmap(BitmapPixelFormat.Bgra8, 1, 1, BitmapAlphaMode.Premultiplied);
                     await _softwareBitmapSource.SetBitmapAsync(emptyBitmap);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected during preview reset
             }
             catch (Exception ex)
             {

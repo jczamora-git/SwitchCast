@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI;
@@ -18,6 +20,8 @@ public sealed partial class PresentationWindow : Window
 {
     private readonly IApplicationSettingsService _settingsService;
     private AppWindow? _appWindow;
+    private PropertyChangedEventHandler? _viewModelPropertyChangedHandler;
+    private int _isCleanedUp;
 
     public PresentationWindow()
     {
@@ -35,19 +39,20 @@ public sealed partial class PresentationWindow : Window
             PresentationVideoPlayer.SetMediaPlayer(ViewModel.MediaPlayer);
         }
 
-        ViewModel.PropertyChanged += (s, e) =>
+        _viewModelPropertyChangedHandler = (s, e) =>
         {
             if (e.PropertyName == nameof(PresentationViewModel.MediaPlayer))
             {
                 DispatcherQueue.TryEnqueue(() =>
                 {
-                    if (ViewModel.MediaPlayer is not null)
+                    if (Volatile.Read(ref _isCleanedUp) == 0 && ViewModel.MediaPlayer is not null)
                     {
                         PresentationVideoPlayer.SetMediaPlayer(ViewModel.MediaPlayer);
                     }
                 });
             }
         };
+        ViewModel.PropertyChanged += _viewModelPropertyChangedHandler;
 
         InitializeAppWindow();
         ApplyTheme(_settingsService.CurrentSettings.Theme);
@@ -315,10 +320,59 @@ public sealed partial class PresentationWindow : Window
         }
     }
 
+    /// <summary>
+    /// Idempotently tears down XAML bindings, detaches native MediaPlayer and Image sources,
+    /// and unhooks event subscriptions to prevent AccessViolationExceptions in Microsoft.WinUI.dll during window destruction.
+    /// </summary>
+    public void Cleanup()
+    {
+        if (Interlocked.Exchange(ref _isCleanedUp, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            Bindings.StopTracking();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[PresentationWindow] Error stopping bindings: {ex.Message}");
+        }
+
+        if (_viewModelPropertyChangedHandler is not null)
+        {
+            ViewModel.PropertyChanged -= _viewModelPropertyChangedHandler;
+            _viewModelPropertyChangedHandler = null;
+        }
+
+        try
+        {
+            PresentationVideoPlayer.SetMediaPlayer(null);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[PresentationWindow] Error detaching MediaPlayer: {ex.Message}");
+        }
+
+        try
+        {
+            PresentationOutputImage.Source = null;
+            PresentationDirectImage.Source = null;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[PresentationWindow] Error detaching image sources: {ex.Message}");
+        }
+
+        _settingsService.ThemeChanged -= OnThemeChanged;
+        ViewModel.SetDispatcherQueue(null);
+        ViewModel.Dispose();
+    }
+
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
-        ViewModel.SetDispatcherQueue(null);
-        _settingsService.ThemeChanged -= OnThemeChanged;
+        Cleanup();
     }
 
     #region Win32 P/Invoke

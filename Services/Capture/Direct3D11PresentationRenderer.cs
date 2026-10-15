@@ -75,6 +75,11 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
                     await _softwareBitmapSource.SetBitmapAsync(sharedBitmap.Bitmap);
                 }
             }
+            catch (OperationCanceledException)
+            {
+                // Expected during source switching or presentation stop
+                Debug.WriteLine("[Direct3D11PresentationRenderer] Render task canceled during normal lifecycle switch.");
+            }
             catch (Exception ex)
             {
                 // Transient render errors during window resize or shutdown safely observed
@@ -141,6 +146,11 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
                     }
                 }
                 tcs.TrySetResult();
+            }
+            catch (OperationCanceledException)
+            {
+                Debug.WriteLine("[Direct3D11PresentationRenderer] Fallback render task canceled during normal lifecycle switch.");
+                tcs.TrySetCanceled();
             }
             catch (Exception ex)
             {
@@ -254,21 +264,7 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
     {
         _isFrozen = false;
         Interlocked.Increment(ref _currentGeneration);
-        _dispatcherQueue.TryEnqueue(async () =>
-        {
-            try
-            {
-                if (!_isDisposed)
-                {
-                    using var emptyBitmap = new SoftwareBitmap(BitmapPixelFormat.Bgra8, 1, 1, BitmapAlphaMode.Premultiplied);
-                    await _softwareBitmapSource.SetBitmapAsync(emptyBitmap);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[Direct3D11PresentationRenderer] Clear exception: {ex.Message}");
-            }
-        });
+        Interlocked.Exchange(ref _isProcessingFrame, 0);
     }
 
     public void Dispose()

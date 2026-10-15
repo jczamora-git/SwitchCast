@@ -7,15 +7,29 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Dock Modal & UI Consistency Hotfix Complete
-- **Overall Status**: **Implemented & Validated (366 Automated Unit & Contract Tests Passing, Debug & Release Builds Clean [0 warnings, 0 errors], Native Hardware Verification Pending)**
-- **Last Updated**: 2026-10-15T23:30:00+08:00 (UTC+8)
+- **Current Phase**: P0 Native Crash Recovery (AccessViolationException After Stop Presenting Fixed)
+- **Overall Status**: **Implemented & Validated (372 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
+- **Last Updated**: 2026-10-16T00:10:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **P0 Native Crash Recovery — AccessViolationException After Stop Presenting Fixed**:
+  - **Confirmed Root Cause**:
+    1. **Asynchronous `SetBitmapAsync` Racing Window Destruction**: In `PresentationCoordinator.StopPresentationAsync`, `_outputRenderer.Clear()` was enqueuing an asynchronous delegate to the WinUI UI thread that created a 1x1 `SoftwareBitmap` and called `await _softwareBitmapSource.SetBitmapAsync(emptyBitmap)`. Meanwhile, `_presentationWindowService.ClosePresentationWindow()` invoked `target.Close()`, destroying the `PresentationWindow`'s native HWND and XAML visual tree. `SoftwareBitmapSource` is a singleton COM object whose underlying WinUI DComp visual connection held references into the destroyed `Image` element. When `SetBitmapAsync` completed its composition update on freed visual memory, `Microsoft.WinUI.dll` crashed with `AccessViolationException` (`0xC0000005: Attempted to read or write protected memory`).
+    2. **Missing Native Control Teardown**: `PresentationWindow.xaml.cs` never set `PresentationOutputImage.Source = null`, `PresentationDirectImage.Source = null`, or `PresentationVideoPlayer.SetMediaPlayer(null)` prior to `Close()`. Native DirectX composition and MediaPlayer references remained bound into destroyed XAML controls.
+    3. **PresentationViewModel Leak & Dangling Subscriptions**: `PresentationViewModel` was never disposed on window close, leaking singleton subscriptions to `_presentationStateService` and `_presentationCoordinator`.
+    4. **Inverted Stop Cleanup Sequence**: `_outputRenderer.Clear()` was invoked before `_captureCoordinator.StopPreviewAsync()` and `_cameraCaptureService.StopCaptureAsync()`, allowing lingering capture frames to queue into the renderer during teardown.
+    5. **Non-Idempotent Stop Invocations**: Simultaneous stop calls from Dashboard, Presenter Dock, hotkeys, or window close would execute duplicate destructive cleanup passes.
+  - **Remediation**:
+    - **Reordered Stop Lifecycle**: In `PresentationCoordinator.ExecuteStopPresentationAsync`, stopped Camera frame acquisition first -> stopped WGC capture second -> stopped PowerPoint slideshow/slides third -> stopped Media Video & cleared Image fourth -> cleared output renderer generations fifth -> transitioned status to `Idle` sixth -> closed and cleaned up `PresentationWindow` seventh -> activated MainWindow and navigated to Dashboard eighth.
+    - **Stop Idempotency**: Implemented `_activeStopTask` deduplication guarded by `_stopLock`. Concurrent Stop calls await the single in-flight Stop task without executing duplicate cleanup.
+    - **PresentationWindow Explicit Teardown**: Added `Cleanup()` to `PresentationWindow.xaml.cs` (called idempotently on `ClosePresentationWindow` and `Closed`). Detaches `PresentationOutputImage.Source = null`, `PresentationDirectImage.Source = null`, `PresentationVideoPlayer.SetMediaPlayer(null)`, unsubscribes `ViewModel.PropertyChanged` and `ThemeChanged`, calls `Bindings.StopTracking()`, and disposes `ViewModel`.
+    - **Safe Atomic Generation Clear**: Updated `Direct3D11PresentationRenderer.Clear()` to atomically increment `_currentGeneration` and reset `_isProcessingFrame = 0` without queuing dangerous, unnecessary 1x1 `SetBitmapAsync` calls into tearing-down XAML trees.
+    - **Expected Cancellation Handling**: Explicitly caught `OperationCanceledException` (including `TaskCanceledException`) in `Direct3D11PresentationRenderer` and `Direct3D11PreviewRenderer`, classifying them as expected source-switching cancellations rather than logging false render error incidents.
+    - **Eliminated Duplicate Dashboard Activation**: Fixed Presenter Dock close to only invoke secondary `ShowDashboard()` when closing while idle; when closing while presenting, `StopPresentationAsync` acts as the single authoritative dashboard activator.
 - [x] **Dock Modal & UI Consistency Hotfix (Centered Confirmation Dialog, Responsive Layout, and Official Website Link)**:
   - **Decoupled Centered Presenter Dock Close Modal**:
     - **Confirmed Root Cause**: `ShowCloseConfirmationDialogAsync` previously showed a `ContentDialog` inside `PresenterDockWindow`'s visual tree, attempting to resize the dock window via a 210 DIP height hack. Because `PresenterDockWindow` is an always-on-top, borderless floating window with non-client drag regions configured via `InputNonClientPointerSource`, clicks were intercepted as window drags or swallowed, causing focus freezes, visual clipping, and occasional deadlocks.

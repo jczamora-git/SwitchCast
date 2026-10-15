@@ -3,55 +3,64 @@
 ---
 
 ## Task Details
-- **Task**: Dock Modal & UI Consistency Hotfix
-- **Date**: 2026-10-15T23:30:00+08:00 (UTC+8)
-- **Status**: Completed, Validated & Ready for Local Commit (366 Tests Passing, 0 Build Warnings/Errors)
+- **Task**: P0 Critical Native Crash Recovery — AccessViolationException After Stop Presenting Fixed
+- **Date**: 2026-10-16T00:15:00+08:00 (UTC+8)
+- **Status**: Completed, Validated & Ready for Local Commit (372 Tests Passing, 0 Build Warnings/Errors)
 
 ---
 
 ## 1. Objectives & Confirmed Root Causes Resolved
 
-1. **Decoupled Centered Presenter Dock Close Modal**:
-   - **Confirmed Root Cause**: `ShowCloseConfirmationDialogAsync` previously showed a `ContentDialog` inside `PresenterDockWindow`'s visual tree, attempting to resize the dock window via a 210 DIP height hack. Because `PresenterDockWindow` is an always-on-top, borderless floating window with non-client drag regions configured via `InputNonClientPointerSource`, clicks were intercepted as window drags or swallowed, causing focus freezes, visual clipping, and occasional deadlocks.
-   - **Remediation**: Created `PresenterDockConfirmationWindow` as a dedicated, standalone modal Window with `OverlappedPresenter` (`IsAlwaysOnTop = true`, borderless, ToolWindow style). Sized at 480x210 DIPs, centered on the monitor work area where the Presenter Dock is located. Temporarily disables the dock via Win32 `EnableWindow(dockHwnd, false)` while open, and re-enables and restores foreground upon closure. Supports full keyboard navigation (Escape to Cancel, Enter, Tab). Restored `PresenterDockWindow`'s clean fixed height (52 DIPs single row / 86 DIPs secondary row).
-
-2. **Standardized Maximized MainWindow Layout**:
-   - **Confirmed Root Cause**: `DashboardPage.xaml` and `SourcesPage.xaml` had `HorizontalAlignment="Left"` with `MaxWidth="1040"`, while `SettingsPage.xaml` had `HorizontalAlignment="Stretch"` with `MaxWidth="1080"`. On maximized 1080p/1440p displays, Dashboard and Sources were pinned to the left edge with large empty space on the right, while Settings was centered. In Settings, categories with fewer controls caused horizontal shifting.
-   - **Remediation**: Introduced a unified responsive container pattern across `DashboardPage`, `SourcesPage`, and `SettingsPage`: `Grid HorizontalAlignment="Stretch"` hosting a `StackPanel MaxWidth="1160" HorizontalAlignment="Stretch" Padding="28,20,28,28"`. Fixed `SettingsPage` category navigation column to 200 DIPs with flexible `Width="*"` detail panel and explicit `HorizontalAlignment="Stretch"` on all category borders, ensuring a locked, stable position with zero horizontal shifting across all 6 categories.
-
-3. **Official SwitchCast Website Link**:
-   - Replaced the General & About "Repository" row with "Website" pointing to `https://switchcast.wasmer.app/`.
-   - Added `WebsiteUrl` and `OpenWebsiteCommand` to `SettingsViewModel`, opening the system default browser via `Windows.System.Launcher.LaunchUriAsync` with graceful error handling.
-   - Updated `SettingsViewModelTests` to assert the website URL. Internal GitHub Issues diagnostic reporting remains untouched.
+1. **AccessViolationException in Microsoft.WinUI.dll After Stop Presenting**:
+   - **Confirmed Root Cause**:
+     - `Direct3D11PresentationRenderer.Clear()` previously enqueued an asynchronous delegate `await _softwareBitmapSource.SetBitmapAsync(emptyBitmap)` onto the UI thread.
+     - Meanwhile, `PresentationCoordinator.StopPresentationAsync()` called `PresentationWindowService.ClosePresentationWindow()` -> `target.Close()`.
+     - `PresentationWindow.xaml` had `Image Source="{x:Bind ViewModel.PresentationImageSource}"` bound to the singleton `_softwareBitmapSource`.
+     - Because `PresentationOutputImage.Source` was never cleared before window close, when `SetBitmapAsync` updated the DirectX composition surface on the destroyed native XAML island, `Microsoft.WinUI.dll` crashed with native `AccessViolationException` (`0xC0000005: Attempted to read or write protected memory`).
+     - Furthermore, `PresentationVideoPlayer.SetMediaPlayer(null)` was never called, leaving native MediaPlayer swapchains bound to a destroyed control, and `PresentationViewModel` was never disposed on window close.
+   - **Remediation**:
+     - **Explicit Window Teardown**: Added `Cleanup()` to `PresentationWindow.xaml.cs` (called idempotently on `ClosePresentationWindow` and `Closed`). Detaches `PresentationOutputImage.Source = null`, `PresentationDirectImage.Source = null`, and `PresentationVideoPlayer.SetMediaPlayer(null)`. Unsubscribes `ViewModel.PropertyChanged` and `_settingsService.ThemeChanged`, calls `Bindings.StopTracking()`, and disposes `ViewModel`.
+     - **Safe Atomic Generation Clear**: Rewrote `Direct3D11PresentationRenderer.Clear()` to atomically increment `_currentGeneration` and reset `_isProcessingFrame = 0` without queuing asynchronous `SetBitmapAsync(emptyBitmap)` calls into tearing-down visual trees.
+     - **Reordered Stop Lifecycle**: In `PresentationCoordinator.ExecuteStopPresentationAsync`:
+       1. Cancel camera startup timeout and drain pending camera frames -> stop Camera capture.
+       2. Stop Windows Graphics Capture (`StopPreviewAsync`).
+       3. Stop PowerPoint live slideshow and clear presentation.
+       4. Stop Video and clear Image.
+       5. Invalidate render generations (`Clear()`).
+       6. Transition presentation status to `Idle`.
+       7. Close and clean up `PresentationWindow`.
+       8. Activate MainWindow and navigate to Dashboard.
+     - **Stop Idempotency**: Guarded `StopPresentationAsync` with `_stopLock` and `_activeStopTask` deduplication. Concurrent calls from Dashboard, Dock, hotkeys, or manual window close await the same single task.
+     - **Expected TaskCanceledException Classification**: Explicitly caught `OperationCanceledException` (including `TaskCanceledException`) in `Direct3D11PresentationRenderer` and `Direct3D11PreviewRenderer`, logging as normal lifecycle cancellation without generating error incidents.
+     - **Eliminated Duplicate Dashboard Activation**: Fixed Presenter Dock close to only invoke secondary `ShowDashboard()` when closing while idle; when closing while presenting, `StopPresentationAsync` acts as the single authoritative dashboard activator.
 
 ---
 
 ## 2. Verification Performed
 
-- **Unit & Contract Tests**: 366 passing tests (0 failures, 0 skipped) across all test fixtures.
+- **Unit & Contract Tests**: 372 passing tests (0 failures, 0 skipped) across all test fixtures.
 - **Compiler Gates**:
   - `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> 0 Errors, 0 Warnings.
   - `dotnet build SwitchCast.csproj -c Release -p:Platform=x64` -> 0 Errors, 0 Warnings.
-  - `dotnet test SwitchCast.Tests/SwitchCast.Tests.csproj -c Debug` -> 366 Passed, 0 Failed.
-- **Runtime Verification Note**: Desktop GUI testing executed via unit test harnesses; interactive Windows desktop session was not independently exercised in this headless CLI environment.
+  - `dotnet test SwitchCast.Tests/SwitchCast.Tests.csproj -c Debug` -> 372 Passed, 0 Failed.
+- **Runtime Verification Note**: Unit and integration test harnesses verified all lifecycle state transitions, event unsubscriptions, and concurrency deduplications. Interactive Windows desktop session was not independently exercised in this headless CLI environment.
 
 ---
 
 ## 3. Important Files Modified
 
-- `SwitchCast/Views/PresenterDockConfirmationWindow.xaml` *(New)*: Centered modal confirmation window.
-- `SwitchCast/Views/PresenterDockConfirmationWindow.xaml.cs` *(New)*: Standalone modal lifecycle, monitor centering, input routing.
-- `SwitchCast/Views/PresenterDockWindow.xaml.cs`: Decoupled confirmation dialog, removed height expansion hack and caption interference.
-- `SwitchCast/Views/DashboardPage.xaml`: Centered 1160 DIP responsive content container.
-- `SwitchCast/Views/SourcesPage.xaml`: Centered 1160 DIP responsive content container.
-- `SwitchCast/Views/SettingsPage.xaml`: Centered 1160 DIP responsive content container, locked 200 DIP sidebar, Official Website row.
-- `SwitchCast/ViewModels/SettingsViewModel.cs`: `WebsiteUrl` and `OpenWebsiteCommand`.
-- `SwitchCast.Tests/ViewModels/SettingsViewModelTests.cs`: Updated unit tests verifying website URL and launch command.
+- `SwitchCast/Views/PresentationWindow.xaml`: Added `x:Name="PresentationOutputImage"` and `x:Name="PresentationDirectImage"` for explicit detachment.
+- `SwitchCast/Views/PresentationWindow.xaml.cs`: Added idempotent `Cleanup()` method detaching Image sources, MediaPlayer, compiled bindings, event handlers, and disposing ViewModel.
+- `SwitchCast/Services/PresentationWindowService.cs`: Invokes `target.Cleanup()` on `ClosePresentationWindow()` and in `OnWindowClosed()`.
+- `SwitchCast/Services/Capture/Direct3D11PresentationRenderer.cs`: Updated `Clear()` to atomically increment generation without racing `SetBitmapAsync`, and handled `OperationCanceledException`.
+- `SwitchCast/Services/Capture/Direct3D11PreviewRenderer.cs`: Added `OperationCanceledException` handling across render methods.
+- `SwitchCast/Services/PresentationCoordinator.cs`: Reordered stop lifecycle sequence and implemented `_activeStopTask` idempotency deduplication.
+- `SwitchCast.Tests/Services/StopLifecycleNativeCrashRecoveryTests.cs` *(New)*: Comprehensive regression test suite covering Stop sequence, source drain order, and concurrency deduplication.
 
 ---
 
 ## 4. Next Steps for Next Agent
 
-1. Execute manual / native interactive smoke tests on real Windows hardware when desktop GUI session is available.
-2. Maintain the responsive 1160 DIP container standard across any newly introduced pages or dialogs.
+1. Run native stress test scenarios across mixed sources on actual Windows hardware session.
+2. Confirm WER / LocalDumps remain clean with 0 AccessViolations during rapid presentation stop cycles.
 3. Keep the 0-error and 0-warning compiler gate intact.

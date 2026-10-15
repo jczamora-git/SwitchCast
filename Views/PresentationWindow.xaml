@@ -92,7 +92,8 @@
                   Background="#000000"
                   HorizontalAlignment="Stretch"
                   VerticalAlignment="Stretch">
-                <Image Source="{x:Bind ViewModel.PresentationImageSource, Mode=OneWay}"
+                <Image x:Name="PresentationOutputImage"
+                       Source="{x:Bind ViewModel.PresentationImageSource, Mode=OneWay}"
                        Stretch="Uniform"
                        HorizontalAlignment="Center"
                        VerticalAlignment="Center" />
@@ -103,7 +104,8 @@
                   Background="#000000"
                   HorizontalAlignment="Stretch"
                   VerticalAlignment="Stretch">
-                <Image Source="{x:Bind ViewModel.DirectImageSource, Mode=OneWay}"
+                <Image x:Name="PresentationDirectImage"
+                       Source="{x:Bind ViewModel.DirectImageSource, Mode=OneWay}"
                        Stretch="Uniform"
                        HorizontalAlignment="Center"
                        VerticalAlignment="Center" />
