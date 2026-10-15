@@ -3,50 +3,32 @@
 ---
 
 ## Task Details
-- **Task**: Full Stability & Regression Recovery Pass
-- **Date**: 2026-10-15T20:30:00+08:00 (UTC+8)
+- **Task**: Dock Modal & UI Consistency Hotfix
+- **Date**: 2026-10-15T23:30:00+08:00 (UTC+8)
 - **Status**: Completed, Validated & Ready for Local Commit (366 Tests Passing, 0 Build Warnings/Errors)
 
 ---
 
 ## 1. Objectives & Confirmed Root Causes Resolved
 
-1. **Stop Presenting & Dock X Confirmation Lifecycle Contract (Actions A - D)**:
-   - **Action A (Stop Presenting)**: Fully stops active capture, video, camera, and slideshows; clears and closes the Presentation Output window; restores and activates `MainWindow`; navigates to the Control Dashboard; preserves process and queue data.
-   - **Action B (Dock X Confirmation)**:
-     - *Active Presentation*: When the presenter clicks X on the Floating Dock while a presentation is running (or paused/blackout), a custom confirmation dialog is presented:
-       - Title: "Stop presentation and close Dock?"
-       - Message: "A presentation is currently running. Closing the Presenter Dock will also stop the presentation and close Presentation Output."
-       - Actions: "Cancel" (keeps Dock and presentation running) and "Stop & Close" (stops presentation via `StopPresentationAsync`, closes output window, closes dock, activates Dashboard).
-       - Window size dynamically expands to 210 DIPs during confirmation to prevent dialog clipping caused by `WM_GETMINMAXINFO` native window constraints.
-     - *Idle*: When no presentation is active, clicking X immediately closes the Dock without confirmation and activates the Control Dashboard.
-   - **Action C (Application Shutdown)**: MainWindow exit confirmation coordinates clean termination; secondary dock confirmation is bypassed, Dashboard is never reactivated, and all resources are properly disposed.
-   - **Action D (Show/Hide Hotkey)**: Hotkey dock toggle remains strictly non-destructive; it never triggers presentation stop or close confirmation.
+1. **Decoupled Centered Presenter Dock Close Modal**:
+   - **Confirmed Root Cause**: `ShowCloseConfirmationDialogAsync` previously showed a `ContentDialog` inside `PresenterDockWindow`'s visual tree, attempting to resize the dock window via a 210 DIP height hack. Because `PresenterDockWindow` is an always-on-top, borderless floating window with non-client drag regions configured via `InputNonClientPointerSource`, clicks were intercepted as window drags or swallowed, causing focus freezes, visual clipping, and occasional deadlocks.
+   - **Remediation**: Created `PresenterDockConfirmationWindow` as a dedicated, standalone modal Window with `OverlappedPresenter` (`IsAlwaysOnTop = true`, borderless, ToolWindow style). Sized at 480x210 DIPs, centered on the monitor work area where the Presenter Dock is located. Temporarily disables the dock via Win32 `EnableWindow(dockHwnd, false)` while open, and re-enables and restores foreground upon closure. Supports full keyboard navigation (Escape to Cancel, Enter, Tab). Restored `PresenterDockWindow`'s clean fixed height (52 DIPs single row / 86 DIPs secondary row).
 
-2. **Crash & Hang Diagnostics with Synchronous Critical Flush & UI Hang Watchdog**:
-   - **Synchronous Critical Flush**: Added `FlushCriticalIncident` to `IErrorReportingService` and `ErrorReportingService` (and `LogCritical` to `SwitchCastDiagnostics`). When `AppDomain.UnhandledException` fires with `e.IsTerminating == true`, incident files are written synchronously directly to disk, preventing process termination before background thread-pool tasks execute.
-   - **Proactive UI Hang Watchdog**: Added `UIHangWatchdog` monitoring WinUI `DispatcherQueue` message loop responsiveness on an independent thread-pool timer. Emits warning diagnostics at 5s unresponsive and critical deadlock incident reports at 15s.
-   - **Startup Crash Banner**: Added `GetPreviousCrashReports()` in `IErrorReportingService` and checked upon Dashboard initialization. An InfoBar appears if an unacknowledged crash incident exists, allowing the user to inspect it in `ErrorReportDialog` or dismiss it.
+2. **Standardized Maximized MainWindow Layout**:
+   - **Confirmed Root Cause**: `DashboardPage.xaml` and `SourcesPage.xaml` had `HorizontalAlignment="Left"` with `MaxWidth="1040"`, while `SettingsPage.xaml` had `HorizontalAlignment="Stretch"` with `MaxWidth="1080"`. On maximized 1080p/1440p displays, Dashboard and Sources were pinned to the left edge with large empty space on the right, while Settings was centered. In Settings, categories with fewer controls caused horizontal shifting.
+   - **Remediation**: Introduced a unified responsive container pattern across `DashboardPage`, `SourcesPage`, and `SettingsPage`: `Grid HorizontalAlignment="Stretch"` hosting a `StackPanel MaxWidth="1160" HorizontalAlignment="Stretch" Padding="28,20,28,28"`. Fixed `SettingsPage` category navigation column to 200 DIPs with flexible `Width="*"` detail panel and explicit `HorizontalAlignment="Stretch"` on all category borders, ensuring a locked, stable position with zero horizontal shifting across all 6 categories.
 
-3. **Camera Frame Task Observation & Bounded Latest-Frame-Wins Loop**:
-   - Replaced unobserved `_ = _outputRenderer.RenderBitmapAsync(bitmap)` in `PresentationCoordinator.OnCameraFrameArrived`.
-   - Implemented a bounded asynchronous rendering loop: if a frame is currently rendering, subsequent frames update `_pendingCameraFrame` while discarding and disposing older unrendered frames.
-   - Dispatches `_cameraCaptureService.NotifyFrameCompleted()` on both success and discard paths, maintaining proper backpressure.
-   - Transition to `PresentationStatus.Active` occurs only after the first camera frame is rendered successfully.
-
-4. **PowerPoint Repeated-Switch Reliability & Slide Index Preservation**:
-   - Added `UpdateSelectedSource(CaptureSource source)` in `IPresentationStateService` / `PresentationStateService`.
-   - `PresentationCoordinator` synchronizes slide position changes to `SelectedSources` so returning to PowerPoint after switching to Video and Camera restores the exact slide index.
-   - Eliminated race condition between lingering camera frames and PowerPoint source switches by discarding pending camera frames before beginning source transitions.
-
-5. **Video Playback Performance & Stutter Prevention**:
-   - Throttled high-frequency `MediaPlaybackSession.PositionChanged` events in `MediaPresentationService` to at most once per 250ms, eliminating UI message loop starvation caused by 60fps position callbacks.
+3. **Official SwitchCast Website Link**:
+   - Replaced the General & About "Repository" row with "Website" pointing to `https://switchcast.wasmer.app/`.
+   - Added `WebsiteUrl` and `OpenWebsiteCommand` to `SettingsViewModel`, opening the system default browser via `Windows.System.Launcher.LaunchUriAsync` with graceful error handling.
+   - Updated `SettingsViewModelTests` to assert the website URL. Internal GitHub Issues diagnostic reporting remains untouched.
 
 ---
 
 ## 2. Verification Performed
 
-- **Unit & Contract Tests**: 366 passing tests (0 failures, 0 skipped) across all test fixtures, including new executable regression contracts in `FullStabilityRegressionContractTests.cs`.
+- **Unit & Contract Tests**: 366 passing tests (0 failures, 0 skipped) across all test fixtures.
 - **Compiler Gates**:
   - `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> 0 Errors, 0 Warnings.
   - `dotnet build SwitchCast.csproj -c Release -p:Platform=x64` -> 0 Errors, 0 Warnings.
@@ -57,26 +39,19 @@
 
 ## 3. Important Files Modified
 
-- `SwitchCast/ViewModels/PresenterDockViewModel.cs`: Lifecycle close confirmation logic, `ConfirmCloseAsync` delegate, `CloseDockAsync()`.
-- `SwitchCast/Views/PresenterDockWindow.xaml.cs`: Native dialog sizing, inline confirmation dialog handling, `AppWindow.Closing` interception.
-- `SwitchCast/Services/Diagnostics/IErrorReportingService.cs` & `ErrorReportingService.cs`: `FlushCriticalIncident`, `GetPreviousCrashReports`, critical synchronous persistence.
-- `SwitchCast/Services/Diagnostics/SwitchCastDiagnostics.cs`: `LogCritical` method with immediate synchronous write.
-- `SwitchCast/Services/Diagnostics/UIHangWatchdog.cs`: Independent background watchdog monitoring UI dispatcher queue heartbeats.
-- `SwitchCast/ViewModels/DashboardViewModel.cs`: Startup previous-crash detection and banner management.
-- `SwitchCast/Views/DashboardPage.xaml` & `DashboardPage.xaml.cs`: Crash notification InfoBar and error dialog invocation.
-- `SwitchCast/Services/Capture/Direct3D11PresentationRenderer.cs`: Asynchronous `RenderBitmapAsync` task completion tracking.
-- `SwitchCast/Services/IPresentationStateService.cs` & `PresentationStateService.cs`: `UpdateSelectedSource` for queue synchronization.
-- `SwitchCast/Services/PresentationCoordinator.cs`: Bounded camera frame delivery loop, PowerPoint slide state retention, switch race prevention.
-- `SwitchCast/Services/Media/MediaPresentationService.cs`: 250ms throttling on `PositionChanged` events.
-- `SwitchCast/App.xaml.cs`: Synchronous critical crash flush on terminating unhandled exceptions, `UIHangWatchdog` instantiation.
-- `SwitchCast.Tests/Services/FullStabilityRegressionContractTests.cs`: Executable behavior contracts covering Scenarios A-E.
-- `SwitchCast.Tests/Services/ErrorReportingServiceTests.cs`: Verification of critical flush and crash report retrieval.
-- `SwitchCast.Tests/ViewModels/PresenterDockViewModelTests.cs`: Unit test coverage for Dock X confirmation vs idle close.
+- `SwitchCast/Views/PresenterDockConfirmationWindow.xaml` *(New)*: Centered modal confirmation window.
+- `SwitchCast/Views/PresenterDockConfirmationWindow.xaml.cs` *(New)*: Standalone modal lifecycle, monitor centering, input routing.
+- `SwitchCast/Views/PresenterDockWindow.xaml.cs`: Decoupled confirmation dialog, removed height expansion hack and caption interference.
+- `SwitchCast/Views/DashboardPage.xaml`: Centered 1160 DIP responsive content container.
+- `SwitchCast/Views/SourcesPage.xaml`: Centered 1160 DIP responsive content container.
+- `SwitchCast/Views/SettingsPage.xaml`: Centered 1160 DIP responsive content container, locked 200 DIP sidebar, Official Website row.
+- `SwitchCast/ViewModels/SettingsViewModel.cs`: `WebsiteUrl` and `OpenWebsiteCommand`.
+- `SwitchCast.Tests/ViewModels/SettingsViewModelTests.cs`: Updated unit tests verifying website URL and launch command.
 
 ---
 
 ## 4. Next Steps for Next Agent
 
-1. Execute manual / native interactive smoke tests on real Windows hardware with webcam, PowerPoint, and MP4 files when desktop GUI session is available.
-2. Maintain the regression behavior contracts in `FullStabilityRegressionContractTests.cs` for any subsequent PRs.
+1. Execute manual / native interactive smoke tests on real Windows hardware when desktop GUI session is available.
+2. Maintain the responsive 1160 DIP container standard across any newly introduced pages or dialogs.
 3. Keep the 0-error and 0-warning compiler gate intact.

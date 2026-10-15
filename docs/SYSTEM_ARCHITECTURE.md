@@ -200,8 +200,9 @@ Triggered from Dashboard, Floating Presenter Dock, or global hotkey:
     - Title: "Stop presentation and close Dock?"
     - Message: "A presentation is currently running. Closing the Presenter Dock will also stop the presentation and close Presentation Output."
     - Options: `Cancel` and `Stop & Close`.
-  - Window bounds dynamically expand to 210 DIPs to ensure dialog visibility within Win32 subclass constraints (`WM_GETMINMAXINFO`).
-  - `Cancel`: Keeps Floating Dock open, keeps presentation live, and leaves output unaffected.
+  - Hosted in a dedicated modal window (`PresenterDockConfirmationWindow`) centered on the active presentation control monitor, completely decoupled from the Floating Dock's compact surface to prevent caption drag interference, clipping, and z-order conflicts.
+  - Temporarily disables owner dock input via Win32 `EnableWindow(dockHwnd, false)` to prevent duplicate actions.
+  - `Cancel` (or Escape key): Dismisses dialog, re-enables dock, keeps Floating Dock open, keeps presentation live, and leaves output unaffected.
   - `Stop & Close`: Calls authoritative `StopPresentationAsync`, closes Presentation Output, closes Floating Dock, and activates Control Dashboard. Does not terminate application.
 - **No Active Presentation (Idle)**:
   - Closes Floating Dock immediately with zero confirmation prompt.

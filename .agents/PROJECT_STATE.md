@@ -7,15 +7,26 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Full Stability & Regression Recovery Pass Complete
+- **Current Phase**: Dock Modal & UI Consistency Hotfix Complete
 - **Overall Status**: **Implemented & Validated (366 Automated Unit & Contract Tests Passing, Debug & Release Builds Clean [0 warnings, 0 errors], Native Hardware Verification Pending)**
-- **Last Updated**: 2026-10-15T20:30:00+08:00 (UTC+8)
+- **Last Updated**: 2026-10-15T23:30:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Dock Modal & UI Consistency Hotfix (Centered Confirmation Dialog, Responsive Layout, and Official Website Link)**:
+  - **Decoupled Centered Presenter Dock Close Modal**:
+    - **Confirmed Root Cause**: `ShowCloseConfirmationDialogAsync` previously showed a `ContentDialog` inside `PresenterDockWindow`'s visual tree, attempting to resize the dock window via a 210 DIP height hack. Because `PresenterDockWindow` is an always-on-top, borderless floating window with non-client drag regions configured via `InputNonClientPointerSource`, clicks were intercepted as window drags or swallowed, causing focus freezes, visual clipping, and occasional deadlocks.
+    - **Remediation**: Created `PresenterDockConfirmationWindow` as a dedicated, standalone modal Window with `OverlappedPresenter` (`IsAlwaysOnTop = true`, borderless, ToolWindow style). Sized at 480x210 DIPs, centered on the monitor work area where the Presenter Dock is located. Temporarily disables the dock via Win32 `EnableWindow(dockHwnd, false)` while open, and re-enables and restores foreground upon closure. Supports full keyboard navigation (Escape to Cancel, Enter, Tab). Restored `PresenterDockWindow`'s clean fixed height (52 DIPs single row / 86 DIPs secondary row).
+  - **Standardized Maximized MainWindow Layout**:
+    - **Confirmed Root Cause**: `DashboardPage.xaml` and `SourcesPage.xaml` had `HorizontalAlignment="Left"` with `MaxWidth="1040"`, while `SettingsPage.xaml` had `HorizontalAlignment="Stretch"` with `MaxWidth="1080"`. On maximized 1080p/1440p displays, Dashboard and Sources were pinned to the left edge with large empty space on the right, while Settings was centered. In Settings, categories with fewer controls caused horizontal shifting.
+    - **Remediation**: Introduced a unified responsive container pattern across `DashboardPage`, `SourcesPage`, and `SettingsPage`: `Grid HorizontalAlignment="Stretch"` hosting a `StackPanel MaxWidth="1160" HorizontalAlignment="Stretch" Padding="28,20,28,28"`. Fixed `SettingsPage` category navigation column to 200 DIPs with flexible `Width="*"` detail panel and explicit `HorizontalAlignment="Stretch"` on all category borders, ensuring a locked, stable position with zero horizontal shifting across all 6 categories.
+  - **Official SwitchCast Website Link**:
+    - Replaced the General & About "Repository" row with "Website" pointing to `https://switchcast.wasmer.app/`.
+    - Added `WebsiteUrl` and `OpenWebsiteCommand` to `SettingsViewModel`, opening the system default browser via `Windows.System.Launcher.LaunchUriAsync` with graceful error handling.
+    - Updated `SettingsViewModelTests` to assert the website URL. Internal GitHub Issues diagnostic reporting remains untouched.
 - [x] **Full Stability & Regression Recovery Pass (Stop/Dock Lifecycle Contract, Diagnostic Crash/Hang Watchdog, Camera Frame Task Observation, PowerPoint Slide Preservation, Video Stutter Fix)**:
   - **Authoritative Lifecycle Contract (Actions A - D)**:
     - **Action A (Stop Presenting)**: Fully terminates active capture/media/slideshow/camera, clears and closes Presentation Output window, restores and activates MainWindow, navigates to Control Dashboard, preserves the application process, and leaves source library and queue data intact without creating duplicate windows.

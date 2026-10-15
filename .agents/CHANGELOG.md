@@ -7,6 +7,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Dock Modal & UI Consistency Hotfix] - 2026-10-15
+
+### Fixed (fix / presenter-dock / modal-hosting / win32 / windowing / layout / responsive)
+- **Decoupled Centered Presenter Dock Close Modal**:
+  - Replaced inline `ContentDialog` inside `PresenterDockWindow` with a dedicated standalone `PresenterDockConfirmationWindow` (`OverlappedPresenter`, `IsAlwaysOnTop = true`, borderless, ToolWindow style).
+  - Centered dialog dynamically on the monitor work area where the Presenter Dock is located.
+  - Eliminated the dock height expansion hack, non-client caption click interference, and focus deadlocks.
+  - Added modal owner window disablement (`EnableWindow`), Escape key cancellation, and proper keyboard navigation (focus on Cancel).
+- **Standardized Maximized MainWindow Layout**:
+  - Unified `DashboardPage`, `SourcesPage`, and `SettingsPage` with a consistent centered 1160 DIP responsive container (`Grid HorizontalAlignment="Stretch"` hosting `StackPanel MaxWidth="1160" HorizontalAlignment="Stretch" Padding="28,20,28,28"`).
+  - Fixed `SettingsPage` category navigation column to 200 DIPs with full flexible detail panel stretching across all categories.
+  - Locked card alignment and eliminated horizontal shifting between Settings categories.
+- **Official SwitchCast Website Link**:
+  - Replaced the General & About repository row with the official website link (`https://switchcast.wasmer.app/`).
+  - Added `WebsiteUrl` and `OpenWebsiteCommand` to `SettingsViewModel` with launcher exception resilience.
+  - Updated `SettingsViewModelTests` to assert the official website URL.
+
+---
+
 ## [Full Stability & Regression Recovery Pass] - 2026-10-15
 
 ### Fixed (fix / lifecycle / presenter-dock / crash-watchdog / camera-queue / powerpoint / video-stutter / test)
