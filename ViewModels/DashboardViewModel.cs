@@ -333,7 +333,7 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
 
         if (SelectedPreviewSource?.Id != newSource.Id)
         {
-            SelectedPreviewSource = newSource;
+            RunOnUIThread(() => SelectedPreviewSource = newSource);
             return;
         }
 
@@ -403,15 +403,18 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
         }
 
         // Align selected source with the authoritative target being started
-        _isSyncingPresentationSource = true;
-        try
+        RunOnUIThread(() =>
         {
-            SelectedPresentationSource = targetSource;
-        }
-        finally
-        {
-            _isSyncingPresentationSource = false;
-        }
+            _isSyncingPresentationSource = true;
+            try
+            {
+                SelectedPresentationSource = targetSource;
+            }
+            finally
+            {
+                _isSyncingPresentationSource = false;
+            }
+        });
 
         try
         {
@@ -550,8 +553,18 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
 
         if (SelectedPresentationSource?.Id != newSource.Id)
         {
-            SelectedPresentationSource = newSource;
-            return;
+            RunOnUIThread(() =>
+            {
+                _isSyncingPresentationSource = true;
+                try
+                {
+                    SelectedPresentationSource = newSource;
+                }
+                finally
+                {
+                    _isSyncingPresentationSource = false;
+                }
+            });
         }
 
         if (HasActivePresentation)
@@ -663,22 +676,22 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
         }
         else if (e.PropertyName == nameof(IPresentationStateService.ActiveSource))
         {
-            if (_presentationStateService.ActiveSource is not null &&
-                SelectedPresentationSource?.Id != _presentationStateService.ActiveSource.Id)
-            {
-                _isSyncingPresentationSource = true;
-                try
-                {
-                    SelectedPresentationSource = _presentationStateService.ActiveSource;
-                }
-                finally
-                {
-                    _isSyncingPresentationSource = false;
-                }
-            }
-
             RunOnUIThread(() =>
             {
+                if (_presentationStateService.ActiveSource is not null &&
+                    SelectedPresentationSource?.Id != _presentationStateService.ActiveSource.Id)
+                {
+                    _isSyncingPresentationSource = true;
+                    try
+                    {
+                        SelectedPresentationSource = _presentationStateService.ActiveSource;
+                    }
+                    finally
+                    {
+                        _isSyncingPresentationSource = false;
+                    }
+                }
+
                 OnPropertyChanged(nameof(ActiveSourceTitle));
                 OnPropertyChanged(nameof(HasActiveSource));
                 NotifyMediaPlaybackProperties();
@@ -687,47 +700,47 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
         else if (e.PropertyName == nameof(IPresentationStateService.SelectedSourceCount) ||
                  e.PropertyName == nameof(IPresentationStateService.SelectedSources))
         {
-            if (SelectedPreviewSource is null || !SelectedSources.Any(s => s.Id == SelectedPreviewSource.Id))
-            {
-                SelectedPreviewSource = SelectedSources.FirstOrDefault(s => s.IsAvailable);
-            }
-
-            if (!HasActivePresentation)
-            {
-                if (SelectedPresentationSource is null || !SelectedSources.Any(s => s.Id == SelectedPresentationSource.Id))
-                {
-                    _isSyncingPresentationSource = true;
-                    try
-                    {
-                        SelectedPresentationSource = SelectedSources.FirstOrDefault(s => s.IsAvailable);
-                    }
-                    finally
-                    {
-                        _isSyncingPresentationSource = false;
-                    }
-                }
-            }
-            else
-            {
-                // While presenting, keep SelectedPresentationSource aligned with CurrentPresentationSource
-                // so unqueueing the active source does NOT trigger an unintended live switch.
-                if (_presentationCoordinator.CurrentPresentationSource is not null &&
-                    SelectedPresentationSource?.Id != _presentationCoordinator.CurrentPresentationSource.Id)
-                {
-                    _isSyncingPresentationSource = true;
-                    try
-                    {
-                        SelectedPresentationSource = _presentationCoordinator.CurrentPresentationSource;
-                    }
-                    finally
-                    {
-                        _isSyncingPresentationSource = false;
-                    }
-                }
-            }
-
             RunOnUIThread(() =>
             {
+                if (SelectedPreviewSource is null || !SelectedSources.Any(s => s.Id == SelectedPreviewSource.Id))
+                {
+                    SelectedPreviewSource = SelectedSources.FirstOrDefault(s => s.IsAvailable);
+                }
+
+                if (!HasActivePresentation)
+                {
+                    if (SelectedPresentationSource is null || !SelectedSources.Any(s => s.Id == SelectedPresentationSource.Id))
+                    {
+                        _isSyncingPresentationSource = true;
+                        try
+                        {
+                            SelectedPresentationSource = SelectedSources.FirstOrDefault(s => s.IsAvailable);
+                        }
+                        finally
+                        {
+                            _isSyncingPresentationSource = false;
+                        }
+                    }
+                }
+                else
+                {
+                    // While presenting, keep SelectedPresentationSource aligned with CurrentPresentationSource
+                    // so unqueueing the active source does NOT trigger an unintended live switch.
+                    if (_presentationCoordinator.CurrentPresentationSource is not null &&
+                        SelectedPresentationSource?.Id != _presentationCoordinator.CurrentPresentationSource.Id)
+                    {
+                        _isSyncingPresentationSource = true;
+                        try
+                        {
+                            SelectedPresentationSource = _presentationCoordinator.CurrentPresentationSource;
+                        }
+                        finally
+                        {
+                            _isSyncingPresentationSource = false;
+                        }
+                    }
+                }
+
                 OnPropertyChanged(nameof(SelectedSourceCount));
                 OnPropertyChanged(nameof(HasSelectedSources));
                 OnPropertyChanged(nameof(HasNoSelectedSources));

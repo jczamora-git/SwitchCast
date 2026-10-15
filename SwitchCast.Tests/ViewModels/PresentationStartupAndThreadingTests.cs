@@ -435,4 +435,114 @@ public class PresentationStartupAndThreadingTests
             mediaService.Dispose();
         }
     }
+
+    [Fact]
+    public void Threading_ActiveSourceChanged_OnWorkerThread_EnqueuesSelectedPresentationSourceOnUIDispatcher()
+    {
+        var mockDispatcher = new Mock<IUIThreadDispatcher>();
+        Action? enqueuedAction = null;
+        mockDispatcher.SetupGet(d => d.HasThreadAccess).Returns(false);
+        mockDispatcher.Setup(d => d.TryEnqueue(It.IsAny<Action>()))
+            .Callback<Action>(act => enqueuedAction = act)
+            .Returns(true);
+
+        var pptSource = new PowerPointSource
+        {
+            Id = "ppt-demo",
+            Title = "Demo.pptx",
+            FilePath = @"C:\Presentations\Demo.pptx",
+            SlideCount = 5,
+            CurrentSlideIndex = 1,
+            IsAvailable = true
+        };
+
+        _mockStateService.SetupGet(s => s.ActiveSource).Returns(pptSource);
+        _mockStateService.SetupGet(s => s.SelectedSources).Returns(new List<CaptureSource> { pptSource });
+
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object,
+            uiDispatcher: mockDispatcher.Object);
+
+        // Raise ActiveSource property change from a simulated background worker thread
+        _mockStateService.Raise(s => s.PropertyChanged += null, new PropertyChangedEventArgs(nameof(IPresentationStateService.ActiveSource)));
+
+        // Must marshal via dispatcher
+        mockDispatcher.Verify(d => d.TryEnqueue(It.IsAny<Action>()), Times.AtLeastOnce);
+        Assert.NotNull(enqueuedAction);
+
+        // Execute the enqueued action as the UI thread would
+        enqueuedAction();
+
+        // SelectedPresentationSource must now safely equal pptSource
+        Assert.Equal(pptSource, vm.SelectedPresentationSource);
+    }
+
+    [Fact]
+    public async Task PowerPoint_Video_Camera_Switching_20Cycles_MaintainsReliableState()
+    {
+        var pptSource = new PowerPointSource
+        {
+            Id = "ppt-1",
+            Title = "Demo.pptx",
+            FilePath = @"C:\Presentations\Demo.pptx",
+            SlideCount = 10,
+            CurrentSlideIndex = 1,
+            IsAvailable = true
+        };
+
+        var videoSource = new VideoMediaSource
+        {
+            Id = "vid-1",
+            Title = "Video.mp4",
+            FilePath = @"C:\Media\Video.mp4",
+            IsAvailable = true
+        };
+
+        var cameraSource = new CameraSource
+        {
+            Id = "cam-1",
+            Title = "Integrated Webcam",
+            DeviceId = "cam-device-1",
+            IsAvailable = true
+        };
+
+        var queue = new List<CaptureSource> { pptSource, videoSource, cameraSource };
+        _mockStateService.SetupGet(s => s.SelectedSources).Returns(queue);
+        _mockStateService.SetupGet(s => s.SelectedSourceCount).Returns(queue.Count);
+
+        _mockPresentationCoordinator.SetupGet(p => p.IsLive).Returns(true);
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object);
+
+        // Execute 20 cycles of: PowerPoint -> Video -> Camera -> PowerPoint
+        for (int cycle = 1; cycle <= 20; cycle++)
+        {
+            // Switch to Video
+            _mockStateService.SetupGet(s => s.ActiveSource).Returns(videoSource);
+            await vm.SwitchPresentationSourceCommand.ExecuteAsync(videoSource);
+            _mockPresentationCoordinator.Verify(p => p.SwitchPresentationSourceAsync(videoSource), Times.Exactly(cycle));
+
+            // Switch to Camera
+            _mockStateService.SetupGet(s => s.ActiveSource).Returns(cameraSource);
+            await vm.SwitchPresentationSourceCommand.ExecuteAsync(cameraSource);
+            _mockPresentationCoordinator.Verify(p => p.SwitchPresentationSourceAsync(cameraSource), Times.Exactly(cycle));
+
+            // Switch back to PowerPoint
+            _mockStateService.SetupGet(s => s.ActiveSource).Returns(pptSource);
+            await vm.SwitchPresentationSourceCommand.ExecuteAsync(pptSource);
+            _mockPresentationCoordinator.Verify(p => p.SwitchPresentationSourceAsync(pptSource), Times.Exactly(cycle));
+
+            // Verify pptSource remains available and queued
+            Assert.True(pptSource.IsAvailable);
+            Assert.Contains(pptSource, queue);
+        }
+    }
 }
