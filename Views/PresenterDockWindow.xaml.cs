@@ -97,7 +97,7 @@ public sealed partial class PresenterDockWindow : Window
             SetWindowSubclass(WindowHandle, _subclassProc, new UIntPtr(1001), IntPtr.Zero);
             _appWindow.Changed += OnAppWindowChanged;
 
-            ApplyWindowSizingAndPosition(ViewModel.IsActiveSourceVideo, initialCenter: true);
+            ApplyWindowSizingAndPosition(ViewModel.HasSecondaryRow, initialCenter: true);
 
             SetWindowPos(WindowHandle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
 
@@ -354,9 +354,9 @@ public sealed partial class PresenterDockWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(PresenterDockViewModel.IsActiveSourceVideo))
+        if (e.PropertyName == nameof(PresenterDockViewModel.HasSecondaryRow))
         {
-            DispatcherQueue.TryEnqueue(() => ApplyWindowSizingAndPosition(ViewModel.IsActiveSourceVideo, initialCenter: false));
+            DispatcherQueue.TryEnqueue(() => ApplyWindowSizingAndPosition(ViewModel.HasSecondaryRow, initialCenter: false));
         }
     }
 
@@ -367,7 +367,7 @@ public sealed partial class PresenterDockWindow : Window
             if (sender.Presenter is OverlappedPresenter presenter && presenter.State == OverlappedPresenterState.Maximized)
             {
                 presenter.Restore();
-                ApplyWindowSizingAndPosition(ViewModel.IsActiveSourceVideo, initialCenter: false);
+                ApplyWindowSizingAndPosition(ViewModel.HasSecondaryRow, initialCenter: false);
             }
         }
     }
@@ -424,7 +424,7 @@ public sealed partial class PresenterDockWindow : Window
                         if (dpi == 0) dpi = 96;
                         double scale = dpi / 96.0;
                         double widthDip = 680.0;
-                        double heightDip = ViewModel.IsActiveSourceVideo ? 86.0 : 52.0;
+                        double heightDip = ViewModel.HasSecondaryRow ? 86.0 : 52.0;
                         int pixelWidth = (int)Math.Round(widthDip * scale);
                         int pixelHeight = (int)Math.Round(heightDip * scale);
 

@@ -30,7 +30,14 @@ public sealed partial class SourcesPage : Page
     {
         if (sender is Button btn && btn.DataContext is SelectableSourceItem item)
         {
-            await ViewModel.RemoveMediaCommand.ExecuteAsync(item);
+            if (item.Source is Models.PowerPointSource)
+            {
+                ViewModel.RemovePowerPoint(item);
+            }
+            else
+            {
+                await ViewModel.RemoveMediaCommand.ExecuteAsync(item);
+            }
         }
     }
 }

@@ -7,6 +7,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Local Presentation Expansion] - 2026-10-15
+
+### Added (feat / architecture / multi-monitor / powerpoint / camera / presenter-controls / test)
+- **Phase P1 — Smart External Display Mode & Configurable Automation**:
+  - Implemented multi-monitor topology discovery via Win32 `MONITORINFOEX` geometry in `ExternalDisplayService`.
+  - Filtered clone/mirrored displays and automatically identified eligible extended monitors.
+  - Automatically positioned existing `PresentationWindow` on external displays without recreating or flickering its native HWND.
+  - Added configurable auto-fullscreen (`AutoFullscreenOnExternalDisplay`) and preferred presentation display settings in `SettingsPage.xaml`.
+  - Handled monitor disconnection gracefully by recovering `PresentationWindow` to the primary display in safe windowed mode.
+- **Phase P2 — PowerPoint Static Slide Presentation (.pptx)**:
+  - Added first-class `PowerPointSource` model with slide count, current slide index, and cached image path management.
+  - Implemented MD5-based slide cache preventing redundant renders and reducing disk space.
+  - Built COM STA slide export renderer (`PowerPointComSlideRenderer`) with robust COM lifecycle and process isolation.
+  - Implemented boundary-safe slide navigation (`NextSlideAsync`, `PreviousSlideAsync`, `GoToSlideAsync`).
+- **Phase P3 — PowerPoint Live Slideshow Integration**:
+  - Built attended windowed slideshow integration (`PowerPointLiveService`) using official PowerPoint COM automation.
+  - Enforced windowed mode (`ppShowTypeWindow = 2`) preventing PowerPoint from hijacking external audience displays.
+  - Added direct slide and animation progression controls.
+- **Phase P4 — Camera Source Integration**:
+  - Added native `CameraSource` model with device identifier and internal webcam vs external USB detection.
+  - Implemented camera enumeration and device hotplug watcher (`CameraDiscoveryService`) via `DeviceInformation.CreateWatcher`.
+  - Implemented frame acquisition pipeline (`CameraCaptureService`) using `MediaCapture` + `MediaFrameReader`, piping `SoftwareBitmap` frames directly to `Direct3D11PresentationRenderer`.
+  - Enforced camera privacy policies, activating camera capture only when live On Air.
+- **Phase P5 — Unified Source Queue & Adaptive Presenter Controls**:
+  - Unified ordered queue handling 6 distinct source types: Window, Monitor, Image, Video, PowerPoint, Camera.
+  - Adapted Floating Presenter Dock with contextual secondary row for PowerPoint slide advance (`Slide X of Y`), preserving strict separation between queued source switching and slide advance.
+  - Added PowerPoint import and Camera categories to `SourcesPage.xaml`.
+  - Expanded automated test suite from 281 to **299 automated unit tests** (100% pass rate). Both Debug and Release builds compile with 0 errors and 0 warnings.
+
+---
+
 ## [1.2.1] - 2026-10-10
 
 - **Media Source Presentation Output Activation**: Updated source switching behavior so that choosing an Image or Video media source under `ActiveAndLive` or `ActiveOnly` mode activates and brings the existing `PresentationWindow` to the foreground (restoring if minimized) instead of failing to activate non-existent external application windows. In `ActiveOnly` mode, the presentation output activates without taking media live, altering `ActiveSource`, or restarting playback; if closed, it opens in Standby mode. `LiveOnly` mode preserves background switching without stealing focus. Ordinary application window and monitor sources retain established Win32 foreground activation behavior.

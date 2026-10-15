@@ -34,6 +34,8 @@ public abstract record CaptureSource
         SourceType.Display => "\uE790",
         SourceType.Image => "\uEB9F",
         SourceType.Video => "\uE714",
+        SourceType.PowerPoint => "\uE8A1",
+        SourceType.Camera => "\uE960",
         _ => "\uE7F4"
     };
 
@@ -46,6 +48,8 @@ public abstract record CaptureSource
         SourceType.Display => "Display",
         SourceType.Image => "Image",
         SourceType.Video => "Video",
+        SourceType.PowerPoint => "PowerPoint",
+        SourceType.Camera => "Camera",
         _ => "Source"
     };
 }

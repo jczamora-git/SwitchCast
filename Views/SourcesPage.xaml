@@ -43,6 +43,19 @@
                         </StackPanel>
                     </Button>
 
+                    <!-- Import PowerPoint Button (visible when PowerPoint selected) -->
+                    <Button Command="{x:Bind ViewModel.AddPowerPointCommand}"
+                            Visibility="{x:Bind ViewModel.IsPowerPointCategorySelected, Mode=OneWay}"
+                            Style="{StaticResource PrimaryAccentButtonStyle}"
+                            VerticalAlignment="Center"
+                            Padding="14,6"
+                            ToolTipService.ToolTip="Import PowerPoint presentation (.pptx)">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <FontIcon Glyph="&#xE8A1;" FontSize="13" />
+                            <TextBlock Text="Import PowerPoint" FontSize="12" />
+                        </StackPanel>
+                    </Button>
+
                     <!-- Refresh Button -->
                     <Button Command="{x:Bind ViewModel.RefreshSourcesCommand}"
                             VerticalAlignment="Center"
@@ -76,10 +89,10 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Category Selector (Windows / Displays / Media Files) -->
+                    <!-- Category Selector (Windows / Displays / Media Files / PowerPoint / Cameras) -->
                     <RadioButtons Grid.Column="0"
                                   SelectedIndex="{x:Bind ViewModel.SelectedCategoryIndex, Mode=TwoWay}"
-                                  MaxColumns="3"
+                                  MaxColumns="5"
                                   VerticalAlignment="Center">
                         <RadioButton Content="{x:Bind ViewModel.WindowCategoryHeader, Mode=OneWay}"
                                      FontSize="12"
@@ -88,6 +101,12 @@
                                      FontSize="12"
                                      Margin="0,0,14,0" />
                         <RadioButton Content="{x:Bind ViewModel.MediaCategoryHeader, Mode=OneWay}"
+                                     FontSize="12"
+                                     Margin="0,0,14,0" />
+                        <RadioButton Content="{x:Bind ViewModel.PowerPointCategoryHeader, Mode=OneWay}"
+                                     FontSize="12"
+                                     Margin="0,0,14,0" />
+                        <RadioButton Content="{x:Bind ViewModel.CameraCategoryHeader, Mode=OneWay}"
                                      FontSize="12" />
                     </RadioButtons>
 
@@ -142,6 +161,10 @@
                         <Button Content="Add Media"
                                 Command="{x:Bind ViewModel.AddMediaCommand}"
                                 Visibility="{x:Bind ViewModel.IsMediaCategorySelected, Mode=OneWay}"
+                                Style="{StaticResource PrimaryAccentButtonStyle}" />
+                        <Button Content="Import PowerPoint"
+                                Command="{x:Bind ViewModel.AddPowerPointCommand}"
+                                Visibility="{x:Bind ViewModel.IsPowerPointCategorySelected, Mode=OneWay}"
                                 Style="{StaticResource PrimaryAccentButtonStyle}" />
                         <Button Content="Scan Again"
                                 Command="{x:Bind ViewModel.RefreshSourcesCommand}" />

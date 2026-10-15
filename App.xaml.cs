@@ -73,6 +73,15 @@ public partial class App : Application
         services.AddSingleton<Services.Media.IMediaPickerService, Services.Media.Win32MediaPickerService>();
         services.AddSingleton<Services.Media.IMediaPresentationService, Services.Media.MediaPresentationService>();
 
+        // PowerPoint Services
+        services.AddSingleton<Services.PowerPoint.IPresentationSlideRenderer, Services.PowerPoint.PowerPointComSlideRenderer>();
+        services.AddSingleton<Services.PowerPoint.IPowerPointPresentationService, Services.PowerPoint.PowerPointPresentationService>();
+        services.AddSingleton<Services.PowerPoint.IPowerPointLiveService, Services.PowerPoint.PowerPointLiveService>();
+
+        // Camera Services
+        services.AddSingleton<Services.Camera.ICameraDiscoveryService, Services.Camera.CameraDiscoveryService>();
+        services.AddSingleton<Services.Camera.ICameraCaptureService, Services.Camera.CameraCaptureService>();
+
         // Presentation Output & Orchestration Services
         services.AddSingleton<IWindowActivationService, Win32WindowActivationService>();
         services.AddSingleton<IPresentationWindowService, PresentationWindowService>();

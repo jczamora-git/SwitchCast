@@ -276,6 +276,50 @@
                                VerticalAlignment="Center"
                                Margin="2,0,4,0" />
                 </Grid>
+
+                <!-- ========================================================= -->
+                <!-- ADAPTIVE POWERPOINT SLIDE NAVIGATION ROW                  -->
+                <!-- ========================================================= -->
+                <Grid x:Name="PowerPointRowGrid"
+                      ColumnSpacing="8"
+                      Padding="6,2,6,0"
+                      VerticalAlignment="Center"
+                      Visibility="{x:Bind views:PresenterDockWindow.BoolToVis(ViewModel.IsActiveSourcePowerPoint), Mode=OneWay}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                        <Button Command="{x:Bind ViewModel.PowerPointPreviousSlideCommand}"
+                                Style="{StaticResource DockIconButtonStyle}"
+                                ToolTipService.ToolTip="Previous Slide">
+                            <FontIcon Glyph="&#xE76B;" FontSize="11" />
+                        </Button>
+                        <Button Command="{x:Bind ViewModel.PowerPointNextSlideCommand}"
+                                Style="{StaticResource DockIconButtonStyle}"
+                                ToolTipService.ToolTip="Next Slide">
+                            <FontIcon Glyph="&#xE76C;" FontSize="11" />
+                        </Button>
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="1"
+                               Text="{x:Bind ViewModel.PowerPointProgressText, Mode=OneWay}"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                    <TextBlock Grid.Column="2"
+                               Text="PowerPoint"
+                               FontSize="10"
+                               FontWeight="Bold"
+                               Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,4,0" />
+                </Grid>
             </StackPanel>
         </Border>
     </Grid>

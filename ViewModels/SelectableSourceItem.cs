@@ -50,11 +50,13 @@ public partial class SelectableSourceItem : ObservableObject
 
     public bool IsMediaSource => Source is MediaFileSource;
 
-    public string? FilePath => (Source as MediaFileSource)?.FilePath;
+    public bool IsRemovable => Source is MediaFileSource or PowerPointSource;
+
+    public string? FilePath => (Source as MediaFileSource)?.FilePath ?? (Source as PowerPointSource)?.FilePath;
 
     public Visibility UnavailableBadgeVisibility => IsAvailable ? Visibility.Collapsed : Visibility.Visible;
 
-    public Visibility RemoveButtonVisibility => IsMediaSource ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility RemoveButtonVisibility => IsRemovable ? Visibility.Visible : Visibility.Collapsed;
 
     public string Subtitle => Source switch
     {
@@ -68,6 +70,12 @@ public partial class SelectableSourceItem : ObservableObject
         VideoMediaSource vid => (vid.Width.HasValue && vid.Height.HasValue)
             ? $"Video • {vid.FormattedDuration} • {vid.Width} × {vid.Height} • {vid.FormattedFileSize}"
             : $"Video • {vid.FormattedDuration} • {vid.FormattedFileSize}",
+        PowerPointSource ppt => ppt.SlideCount > 0
+            ? $"PowerPoint • {ppt.SlideCount} slides • {(ppt.IsLiveSlideshow ? "Live Slideshow" : "Static Deck")}"
+            : "PowerPoint Presentation (.pptx)",
+        CameraSource cam => (cam.Width > 0 && cam.Height > 0)
+            ? $"Camera • {cam.Width} × {cam.Height} • {(cam.IsInternal ? "Built-in Webcam" : "USB Camera")}"
+            : $"Camera • {(cam.IsInternal ? "Built-in Webcam" : "USB Camera")}",
         _ => string.Empty
     };
 

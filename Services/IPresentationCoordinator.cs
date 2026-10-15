@@ -90,6 +90,41 @@ public interface IPresentationCoordinator : INotifyPropertyChanged, IDisposable
     bool IsActiveSourceImage { get; }
 
     /// <summary>
+    /// Whether the active on-air source is a PowerPoint presentation.
+    /// </summary>
+    bool IsActiveSourcePowerPoint { get; }
+
+    /// <summary>
+    /// Whether the active on-air source is a live camera capture device.
+    /// </summary>
+    bool IsActiveSourceCamera { get; }
+
+    /// <summary>
+    /// Human-readable progress text for the active PowerPoint deck (e.g. "Slide 3 of 24"), or null.
+    /// </summary>
+    string? PowerPointProgressText { get; }
+
+    /// <summary>
+    /// ImageSource for static PowerPoint slide presentation.
+    /// </summary>
+    ImageSource? PowerPointSlideImageSource { get; }
+
+    /// <summary>
+    /// Advances to the next slide in the active PowerPoint presentation.
+    /// </summary>
+    Task<bool> PowerPointNextSlideAsync();
+
+    /// <summary>
+    /// Navigates to the previous slide in the active PowerPoint presentation.
+    /// </summary>
+    Task<bool> PowerPointPreviousSlideAsync();
+
+    /// <summary>
+    /// Jumps directly to a specific slide in the active PowerPoint presentation.
+    /// </summary>
+    Task<bool> PowerPointGoToSlideAsync(int slideIndex);
+
+    /// <summary>
     /// Gets the last error message encountered during presentation operations.
     /// </summary>
     string? LastErrorMessage { get; }

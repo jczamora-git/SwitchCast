@@ -33,7 +33,10 @@ public partial class PresentationViewModel : ObservableObject
 
     public ImageSource? PresentationImageSource => _presentationCoordinator.PresentationImageSource;
 
-    public ImageSource? DirectImageSource => _presentationCoordinator.DirectImageSource;
+    public ImageSource? DirectImageSource =>
+        _presentationCoordinator.IsActiveSourcePowerPoint
+            ? _presentationCoordinator.PowerPointSlideImageSource
+            : _presentationCoordinator.DirectImageSource;
 
     public MediaPlayer? MediaPlayer => _presentationCoordinator.MediaPlayer;
 
@@ -48,12 +51,12 @@ public partial class PresentationViewModel : ObservableObject
             : Visibility.Collapsed;
 
     public Visibility ScreenCaptureVisibility =>
-        IsLiveOrPaused && (ActiveSource?.Type == SourceType.Window || ActiveSource?.Type == SourceType.Display)
+        IsLiveOrPaused && (ActiveSource?.Type == SourceType.Window || ActiveSource?.Type == SourceType.Display || ActiveSource?.Type == SourceType.Camera || (ActiveSource is PowerPointSource ppt && ppt.IsLiveSlideshow))
             ? Visibility.Visible
             : Visibility.Collapsed;
 
     public Visibility DirectImageVisibility =>
-        IsLiveOrPaused && ActiveSource?.Type == SourceType.Image
+        IsLiveOrPaused && (ActiveSource?.Type == SourceType.Image || (ActiveSource is PowerPointSource ppt && !ppt.IsLiveSlideshow))
             ? Visibility.Visible
             : Visibility.Collapsed;
 
@@ -86,7 +89,8 @@ public partial class PresentationViewModel : ObservableObject
         {
             OnPropertyChanged(nameof(PresentationImageSource));
         }
-        else if (e.PropertyName == nameof(IPresentationCoordinator.DirectImageSource))
+        else if (e.PropertyName == nameof(IPresentationCoordinator.DirectImageSource) ||
+                 e.PropertyName == nameof(IPresentationCoordinator.PowerPointSlideImageSource))
         {
             OnPropertyChanged(nameof(DirectImageSource));
         }

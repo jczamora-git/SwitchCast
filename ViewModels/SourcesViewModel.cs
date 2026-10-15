@@ -20,16 +20,20 @@ public partial class SourcesViewModel : ObservableObject
     private readonly IWindowIconService? _windowIconService;
     private readonly IMediaDiscoveryService _mediaDiscoveryService;
     private readonly IMediaPickerService _mediaPickerService;
+    private readonly Services.PowerPoint.IPowerPointPresentationService? _powerPointService;
+    private readonly Services.Camera.ICameraDiscoveryService? _cameraDiscoveryService;
     private readonly IApplicationSettingsService? _settingsService;
     private readonly Microsoft.UI.Dispatching.DispatcherQueue? _dispatcherQueue;
 
     private readonly List<SelectableSourceItem> _allWindows = [];
     private readonly List<SelectableSourceItem> _allDisplays = [];
     private readonly List<SelectableSourceItem> _allMedia = [];
+    private readonly List<SelectableSourceItem> _allPowerPoint = [];
+    private readonly List<SelectableSourceItem> _allCameras = [];
     private bool _isSyncingSelection;
 
     [ObservableProperty]
-    private int _selectedCategoryIndex = 0; // 0 = Windows, 1 = Displays, 2 = Media Files
+    private int _selectedCategoryIndex = 0; // 0 = Windows, 1 = Displays, 2 = Media Files, 3 = PowerPoint, 4 = Cameras
 
     [ObservableProperty]
     private string _searchQuery = string.Empty;
@@ -52,6 +56,12 @@ public partial class SourcesViewModel : ObservableObject
     [ObservableProperty]
     private string _mediaCategoryHeader = "Media Files (0)";
 
+    [ObservableProperty]
+    private string _powerPointCategoryHeader = "PowerPoint (0)";
+
+    [ObservableProperty]
+    private string _cameraCategoryHeader = "Cameras (0)";
+
     public SourcesViewModel(
         IPresentationStateService presentationStateService,
         IWindowDiscoveryService windowDiscoveryService,
@@ -59,7 +69,9 @@ public partial class SourcesViewModel : ObservableObject
         IWindowIconService? windowIconService = null,
         IMediaDiscoveryService? mediaDiscoveryService = null,
         IMediaPickerService? mediaPickerService = null,
-        IApplicationSettingsService? settingsService = null)
+        IApplicationSettingsService? settingsService = null,
+        Services.PowerPoint.IPowerPointPresentationService? powerPointService = null,
+        Services.Camera.ICameraDiscoveryService? cameraDiscoveryService = null)
     {
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
         _windowDiscoveryService = windowDiscoveryService ?? throw new ArgumentNullException(nameof(windowDiscoveryService));
@@ -67,6 +79,8 @@ public partial class SourcesViewModel : ObservableObject
         _windowIconService = windowIconService;
         _mediaDiscoveryService = mediaDiscoveryService ?? new MediaDiscoveryService();
         _mediaPickerService = mediaPickerService ?? new Win32MediaPickerService();
+        _powerPointService = powerPointService;
+        _cameraDiscoveryService = cameraDiscoveryService;
         _settingsService = settingsService;
         _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 
@@ -86,11 +100,17 @@ public partial class SourcesViewModel : ObservableObject
 
     public bool IsMediaCategorySelected => SelectedCategoryIndex == 2;
 
+    public bool IsPowerPointCategorySelected => SelectedCategoryIndex == 3;
+
+    public bool IsCameraCategorySelected => SelectedCategoryIndex == 4;
+
     public string EmptyStateTitle => SelectedCategoryIndex switch
     {
         0 => "No Application Windows Found",
         1 => "No Displays Detected",
-        _ => "No Media Files Imported"
+        2 => "No Media Files Imported",
+        3 => "No PowerPoint Presentations Imported",
+        _ => "No Cameras Detected"
     };
 
     public string EmptyStateSubtitle => string.IsNullOrWhiteSpace(SearchQuery)
@@ -98,7 +118,9 @@ public partial class SourcesViewModel : ObservableObject
         {
             0 => "No running desktop application windows are currently visible. Launch an application and click Refresh.",
             1 => "No display monitors detected on this system. Click Refresh to scan again.",
-            _ => "Import local images and videos to present them directly without third-party applications. Click 'Add Media'."
+            2 => "Import local images and videos to present them directly without third-party applications. Click 'Add Media'.",
+            3 => "Import PowerPoint decks (.pptx) to present slides directly or launch live slideshows. Click 'Import PowerPoint'.",
+            _ => "No webcam or USB video capture devices detected. Connect a camera and click Refresh."
         })
         : $"No presentation sources match '{SearchQuery}'.";
 
@@ -119,11 +141,15 @@ public partial class SourcesViewModel : ObservableObject
         {
             var windowsTask = _windowDiscoveryService.EnumerateWindowsAsync();
             var monitorsTask = _monitorDiscoveryService.EnumerateMonitorsAsync();
+            var camerasTask = _cameraDiscoveryService is not null
+                ? _cameraDiscoveryService.EnumerateCamerasAsync()
+                : Task.FromResult<IReadOnlyList<CameraSource>>([]);
 
-            await Task.WhenAll(windowsTask, monitorsTask).ConfigureAwait(true);
+            await Task.WhenAll(windowsTask, monitorsTask, camerasTask).ConfigureAwait(true);
 
             var discoveredWindows = await windowsTask.ConfigureAwait(true);
             var discoveredMonitors = await monitorsTask.ConfigureAwait(true);
+            var discoveredCameras = await camerasTask.ConfigureAwait(true);
 
             // Load persisted media files if not yet loaded
             if (_allMedia.Count == 0 && _settingsService?.CurrentSettings.ImportedMediaPaths is { Count: > 0 } paths)
@@ -150,10 +176,22 @@ public partial class SourcesViewModel : ObservableObject
                 }
             }
 
+            // Reconcile existing PowerPoint availability
+            for (int i = 0; i < _allPowerPoint.Count; i++)
+            {
+                var item = _allPowerPoint[i];
+                if (item.Source is PowerPointSource ppt)
+                {
+                    item.IsAvailable = File.Exists(ppt.FilePath);
+                }
+            }
+
             var activeIds = new HashSet<string>(
                 discoveredWindows.Select(w => w.Id)
                 .Concat(discoveredMonitors.Select(m => m.Id))
-                .Concat(_allMedia.Where(m => m.IsAvailable).Select(m => m.Id)));
+                .Concat(_allMedia.Where(m => m.IsAvailable).Select(m => m.Id))
+                .Concat(_allPowerPoint.Where(p => p.IsAvailable).Select(p => p.Id))
+                .Concat(discoveredCameras.Select(c => c.Id)));
 
             _presentationStateService.ReconcileAvailability(activeIds);
 
@@ -169,6 +207,13 @@ public partial class SourcesViewModel : ObservableObject
             {
                 var isSelected = _presentationStateService.IsSourceSelected(mon.Id);
                 _allDisplays.Add(new SelectableSourceItem(mon, isSelected, OnItemSelectionChanged));
+            }
+
+            _allCameras.Clear();
+            foreach (var cam in discoveredCameras)
+            {
+                var isSelected = _presentationStateService.IsSourceSelected(cam.Id);
+                _allCameras.Add(new SelectableSourceItem(cam, isSelected, OnItemSelectionChanged));
             }
 
             UpdateCategoryHeaders();
@@ -286,11 +331,88 @@ public partial class SourcesViewModel : ObservableObject
         }
     }
 
+    [RelayCommand]
+    public async Task AddPowerPointAsync()
+    {
+        try
+        {
+            var pickedPaths = await _mediaPickerService.PickPowerPointFilesAsync().ConfigureAwait(true);
+            if (pickedPaths.Count == 0)
+            {
+                return;
+            }
+
+            var existingPaths = new HashSet<string>(
+                _allPowerPoint.Select(p => (p.Source as PowerPointSource)?.FilePath ?? string.Empty),
+                StringComparer.OrdinalIgnoreCase);
+
+            bool addedAny = false;
+            foreach (var path in pickedPaths)
+            {
+                if (string.IsNullOrWhiteSpace(path) || existingPaths.Contains(path) || !File.Exists(path))
+                {
+                    continue;
+                }
+
+                PowerPointSource pptSource;
+                if (_powerPointService is not null)
+                {
+                    pptSource = await _powerPointService.ImportPresentationAsync(path).ConfigureAwait(true);
+                }
+                else
+                {
+                    pptSource = new PowerPointSource(path);
+                }
+
+                var isSelected = _presentationStateService.IsSourceSelected(pptSource.Id);
+                var item = new SelectableSourceItem(pptSource, isSelected, OnItemSelectionChanged);
+                _allPowerPoint.Add(item);
+                existingPaths.Add(path);
+                addedAny = true;
+            }
+
+            if (addedAny)
+            {
+                UpdateCategoryHeaders();
+                ApplyFilter();
+            }
+        }
+        catch (Exception ex)
+        {
+            HasError = true;
+            ErrorMessage = $"Failed to import PowerPoint: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public void RemovePowerPoint(SelectableSourceItem? item)
+    {
+        if (item is null || item.Source is not PowerPointSource ppt)
+        {
+            return;
+        }
+
+        try
+        {
+            _allPowerPoint.Remove(item);
+            _presentationStateService.RemoveSelectedSource(item.Id);
+            UpdateCategoryHeaders();
+            ApplyFilter();
+        }
+        catch (Exception ex)
+        {
+            HasError = true;
+            ErrorMessage = $"Failed to remove PowerPoint presentation: {ex.Message}";
+        }
+    }
+
     private void UpdateCategoryHeaders()
     {
         WindowCategoryHeader = $"Application Windows ({_allWindows.Count})";
         DisplayCategoryHeader = $"Displays & Monitors ({_allDisplays.Count})";
         MediaCategoryHeader = $"Media Files ({_allMedia.Count})";
+        PowerPointCategoryHeader = $"PowerPoint ({_allPowerPoint.Count})";
+        CameraCategoryHeader = $"Cameras ({_allCameras.Count})";
     }
 
     private async Task LoadIconsAsync(IEnumerable<SelectableSourceItem> items)
@@ -355,6 +477,8 @@ public partial class SourcesViewModel : ObservableObject
     partial void OnSelectedCategoryIndexChanged(int value)
     {
         OnPropertyChanged(nameof(IsMediaCategorySelected));
+        OnPropertyChanged(nameof(IsPowerPointCategorySelected));
+        OnPropertyChanged(nameof(IsCameraCategorySelected));
         ApplyFilter();
     }
 
@@ -371,7 +495,9 @@ public partial class SourcesViewModel : ObservableObject
         {
             0 => _allWindows,
             1 => _allDisplays,
-            _ => _allMedia
+            2 => _allMedia,
+            3 => _allPowerPoint,
+            _ => _allCameras
         };
 
         var query = SearchQuery?.Trim() ?? string.Empty;
@@ -381,7 +507,8 @@ public partial class SourcesViewModel : ObservableObject
             : sourceList.Where(item =>
                 item.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
                 (item.Source is WindowSource w && w.ProcessName.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
-                (item.Source is MediaFileSource m && m.FilePath.Contains(query, StringComparison.OrdinalIgnoreCase)));
+                (item.Source is MediaFileSource m && m.FilePath.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
+                (item.Source is PowerPointSource p && p.FilePath.Contains(query, StringComparison.OrdinalIgnoreCase)));
 
         foreach (var item in filtered)
         {
@@ -425,7 +552,7 @@ public partial class SourcesViewModel : ObservableObject
             try
             {
                 // Sync item selection states across all discovered collections so switching tabs shows accurate state
-                foreach (var item in _allWindows.Concat(_allDisplays).Concat(_allMedia))
+                foreach (var item in _allWindows.Concat(_allDisplays).Concat(_allMedia).Concat(_allPowerPoint).Concat(_allCameras))
                 {
                     var isSelected = _presentationStateService.IsSourceSelected(item.Id);
                     if (item.IsSelected != isSelected)

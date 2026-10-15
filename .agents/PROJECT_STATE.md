@@ -7,15 +7,39 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Local Presentation Expansion — Phase P1 Complete
-- **Overall Status**: **In Progress (P0 & P1 Implemented & Validated)**
-- **Last Updated**: 2026-10-15T14:18:00+08:00 (UTC+8)
+- **Current Phase**: Local Presentation Expansion — Phases P0 through P5 Complete
+- **Overall Status**: **Implemented & Validated (299 Automated Unit Tests Passing, Debug & Release Builds Clean)**
+- **Last Updated**: 2026-10-15T14:46:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Local Presentation Expansion (Phases P0 - P5 Complete)**:
+  - **P1 — Smart External Display Mode & Configurable Automation**:
+    - Multi-monitor topology discovery via Win32 `MONITORINFOEX` geometry.
+    - Automatic detection and positioning of existing `PresentationWindow` on secondary display without HWND recreation.
+    - Configurable automatic fullscreen (`AutoFullscreenOnExternalDisplay`) and preferred monitor persistence.
+    - Safe recovery to primary display in `Windowed` mode upon external display disconnect.
+  - **P2 — PowerPoint Static Slide Integration (.pptx)**:
+    - First-class `PowerPointSource` model tracking `FilePath`, `SlideCount`, `CurrentSlideIndex`, `SlideImagePaths`.
+    - Local disk MD5-hashed slide cache preventing redundant renders.
+    - `PowerPointComSlideRenderer` export engine with COM lifecycle isolation.
+    - Bidirectional slide navigation (`NextSlideAsync`, `PreviousSlideAsync`, `GoToSlideAsync`) with boundary clamping.
+  - **P3 — PowerPoint Live Slideshow Integration**:
+    - Attended COM automation via `IPowerPointLiveService` / `PowerPointLiveService`.
+    - Enforces windowed slideshow mode (`ppShowTypeWindow = 2`) to ensure PowerPoint never takes over the audience display/projector.
+    - Direct slideshow navigation (`NextAsync`, `PreviousAsync`, `GoToSlideAsync`) for animations and slides.
+  - **P4 — Camera Source Integration (Webcam / USB Capture Devices)**:
+    - `CameraSource` model tracking `DeviceId`, resolution, and `IsInternal` (built-in webcam vs external USB).
+    - Camera discovery and hotplug watching via `ICameraDiscoveryService` / `DeviceInformation.CreateWatcher`.
+    - Native video frame acquisition via `ICameraCaptureService` using `MediaCapture` and `MediaFrameReader`, rendering directly into `IPresentationOutputRenderer.RenderBitmapAsync`.
+    - Privacy compliance: cameras are only activated when selected On Air, with graceful error handling when access is denied or device is busy.
+  - **P5 — Unified Source Queue & Adaptive Presenter Dock Controls**:
+    - Unified 6-source queue: Window, Monitor, Image, Video, PowerPoint, Camera.
+    - Adaptive Floating Presenter Dock: contextual secondary row for PowerPoint slide advance and progress indicator (`Slide X of Y`), maintaining clear separation between queued source switching and slide advance.
+    - Expanded unit test suite to **299 automated unit tests** (100% pass rate). Both Debug and Release builds compile with 0 errors and 0 warnings.
 - [x] **Phase P1 — Smart External Display Mode & Configurable Automation**:
   - **Multi-Monitor Topology Discovery**: `IExternalDisplayService` and `ExternalDisplayService` automatically analyze physical desktop layout, identifying primary display, extended non-primary displays, and distinguishing clone/mirrored configurations (shared geometry).
   - **Single Presentation Output Window HWND Preservation**: When an eligible extended TV/projector is detected, automatically moves the existing `PresentationWindow` to the external display's work area bounds without destroying, recreating, or flickering the HWND.

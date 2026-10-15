@@ -262,6 +262,14 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
 
     public bool IsActiveSourceVideo => _presentationCoordinator.IsActiveSourceVideo;
 
+    public bool IsActiveSourcePowerPoint => _presentationCoordinator.IsActiveSourcePowerPoint;
+
+    public bool IsActiveSourceCamera => _presentationCoordinator.IsActiveSourceCamera;
+
+    public string PowerPointProgressText => _presentationCoordinator.PowerPointProgressText ?? "PowerPoint";
+
+    public bool HasSecondaryRow => IsActiveSourceVideo || IsActiveSourcePowerPoint;
+
     public bool IsMediaMuted => _presentationCoordinator.MediaPresentationService.IsMuted;
 
     public double MediaVolume
@@ -481,6 +489,20 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
+    private async Task PowerPointNextSlideAsync()
+    {
+        await _presentationCoordinator.PowerPointNextSlideAsync();
+        OnPropertyChanged(nameof(PowerPointProgressText));
+    }
+
+    [RelayCommand]
+    private async Task PowerPointPreviousSlideAsync()
+    {
+        await _presentationCoordinator.PowerPointPreviousSlideAsync();
+        OnPropertyChanged(nameof(PowerPointProgressText));
+    }
+
+    [RelayCommand]
     private async Task NextSourceAsync()
     {
         await _presentationCoordinator.SwitchToNextSourceAsync();
@@ -616,6 +638,7 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(MediaVolumePercentText));
         OnPropertyChanged(nameof(MediaMuteButtonGlyph));
         OnPropertyChanged(nameof(MediaMuteButtonTooltip));
+        OnPropertyChanged(nameof(HasSecondaryRow));
     }
 
     private void NotifyAllProperties()
@@ -638,6 +661,10 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(PauseButtonGlyph));
         OnPropertyChanged(nameof(BlackoutButtonText));
         OnPropertyChanged(nameof(BlackoutButtonGlyph));
+        OnPropertyChanged(nameof(IsActiveSourcePowerPoint));
+        OnPropertyChanged(nameof(IsActiveSourceCamera));
+        OnPropertyChanged(nameof(PowerPointProgressText));
+        OnPropertyChanged(nameof(HasSecondaryRow));
         NotifyMediaProperties();
         NotifyFullscreenProperties();
         NotifyModeProperties();

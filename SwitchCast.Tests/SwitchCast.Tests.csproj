@@ -50,6 +50,16 @@
     <Compile Include="..\Services\Media\Win32MediaPickerService.cs" Link="Linked\Services\Media\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Media\IMediaPresentationService.cs" Link="Linked\Services\Media\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Media\MediaPresentationService.cs" Link="Linked\Services\Media\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\PowerPoint\IPresentationSlideRenderer.cs" Link="Linked\Services\PowerPoint\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\PowerPoint\PowerPointComSlideRenderer.cs" Link="Linked\Services\PowerPoint\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\PowerPoint\IPowerPointPresentationService.cs" Link="Linked\Services\PowerPoint\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\PowerPoint\PowerPointPresentationService.cs" Link="Linked\Services\PowerPoint\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\PowerPoint\IPowerPointLiveService.cs" Link="Linked\Services\PowerPoint\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\PowerPoint\PowerPointLiveService.cs" Link="Linked\Services\PowerPoint\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Camera\ICameraDiscoveryService.cs" Link="Linked\Services\Camera\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Camera\CameraDiscoveryService.cs" Link="Linked\Services\Camera\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Camera\ICameraCaptureService.cs" Link="Linked\Services\Camera\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Camera\CameraCaptureService.cs" Link="Linked\Services\Camera\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\CaptureState.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\ICaptureCoordinator.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Capture\CaptureCoordinator.cs" Link="Linked\Services\Capture\%(Filename)%(Extension)" />

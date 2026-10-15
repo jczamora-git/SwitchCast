@@ -23,5 +23,15 @@ public enum SourceType
     /// <summary>
     /// Direct local video media file.
     /// </summary>
-    Video
+    Video,
+
+    /// <summary>
+    /// Microsoft PowerPoint presentation document (.pptx).
+    /// </summary>
+    PowerPoint,
+
+    /// <summary>
+    /// Connected USB or integrated camera video capture device.
+    /// </summary>
+    Camera
 }

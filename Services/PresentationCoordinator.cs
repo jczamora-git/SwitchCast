@@ -4,12 +4,15 @@ using Microsoft.UI.Xaml.Media;
 using SwitchCast.Models;
 using SwitchCast.Services.Capture;
 using SwitchCast.Services.Media;
+using SwitchCast.Services.PowerPoint;
+using SwitchCast.Services.Camera;
+using Windows.Graphics.Imaging;
 
 namespace SwitchCast.Services;
 
 /// <summary>
 /// Authoritative coordinator managing the Presentation Output Window, presentation lifecycle, freeze/blackout, and frame distribution.
-/// Implements serialized transition management, latest-request-wins coalescing, and non-blocking frame forwarding across all 4 source types.
+/// Implements serialized transition management, latest-request-wins coalescing, and non-blocking frame forwarding across all source types.
 /// </summary>
 public sealed partial class PresentationCoordinator : ObservableObject, IPresentationCoordinator
 {
@@ -21,6 +24,9 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     private readonly IMediaPresentationService _mediaPresentationService;
     private readonly INavigationService? _navigationService;
     private readonly IExternalDisplayService? _externalDisplayService;
+    private readonly IPowerPointPresentationService _powerPointService;
+    private readonly IPowerPointLiveService? _powerPointLiveService;
+    private readonly ICameraCaptureService? _cameraCaptureService;
     private readonly SemaphoreSlim _transitionSemaphore = new(1, 1);
 
     private CaptureSource? _targetRequestedPresentationSource;
@@ -39,7 +45,10 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         IWindowActivationService windowActivationService,
         IMediaPresentationService? mediaPresentationService = null,
         INavigationService? navigationService = null,
-        IExternalDisplayService? externalDisplayService = null)
+        IExternalDisplayService? externalDisplayService = null,
+        IPowerPointPresentationService? powerPointService = null,
+        IPowerPointLiveService? powerPointLiveService = null,
+        ICameraCaptureService? cameraCaptureService = null)
     {
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
         _presentationWindowService = presentationWindowService ?? throw new ArgumentNullException(nameof(presentationWindowService));
@@ -49,6 +58,9 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         _mediaPresentationService = mediaPresentationService ?? new MediaPresentationService();
         _navigationService = navigationService;
         _externalDisplayService = externalDisplayService;
+        _powerPointService = powerPointService ?? new PowerPointPresentationService();
+        _powerPointLiveService = powerPointLiveService;
+        _cameraCaptureService = cameraCaptureService;
 
         _presentationStateService.PropertyChanged += (s, e) =>
         {
@@ -83,6 +95,27 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         };
 
         _captureCoordinator.FrameArrived += OnCaptureFrameArrived;
+
+        _powerPointService.SlideChanged += (s, e) =>
+        {
+            OnPropertyChanged(nameof(PowerPointSlideImageSource));
+            OnPropertyChanged(nameof(PowerPointProgressText));
+            OnPropertyChanged(nameof(DirectImageSource));
+        };
+
+        if (_powerPointLiveService is not null)
+        {
+            _powerPointLiveService.SlidePositionChanged += (s, e) =>
+            {
+                OnPropertyChanged(nameof(PowerPointProgressText));
+            };
+        }
+
+        if (_cameraCaptureService is not null)
+        {
+            _cameraCaptureService.FrameArrived += OnCameraFrameArrived;
+        }
+
         _presentationWindowService.WindowOpened += (s, e) => OnPropertyChanged(nameof(IsOutputWindowOpen));
         _presentationWindowService.WindowClosed += OnWindowClosed;
     }
@@ -111,6 +144,30 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
     public bool IsActiveSourceImage => CurrentPresentationSource?.Type == SourceType.Image;
 
+    public bool IsActiveSourcePowerPoint => CurrentPresentationSource?.Type == SourceType.PowerPoint;
+
+    public bool IsActiveSourceCamera => CurrentPresentationSource?.Type == SourceType.Camera;
+
+    public string? PowerPointProgressText
+    {
+        get
+        {
+            if (CurrentPresentationSource is PowerPointSource ppt)
+            {
+                if (ppt.IsLiveSlideshow && _powerPointLiveService is not null)
+                {
+                    return _powerPointLiveService.TotalSlideCount > 0
+                        ? $"Slide {_powerPointLiveService.CurrentSlideIndex} of {_powerPointLiveService.TotalSlideCount}"
+                        : "PowerPoint Live";
+                }
+                return ppt.SlideProgressText;
+            }
+            return null;
+        }
+    }
+
+    public ImageSource? PowerPointSlideImageSource => _powerPointService.CurrentSlideImageSource;
+
     public IMediaPresentationService MediaPresentationService => _mediaPresentationService;
 
     public Task SetSwitchModeAsync(PresenterSwitchMode mode)
@@ -121,7 +178,10 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
     public ImageSource? PresentationImageSource => _outputRenderer.PresentationImageSource;
 
-    public ImageSource? DirectImageSource => _mediaPresentationService.DirectImageSource;
+    public ImageSource? DirectImageSource =>
+        IsActiveSourcePowerPoint
+            ? _powerPointService.CurrentSlideImageSource
+            : _mediaPresentationService.DirectImageSource;
 
     public Windows.Media.Playback.MediaPlayer? MediaPlayer => _mediaPresentationService.Player;
 
@@ -202,11 +262,73 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                 _mediaPresentationService.ClearImage();
                 await _mediaPresentationService.PlayVideoAsync(videoSource).ConfigureAwait(false);
             }
+            else if (targetSource is PowerPointSource pptSource)
+            {
+                if (_captureCoordinator.State == CaptureState.Capturing)
+                {
+                    await _captureCoordinator.StopPreviewAsync().ConfigureAwait(false);
+                }
+                await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
+                _mediaPresentationService.ClearImage();
+                if (_cameraCaptureService is not null)
+                {
+                    await _cameraCaptureService.StopCaptureAsync().ConfigureAwait(false);
+                }
+
+                if (pptSource.IsLiveSlideshow && _powerPointLiveService is not null)
+                {
+                    await _powerPointLiveService.StartSlideshowAsync(pptSource.FilePath).ConfigureAwait(false);
+                    if (_powerPointLiveService.SlideshowWindowHandle != nint.Zero)
+                    {
+                        var windowSource = new WindowSource
+                        {
+                            Id = $"win_{_powerPointLiveService.SlideshowWindowHandle}",
+                            Title = "PowerPoint Slide Show",
+                            WindowHandle = _powerPointLiveService.SlideshowWindowHandle,
+                            ProcessName = "POWERPNT",
+                            IsAvailable = true
+                        };
+                        await _captureCoordinator.StartPreviewAsync(windowSource).ConfigureAwait(false);
+                    }
+                }
+                else
+                {
+                    await _powerPointService.LoadPresentationAsync(pptSource).ConfigureAwait(false);
+                }
+            }
+            else if (targetSource is CameraSource cameraSource)
+            {
+                if (_captureCoordinator.State == CaptureState.Capturing)
+                {
+                    await _captureCoordinator.StopPreviewAsync().ConfigureAwait(false);
+                }
+                await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
+                _mediaPresentationService.ClearImage();
+                _powerPointService.ClearPresentation();
+                if (_powerPointLiveService is not null && _powerPointLiveService.IsLiveSlideshowRunning)
+                {
+                    await _powerPointLiveService.StopSlideshowAsync().ConfigureAwait(false);
+                }
+
+                if (_cameraCaptureService is not null)
+                {
+                    await _cameraCaptureService.StartCaptureAsync(cameraSource).ConfigureAwait(false);
+                }
+            }
             else
             {
                 // Window or Display source
                 _mediaPresentationService.ClearImage();
                 await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
+                _powerPointService.ClearPresentation();
+                if (_powerPointLiveService is not null && _powerPointLiveService.IsLiveSlideshowRunning)
+                {
+                    await _powerPointLiveService.StopSlideshowAsync().ConfigureAwait(false);
+                }
+                if (_cameraCaptureService is not null)
+                {
+                    await _cameraCaptureService.StopCaptureAsync().ConfigureAwait(false);
+                }
 
                 if (_captureCoordinator.State != CaptureState.Capturing)
                 {
@@ -238,7 +360,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                         _presentationStateService.SetForegroundSource(targetSource);
                     }
                 }
-                else if (targetSource is ImageMediaSource or VideoMediaSource)
+                else if (targetSource is ImageMediaSource or VideoMediaSource or CameraSource or PowerPointSource)
                 {
                     ActivatePresentationOutput();
                     _presentationStateService.SetForegroundSource(null);
@@ -280,6 +402,17 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             _outputRenderer.Clear();
             _mediaPresentationService.ClearImage();
             await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
+
+            if (_powerPointLiveService is not null && _powerPointLiveService.IsLiveSlideshowRunning)
+            {
+                await _powerPointLiveService.StopSlideshowAsync().ConfigureAwait(false);
+            }
+            _powerPointService.ClearPresentation();
+
+            if (_cameraCaptureService is not null && _cameraCaptureService.IsCapturing)
+            {
+                await _cameraCaptureService.StopCaptureAsync().ConfigureAwait(false);
+            }
 
             _presentationStateService.SetActiveSource(null);
             _presentationStateService.SetForegroundSource(null);
@@ -346,6 +479,16 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                     await _captureCoordinator.StopPreviewAsync().ConfigureAwait(false);
                 }
                 await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
+                _powerPointService.ClearPresentation();
+                if (_powerPointLiveService is not null && _powerPointLiveService.IsLiveSlideshowRunning)
+                {
+                    await _powerPointLiveService.StopSlideshowAsync().ConfigureAwait(false);
+                }
+                if (_cameraCaptureService is not null && _cameraCaptureService.IsCapturing)
+                {
+                    await _cameraCaptureService.StopCaptureAsync().ConfigureAwait(false);
+                }
+
                 await _mediaPresentationService.LoadImageAsync(imageSource).ConfigureAwait(false);
             }
             else if (newSource is VideoMediaSource videoSource)
@@ -355,13 +498,85 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                     await _captureCoordinator.StopPreviewAsync().ConfigureAwait(false);
                 }
                 _mediaPresentationService.ClearImage();
+                _powerPointService.ClearPresentation();
+                if (_powerPointLiveService is not null && _powerPointLiveService.IsLiveSlideshowRunning)
+                {
+                    await _powerPointLiveService.StopSlideshowAsync().ConfigureAwait(false);
+                }
+                if (_cameraCaptureService is not null && _cameraCaptureService.IsCapturing)
+                {
+                    await _cameraCaptureService.StopCaptureAsync().ConfigureAwait(false);
+                }
+
                 await _mediaPresentationService.PlayVideoAsync(videoSource).ConfigureAwait(false);
+            }
+            else if (newSource is PowerPointSource pptSource)
+            {
+                if (_captureCoordinator.State == CaptureState.Capturing)
+                {
+                    await _captureCoordinator.StopPreviewAsync().ConfigureAwait(false);
+                }
+                await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
+                _mediaPresentationService.ClearImage();
+                if (_cameraCaptureService is not null && _cameraCaptureService.IsCapturing)
+                {
+                    await _cameraCaptureService.StopCaptureAsync().ConfigureAwait(false);
+                }
+
+                if (pptSource.IsLiveSlideshow && _powerPointLiveService is not null)
+                {
+                    await _powerPointLiveService.StartSlideshowAsync(pptSource.FilePath).ConfigureAwait(false);
+                    if (_powerPointLiveService.SlideshowWindowHandle != nint.Zero)
+                    {
+                        var windowSource = new WindowSource
+                        {
+                            Id = $"win_{_powerPointLiveService.SlideshowWindowHandle}",
+                            Title = "PowerPoint Slide Show",
+                            WindowHandle = _powerPointLiveService.SlideshowWindowHandle,
+                            ProcessName = "POWERPNT",
+                            IsAvailable = true
+                        };
+                        await _captureCoordinator.StartPreviewAsync(windowSource).ConfigureAwait(false);
+                    }
+                }
+                else
+                {
+                    await _powerPointService.LoadPresentationAsync(pptSource).ConfigureAwait(false);
+                }
+            }
+            else if (newSource is CameraSource cameraSource)
+            {
+                if (_captureCoordinator.State == CaptureState.Capturing)
+                {
+                    await _captureCoordinator.StopPreviewAsync().ConfigureAwait(false);
+                }
+                await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
+                _mediaPresentationService.ClearImage();
+                _powerPointService.ClearPresentation();
+                if (_powerPointLiveService is not null && _powerPointLiveService.IsLiveSlideshowRunning)
+                {
+                    await _powerPointLiveService.StopSlideshowAsync().ConfigureAwait(false);
+                }
+
+                if (_cameraCaptureService is not null)
+                {
+                    await _cameraCaptureService.StartCaptureAsync(cameraSource).ConfigureAwait(false);
+                }
             }
             else
             {
                 // Window or Display source
                 _mediaPresentationService.ClearImage();
                 await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
+                _powerPointService.ClearPresentation();
+                if (_powerPointLiveService is not null && _powerPointLiveService.IsLiveSlideshowRunning)
+                {
+                    await _powerPointLiveService.StopSlideshowAsync().ConfigureAwait(false);
+                }
+                if (_cameraCaptureService is not null && _cameraCaptureService.IsCapturing)
+                {
+                    await _cameraCaptureService.StopCaptureAsync().ConfigureAwait(false);
+                }
 
                 if (_captureCoordinator.State != CaptureState.Capturing)
                 {
@@ -394,7 +609,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                 _presentationStateService.SetStatus(PresentationStatus.Active);
             }
 
-            if (SwitchMode == PresenterSwitchMode.ActiveAndLive && (newSource is ImageMediaSource or VideoMediaSource))
+            if (SwitchMode == PresenterSwitchMode.ActiveAndLive && (newSource is ImageMediaSource or VideoMediaSource or CameraSource or PowerPointSource))
             {
                 ActivatePresentationOutput();
             }
@@ -561,7 +776,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                         _presentationStateService.SetForegroundSource(null);
                     }
                 }
-                else if (targetSource is ImageMediaSource or VideoMediaSource)
+                else if (targetSource is ImageMediaSource or VideoMediaSource or PowerPointSource or CameraSource)
                 {
                     _presentationStateService.SetForegroundSource(null);
                     ActivatePresentationOutput();
@@ -752,10 +967,92 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         }
     }
 
+    public async Task<bool> PowerPointNextSlideAsync()
+    {
+        if (CurrentPresentationSource is not PowerPointSource ppt)
+        {
+            return false;
+        }
+
+        if (ppt.IsLiveSlideshow && _powerPointLiveService is not null)
+        {
+            await _powerPointLiveService.NextAsync().ConfigureAwait(false);
+            OnPropertyChanged(nameof(PowerPointProgressText));
+            return true;
+        }
+
+        bool result = await _powerPointService.NextSlideAsync().ConfigureAwait(false);
+        OnPropertyChanged(nameof(PowerPointProgressText));
+        OnPropertyChanged(nameof(PowerPointSlideImageSource));
+        return result;
+    }
+
+    public async Task<bool> PowerPointPreviousSlideAsync()
+    {
+        if (CurrentPresentationSource is not PowerPointSource ppt)
+        {
+            return false;
+        }
+
+        if (ppt.IsLiveSlideshow && _powerPointLiveService is not null)
+        {
+            await _powerPointLiveService.PreviousAsync().ConfigureAwait(false);
+            OnPropertyChanged(nameof(PowerPointProgressText));
+            return true;
+        }
+
+        bool result = await _powerPointService.PreviousSlideAsync().ConfigureAwait(false);
+        OnPropertyChanged(nameof(PowerPointProgressText));
+        OnPropertyChanged(nameof(PowerPointSlideImageSource));
+        return result;
+    }
+
+    public async Task<bool> PowerPointGoToSlideAsync(int slideIndex)
+    {
+        if (CurrentPresentationSource is not PowerPointSource ppt)
+        {
+            return false;
+        }
+
+        if (ppt.IsLiveSlideshow && _powerPointLiveService is not null)
+        {
+            await _powerPointLiveService.GoToSlideAsync(slideIndex).ConfigureAwait(false);
+            OnPropertyChanged(nameof(PowerPointProgressText));
+            return true;
+        }
+
+        bool result = await _powerPointService.GoToSlideAsync(slideIndex).ConfigureAwait(false);
+        OnPropertyChanged(nameof(PowerPointProgressText));
+        OnPropertyChanged(nameof(PowerPointSlideImageSource));
+        return result;
+    }
+
+    private void OnCameraFrameArrived(object? sender, SoftwareBitmap bitmap)
+    {
+        if (Status != PresentationStatus.Active || !IsActiveSourceCamera)
+        {
+            return;
+        }
+
+        try
+        {
+            _ = _outputRenderer.RenderBitmapAsync(bitmap);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[PresentationCoordinator] OnCameraFrameArrived handled error: {ex.Message}");
+        }
+    }
+
     public void Dispose()
     {
         _captureCoordinator.FrameArrived -= OnCaptureFrameArrived;
         _presentationWindowService.WindowClosed -= OnWindowClosed;
+
+        if (_cameraCaptureService is not null)
+        {
+            _cameraCaptureService.FrameArrived -= OnCameraFrameArrived;
+        }
 
         _mediaPresentationService.Dispose();
         _outputRenderer.Dispose();

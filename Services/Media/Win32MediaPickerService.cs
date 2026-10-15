@@ -71,6 +71,43 @@ public class Win32MediaPickerService : IMediaPickerService
         return [];
     }
 
+    public async Task<IReadOnlyList<string>> PickPowerPointFilesAsync()
+    {
+        try
+        {
+            var picker = new FileOpenPicker
+            {
+                ViewMode = PickerViewMode.Thumbnail,
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary
+            };
+
+            IntPtr hwnd = _windowHandleProvider?.Invoke() ?? IntPtr.Zero;
+            if (hwnd == IntPtr.Zero)
+            {
+                hwnd = GetActiveWindow();
+            }
+
+            if (hwnd != IntPtr.Zero)
+            {
+                InitializeWithWindow.Initialize(picker, hwnd);
+            }
+
+            picker.FileTypeFilter.Add(".pptx");
+
+            var files = await picker.PickMultipleFilesAsync();
+            if (files is not null && files.Count > 0)
+            {
+                return files.Select(f => f.Path).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Win32MediaPickerService] PickPowerPointFilesAsync failed: {ex.Message}");
+        }
+
+        return [];
+    }
+
     [DllImport("user32.dll")]
     private static extern IntPtr GetActiveWindow();
 }
