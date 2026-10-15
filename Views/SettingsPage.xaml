@@ -10,7 +10,8 @@
     mc:Ignorable="d">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="16" Padding="28,20,28,28" MaxWidth="1080" HorizontalAlignment="Stretch">
+        <Grid HorizontalAlignment="Stretch">
+            <StackPanel Spacing="16" Padding="28,20,28,28" MaxWidth="1160" HorizontalAlignment="Stretch">
             
             <!-- Page Header -->
             <StackPanel Spacing="3">
@@ -24,10 +25,10 @@
             </StackPanel>
 
             <!-- Two-Pane Settings Layout -->
-            <Grid ColumnSpacing="20" Margin="0,4,0,0">
+            <Grid ColumnSpacing="20" Margin="0,4,0,0" HorizontalAlignment="Stretch">
                 <Grid.ColumnDefinitions>
-                    <!-- Category Navigation Pane (190 DIP) -->
-                    <ColumnDefinition Width="190" />
+                    <!-- Category Navigation Pane (200 DIP) -->
+                    <ColumnDefinition Width="200" />
                     <!-- Settings Content Pane (Flexible) -->
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
@@ -132,12 +133,13 @@
                 </Border>
 
                 <!-- Settings Content Panel -->
-                <StackPanel Grid.Column="1" Spacing="16">
+                <StackPanel Grid.Column="1" Spacing="16" HorizontalAlignment="Stretch">
                     
                     <!-- ========================================================= -->
                     <!-- CATEGORY 0: GENERAL & ABOUT                               -->
                     <!-- ========================================================= -->
                     <Border Visibility="{x:Bind ViewModel.GeneralCategoryVisibility, Mode=OneWay}"
+                            HorizontalAlignment="Stretch"
                             Background="{ThemeResource AppSurfaceBrush}"
                             BorderBrush="{ThemeResource AppBorderBrush}"
                             BorderThickness="1"
@@ -241,6 +243,7 @@
                     <!-- CATEGORY 1: APPEARANCE & THEME                            -->
                     <!-- ========================================================= -->
                     <Border Visibility="{x:Bind ViewModel.AppearanceCategoryVisibility, Mode=OneWay}"
+                            HorizontalAlignment="Stretch"
                             Background="{ThemeResource AppSurfaceBrush}"
                             BorderBrush="{ThemeResource AppBorderBrush}"
                             BorderThickness="1"
@@ -284,6 +287,7 @@
                     <!-- CATEGORY 2: WINDOW PREFERENCES                            -->
                     <!-- ========================================================= -->
                     <Border Visibility="{x:Bind ViewModel.WindowCategoryVisibility, Mode=OneWay}"
+                            HorizontalAlignment="Stretch"
                             Background="{ThemeResource AppSurfaceBrush}"
                             BorderBrush="{ThemeResource AppBorderBrush}"
                             BorderThickness="1"
@@ -323,6 +327,7 @@
                     <!-- CATEGORY 3: PRESENTER CONTROLS                            -->
                     <!-- ========================================================= -->
                     <Border Visibility="{x:Bind ViewModel.PresenterCategoryVisibility, Mode=OneWay}"
+                            HorizontalAlignment="Stretch"
                             Background="{ThemeResource AppSurfaceBrush}"
                             BorderBrush="{ThemeResource AppBorderBrush}"
                             BorderThickness="1"
@@ -500,6 +505,7 @@
                     <!-- CATEGORY 4: KEYBOARD SHORTCUTS                            -->
                     <!-- ========================================================= -->
                     <Border Visibility="{x:Bind ViewModel.ShortcutsCategoryVisibility, Mode=OneWay}"
+                            HorizontalAlignment="Stretch"
                             Background="{ThemeResource AppSurfaceBrush}"
                             BorderBrush="{ThemeResource AppBorderBrush}"
                             BorderThickness="1"
@@ -575,6 +581,7 @@
                     <!-- CATEGORY 5: DIAGNOSTICS & REPORTS                         -->
                     <!-- ========================================================= -->
                     <Border Visibility="{x:Bind ViewModel.DiagnosticsCategoryVisibility, Mode=OneWay}"
+                            HorizontalAlignment="Stretch"
                             Background="{ThemeResource AppSurfaceBrush}"
                             BorderBrush="{ThemeResource AppBorderBrush}"
                             BorderThickness="1"
@@ -719,6 +726,7 @@
                 </StackPanel>
             </Grid>
 
-        </StackPanel>
+            </StackPanel>
+        </Grid>
     </ScrollViewer>
 </Page>

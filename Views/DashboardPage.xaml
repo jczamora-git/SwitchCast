@@ -9,7 +9,8 @@
     mc:Ignorable="d">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="16" Padding="28,20,28,28" MaxWidth="1040" HorizontalAlignment="Left">
+        <Grid HorizontalAlignment="Stretch">
+            <StackPanel Spacing="16" Padding="28,20,28,28" MaxWidth="1160" HorizontalAlignment="Stretch">
             
             <!-- Header & Secondary Actions -->
             <Grid>
@@ -757,6 +758,7 @@
                 </ItemsControl>
             </StackPanel>
 
-        </StackPanel>
+            </StackPanel>
+        </Grid>
     </ScrollViewer>
 </Page>
