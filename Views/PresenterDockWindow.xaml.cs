@@ -34,10 +34,11 @@ public sealed partial class PresenterDockWindow : Window
 
     public PresenterDockWindow()
     {
-        InitializeComponent();
         _subclassProc = DockSubclassProc;
         ViewModel = App.Current.Services.GetRequiredService<PresenterDockViewModel>();
         ViewModel.SetDispatcherQueue(DispatcherQueue);
+        InitializeComponent();
+        Bindings.Update();
 
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
         Closed += OnWindowClosed;
@@ -354,9 +355,17 @@ public sealed partial class PresenterDockWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(PresenterDockViewModel.HasSecondaryRow))
+        if (e.PropertyName == nameof(PresenterDockViewModel.HasSecondaryRow) ||
+            e.PropertyName == nameof(PresenterDockViewModel.IsActiveSourcePowerPoint) ||
+            e.PropertyName == nameof(PresenterDockViewModel.IsActiveSourceVideo) ||
+            e.PropertyName == nameof(PresenterDockViewModel.PowerPointRowVisibility) ||
+            e.PropertyName == nameof(PresenterDockViewModel.VideoPlaybackRowVisibility))
         {
-            DispatcherQueue.TryEnqueue(() => ApplyWindowSizingAndPosition(ViewModel.HasSecondaryRow, initialCenter: false));
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                Bindings.Update();
+                ApplyWindowSizingAndPosition(ViewModel.HasSecondaryRow, initialCenter: false);
+            });
         }
     }
 

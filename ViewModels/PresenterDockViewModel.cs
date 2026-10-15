@@ -3,8 +3,10 @@ using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
 using SwitchCast.Models;
 using SwitchCast.Services;
+using SwitchCast.Services.Diagnostics;
 
 namespace SwitchCast.ViewModels;
 
@@ -274,6 +276,10 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
 
     public bool HasSecondaryRow => IsActiveSourceVideo || IsActiveSourcePowerPoint;
 
+    public Visibility VideoPlaybackRowVisibility => IsActiveSourceVideo ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility PowerPointRowVisibility => IsActiveSourcePowerPoint ? Visibility.Visible : Visibility.Collapsed;
+
     public bool IsMediaMuted => _presentationCoordinator.MediaPresentationService.IsMuted;
 
     public double MediaVolume
@@ -495,27 +501,55 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task PowerPointNextSlideAsync()
     {
-        await _presentationCoordinator.PowerPointNextSlideAsync();
-        OnPropertyChanged(nameof(PowerPointProgressText));
+        try
+        {
+            await _presentationCoordinator.PowerPointNextSlideAsync();
+            OnPropertyChanged(nameof(PowerPointProgressText));
+        }
+        catch (Exception ex)
+        {
+            SwitchCastDiagnostics.LogException(nameof(PresenterDockViewModel), nameof(PowerPointNextSlideAsync), ex, $"HResult=0x{ex.HResult:X8}");
+        }
     }
 
     [RelayCommand]
     private async Task PowerPointPreviousSlideAsync()
     {
-        await _presentationCoordinator.PowerPointPreviousSlideAsync();
-        OnPropertyChanged(nameof(PowerPointProgressText));
+        try
+        {
+            await _presentationCoordinator.PowerPointPreviousSlideAsync();
+            OnPropertyChanged(nameof(PowerPointProgressText));
+        }
+        catch (Exception ex)
+        {
+            SwitchCastDiagnostics.LogException(nameof(PresenterDockViewModel), nameof(PowerPointPreviousSlideAsync), ex, $"HResult=0x{ex.HResult:X8}");
+        }
     }
 
     [RelayCommand]
     private async Task NextSourceAsync()
     {
-        await _presentationCoordinator.SwitchToNextSourceAsync();
+        try
+        {
+            await _presentationCoordinator.SwitchToNextSourceAsync();
+        }
+        catch (Exception ex)
+        {
+            SwitchCastDiagnostics.LogException(nameof(PresenterDockViewModel), nameof(NextSourceAsync), ex, $"HResult=0x{ex.HResult:X8}");
+        }
     }
 
     [RelayCommand]
     private async Task PreviousSourceAsync()
     {
-        await _presentationCoordinator.SwitchToPreviousSourceAsync();
+        try
+        {
+            await _presentationCoordinator.SwitchToPreviousSourceAsync();
+        }
+        catch (Exception ex)
+        {
+            SwitchCastDiagnostics.LogException(nameof(PresenterDockViewModel), nameof(PreviousSourceAsync), ex, $"HResult=0x{ex.HResult:X8}");
+        }
     }
 
     [RelayCommand]
@@ -523,33 +557,61 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
     {
         if (source is not null && source.IsAvailable)
         {
-            await _presentationCoordinator.ExecuteSourceSwitchAsync(source);
+            try
+            {
+                await _presentationCoordinator.ExecuteSourceSwitchAsync(source);
+            }
+            catch (Exception ex)
+            {
+                SwitchCastDiagnostics.LogException(nameof(PresenterDockViewModel), nameof(SwitchSourceAsync), ex, $"SourceId={source.Id}, Type={source.Type}, HResult=0x{ex.HResult:X8}");
+            }
         }
     }
 
     [RelayCommand]
     private async Task TogglePauseAsync()
     {
-        if (IsPaused)
+        try
         {
-            await _presentationCoordinator.ResumePresentationAsync();
+            if (IsPaused)
+            {
+                await _presentationCoordinator.ResumePresentationAsync();
+            }
+            else if (IsLive)
+            {
+                await _presentationCoordinator.PausePresentationAsync();
+            }
         }
-        else if (IsLive)
+        catch (Exception ex)
         {
-            await _presentationCoordinator.PausePresentationAsync();
+            SwitchCastDiagnostics.LogException(nameof(PresenterDockViewModel), nameof(TogglePauseAsync), ex, $"HResult=0x{ex.HResult:X8}");
         }
     }
 
     [RelayCommand]
     private async Task ToggleBlackoutAsync()
     {
-        await _presentationCoordinator.ToggleBlackoutAsync();
+        try
+        {
+            await _presentationCoordinator.ToggleBlackoutAsync();
+        }
+        catch (Exception ex)
+        {
+            SwitchCastDiagnostics.LogException(nameof(PresenterDockViewModel), nameof(ToggleBlackoutAsync), ex, $"HResult=0x{ex.HResult:X8}");
+        }
     }
 
     [RelayCommand]
     private async Task StopPresentationAsync()
     {
-        await _presentationCoordinator.StopPresentationAsync();
+        try
+        {
+            await _presentationCoordinator.StopPresentationAsync();
+        }
+        catch (Exception ex)
+        {
+            SwitchCastDiagnostics.LogException(nameof(PresenterDockViewModel), nameof(StopPresentationAsync), ex, $"HResult=0x{ex.HResult:X8}");
+        }
     }
 
     [RelayCommand]
@@ -643,6 +705,7 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(MediaMuteButtonGlyph));
         OnPropertyChanged(nameof(MediaMuteButtonTooltip));
         OnPropertyChanged(nameof(HasSecondaryRow));
+        OnPropertyChanged(nameof(VideoPlaybackRowVisibility));
     }
 
     private void NotifyAllProperties()
@@ -669,6 +732,8 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsActiveSourceCamera));
         OnPropertyChanged(nameof(PowerPointProgressText));
         OnPropertyChanged(nameof(HasSecondaryRow));
+        OnPropertyChanged(nameof(PowerPointRowVisibility));
+        OnPropertyChanged(nameof(VideoPlaybackRowVisibility));
         NotifyMediaProperties();
         NotifyFullscreenProperties();
         NotifyModeProperties();

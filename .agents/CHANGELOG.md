@@ -7,6 +7,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [PowerPoint & Presenter Dock Regression Hotfix] - 2026-10-15
+
+### Fixed (fix / powerpoint / presenter-dock / lifecycle / layout / threading / test)
+- **PowerPoint COM Switching Crash Resolution**:
+  - Hardened `CameraCaptureService.StopCaptureInternalAsync` with guarded disposal try/catch blocks logging any WinRT/COM shutdown exceptions via `SwitchCastDiagnostics.LogException` without breaking transition flow.
+  - Updated `PowerPointPresentationService.LoadPresentationAsync` to automatically trigger `ImportPresentationAsync(source.FilePath)` if `SlideImagePaths` is empty before going live.
+  - Hardened `UpdateSlideImageAsync` in `PowerPointPresentationService` to verify UI `DispatcherQueue` before attempting `BitmapImage` instantiation.
+  - Added high-fidelity structured diagnostics with hex HRESULT (`0x{ex.HResult:X8}`), managed thread ID, source ID, source type, and stack trace in `PresentationCoordinator.StartPresentationAsync` and `SwitchPresentationSourceAsync`.
+  - Guarded all async commands in `PresenterDockViewModel` (`SwitchSourceAsync`, `NextSourceAsync`, `PreviousSourceAsync`, `PowerPointNextSlideAsync`, `PowerPointPreviousSlideAsync`, `TogglePauseAsync`, `ToggleBlackoutAsync`, `StopPresentationAsync`) with `try / catch` logging via `SwitchCastDiagnostics.LogException`.
+- **Centralized Automatic Presenter Dock Startup**:
+  - Centralized dock opening in `PresentationCoordinator.StartPresentationAsync`: automatically opens the existing Dock instance once when presentation starts for all 6 source types (Window, Display, Image, Video, PowerPoint, Camera) whenever `AutoOpenPresenterDock != false`.
+  - Added `SetDispatcherQueue` to `IPresenterDockService` and `PresenterDockService`, wired from `_mainWindow.DispatcherQueue` in `App.xaml.cs`.
+  - Implemented UI thread dispatch marshaling in `PresenterDockService.ShowDock()`, `CloseDock()`, and `ToggleDock()`, guaranteeing thread-safe window instantiation and activation from any thread.
+  - Preserved manual close behavior: source switches do not reopen a manually closed dock; stopping and starting a new presentation reopens the dock.
+- **Floating Dock PowerPoint Controls & Empty Black Secondary Row Fix**:
+  - Moved `ViewModel` assignment and `ViewModel.SetDispatcherQueue(DispatcherQueue)` before `InitializeComponent()` in `PresenterDockWindow.xaml.cs`, and called `Bindings.Update()` immediately after, ensuring WinUI compiled bindings (`x:Bind`) attach to `ViewModel.PropertyChanged`.
+  - Added direct typed properties `PowerPointRowVisibility` and `VideoPlaybackRowVisibility` to `PresenterDockViewModel` and bound them directly in `PresenterDockWindow.xaml`.
+  - Updated `PresenterDockWindow.OnViewModelPropertyChanged` to trigger `Bindings.Update()` and dynamic window sizing upon changes to `HasSecondaryRow`, `IsActiveSourcePowerPoint`, `IsActiveSourceVideo`, `PowerPointRowVisibility`, or `VideoPlaybackRowVisibility`.
+  - Raised `IsActiveSourcePowerPoint`, `IsActiveSourceCamera`, `PowerPointProgressText`, and `DirectImageSource` in `PresentationCoordinator` on `ActiveSource` change.
+  - Updated `PresentationViewModel.NotifyAllLayers` to notify `DirectImageSource`, `PresentationImageSource`, and `MediaPlayer`.
+- **Automated Regression Suite**:
+  - Added `PowerPointDockRegressionTests.cs` (16 new automated tests) covering all 6 source types auto-opening dock, PowerPoint static and Live switching, guarded command safety, and secondary row visibility, bringing total test count to **342 passing automated tests** (0 failures, 0 skipped). Both Debug and Release builds compile with 0 errors and 0 warnings.
+
+---
+
 ## [Presentation Pipeline Hotfix] - 2026-10-15
 
 ### Fixed (fix / ui-threading / first-source-start / dispatcher / camera / video / test)

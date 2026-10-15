@@ -222,7 +222,16 @@ public sealed class CameraCaptureService : ICameraCaptureService
             {
                 SwitchCastDiagnostics.LogException(nameof(CameraCaptureService), "StopFrameReader", ex);
             }
-            _frameReader.Dispose();
+
+            try
+            {
+                _frameReader.Dispose();
+            }
+            catch (Exception ex)
+            {
+                SwitchCastDiagnostics.LogException(nameof(CameraCaptureService), "DisposeFrameReader", ex);
+            }
+
             _frameReader = null;
         }
 
@@ -233,7 +242,16 @@ public sealed class CameraCaptureService : ICameraCaptureService
                 _mediaCapture.Failed -= OnMediaCaptureFailed;
             }
             catch { }
-            _mediaCapture.Dispose();
+
+            try
+            {
+                _mediaCapture.Dispose();
+            }
+            catch (Exception ex)
+            {
+                SwitchCastDiagnostics.LogException(nameof(CameraCaptureService), "DisposeMediaCapture", ex);
+            }
+
             _mediaCapture = null;
         }
 

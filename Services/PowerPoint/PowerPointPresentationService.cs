@@ -119,6 +119,33 @@ public sealed class PowerPointPresentationService : IPowerPointPresentationServi
         await _semaphore.WaitAsync().ConfigureAwait(false);
         try
         {
+            // If the source does not have cached slide images yet, render them now before taking live
+            if ((source.SlideImagePaths is null || source.SlideImagePaths.Count == 0) && File.Exists(source.FilePath))
+            {
+                try
+                {
+                    var imported = await ImportPresentationAsync(source.FilePath).ConfigureAwait(false);
+                    if (imported.SlideCount > 0)
+                    {
+                        source = source with
+                        {
+                            SlideCount = imported.SlideCount,
+                            SlideImagePaths = imported.SlideImagePaths,
+                            CurrentSlideIndex = 1,
+                            IsAvailable = true
+                        };
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Diagnostics.SwitchCastDiagnostics.LogException(
+                        nameof(PowerPointPresentationService),
+                        "LoadPresentationAsync (RenderDeckFallback)",
+                        ex,
+                        sourceDetails: Path.GetFileName(source.FilePath));
+                }
+            }
+
             ActivePowerPointSource = source;
             await UpdateSlideImageAsync(source.CurrentSlideImagePath).ConfigureAwait(false);
             SlideChanged?.Invoke(this, EventArgs.Empty);
@@ -216,7 +243,16 @@ public sealed class PowerPointPresentationService : IPowerPointPresentationServi
         }
 
         var dispatcher = _dispatcherQueue ?? Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
-        if (dispatcher is null || dispatcher.HasThreadAccess)
+        if (dispatcher is null)
+        {
+            Diagnostics.SwitchCastDiagnostics.LogInfo(
+                nameof(PowerPointPresentationService),
+                $"No DispatcherQueue configured; skipping BitmapImage creation on worker thread for '{Path.GetFileName(imagePath)}'.");
+            _currentSlideImageSource = null;
+            return;
+        }
+
+        if (dispatcher.HasThreadAccess)
         {
             try
             {

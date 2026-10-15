@@ -7,15 +7,43 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Presentation Pipeline Hotfix — First Queued Source Auto-Start & UI State Dispatch Stabilization Complete
-- **Overall Status**: **Implemented & Validated (326 Automated Unit Tests Passing, Debug & Release Builds Clean, Native Hardware Verification Pending)**
-- **Last Updated**: 2026-10-15T17:25:00+08:00 (UTC+8)
+- **Current Phase**: Critical PowerPoint & Presenter Dock Regression Hotfix Complete
+- **Overall Status**: **Implemented & Validated (342 Automated Unit Tests Passing, Debug & Release Builds Clean, Native Hardware Verification Pending)**
+- **Last Updated**: 2026-10-15T18:55:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Critical PowerPoint & Presenter Dock Regression Hotfix (COM Crash, Auto-Open Dock & Broken Slide Controls)**:
+  - **PowerPoint COM Switching Crash Resolution**:
+    - **Confirmed Root Cause**: When transitioning Camera -> PowerPoint, `CameraCaptureService.StopCaptureInternalAsync` invoked `_frameReader.Dispose()` and `_mediaCapture.Dispose()` on the deactivation path outside guarded try/catch blocks; native WinRT/COM shutdown exceptions escaped into `SwitchPresentationSourceAsync`. Simultaneously, if PowerPoint slides had not yet been cached or had missing slide image paths, `PowerPointPresentationService.LoadPresentationAsync` called `UpdateSlideImageAsync` with null/empty paths or attempted background `BitmapImage` creation without dispatcher validation. When `SwitchPresentationSourceAsync` caught the failure, it logged only `error={ex.Message}` (often empty for COMExceptions) without hex HRESULT or stack trace, then rethrew `throw;`, hitting `PresenterDockViewModel.SwitchSourceAsync` which had no try-catch, causing an unhandled task exception breaking in `App.xaml.cs`.
+    - **Remediation**:
+      - Hardened `CameraCaptureService.StopCaptureInternalAsync`: guarded `_frameReader.Dispose()` and `_mediaCapture.Dispose()` with dedicated try/catch blocks logging any disposal exceptions via `SwitchCastDiagnostics.LogException` without breaking transition flow.
+      - Updated `PowerPointPresentationService.LoadPresentationAsync`: added automatic fallback import (`ImportPresentationAsync(source.FilePath)`) if `SlideImagePaths` is empty before going live; strictly guarded `UpdateSlideImageAsync` to verify UI `DispatcherQueue` before attempting `BitmapImage` instantiation.
+      - Added high-fidelity structured diagnostics with hex HRESULT (`0x{ex.HResult:X8}`), managed thread ID, source ID, source type, and stack trace in `PresentationCoordinator.StartPresentationAsync` and `SwitchPresentationSourceAsync`.
+      - Guarded all async commands in `PresenterDockViewModel` (`SwitchSourceAsync`, `NextSourceAsync`, `PreviousSourceAsync`, `PowerPointNextSlideAsync`, `PowerPointPreviousSlideAsync`, `TogglePauseAsync`, `ToggleBlackoutAsync`, `StopPresentationAsync`) with `try / catch` logging via `SwitchCastDiagnostics.LogException` to prevent unhandled exceptions from terminating UI tasks.
+  - **Centralized Automatic Presenter Dock Startup**:
+    - **Confirmed Root Cause**: `_dockService?.ShowDock()` was previously called only in `DashboardViewModel.StartPresentationAsync` after an asynchronous `ConfigureAwait(false)` resumption, causing cross-thread window creation exceptions. Direct coordinator starts, hotkeys, and non-window sources lacked a centralized startup guarantee.
+    - **Remediation**:
+      - Injected `IPresenterDockService` and `IApplicationSettingsService` directly into `PresentationCoordinator`.
+      - Centralized automatic dock startup in `PresentationCoordinator.StartPresentationAsync`: opens the existing Dock instance once when presentation starts for all 6 source types (Window, Display, Image, Video, PowerPoint, Camera) whenever `AutoOpenPresenterDock != false`.
+      - Added `SetDispatcherQueue` to `IPresenterDockService` and `PresenterDockService`, wired from `_mainWindow.DispatcherQueue` in `App.xaml.cs`.
+      - Implemented UI thread dispatch marshaling in `PresenterDockService.ShowDock()`, `CloseDock()`, and `ToggleDock()`, guaranteeing thread-safe window instantiation and activation from any thread.
+      - Preserved user close behavior: source switches do not reopen a manually closed dock; stopping and starting a new presentation reopens the dock.
+  - **Floating Dock PowerPoint Controls & Empty Black Secondary Row Fix**:
+    - **Confirmed Root Cause**:
+      1. In `PresenterDockWindow.xaml.cs`, `ViewModel` was assigned *after* `InitializeComponent()`. When `InitializeComponent()` executed `this.Bindings.Initialize()`, `this.ViewModel` was `null`, so WinUI compiled bindings (`x:Bind`) never attached child listeners to `ViewModel.PropertyChanged`.
+      2. In `PresentationCoordinator.cs`, property changed handler on `PresentationStateService` notified media properties but omitted `IsActiveSourcePowerPoint`, `IsActiveSourceCamera`, and `PowerPointProgressText`.
+      3. Code-behind in `PresenterDockWindow.xaml.cs` listened to `HasSecondaryRow` and resized `_appWindow` to 86 DIPs, but `PowerPointRowGrid.Visibility` remained `Collapsed` because `x:Bind` was disconnected, leaving a black empty gap.
+    - **Remediation**:
+      - Moved `ViewModel` assignment and `ViewModel.SetDispatcherQueue(DispatcherQueue)` before `InitializeComponent()` in `PresenterDockWindow.xaml.cs`, and called `Bindings.Update()` immediately after.
+      - Added direct typed properties `PowerPointRowVisibility` and `VideoPlaybackRowVisibility` to `PresenterDockViewModel` and bound them in `PresenterDockWindow.xaml`.
+      - Updated `PresenterDockWindow.OnViewModelPropertyChanged` to trigger `Bindings.Update()` and dynamic window sizing upon changes to `HasSecondaryRow`, `IsActiveSourcePowerPoint`, `IsActiveSourceVideo`, `PowerPointRowVisibility`, or `VideoPlaybackRowVisibility`.
+      - Raised `IsActiveSourcePowerPoint`, `IsActiveSourceCamera`, `PowerPointProgressText`, and `DirectImageSource` in `PresentationCoordinator` on `ActiveSource` change.
+  - **Automated Regression Suite**:
+    - Added `PowerPointDockRegressionTests.cs` (16 new automated tests), expanding the total test suite to **342 automated unit tests** (100% pass rate). Both Debug and Release builds compile with 0 errors and 0 warnings.
 - [x] **Presentation Pipeline Hotfix (First Queued Source Auto-Start & UI State Dispatch Stabilization)**:
   - **COMException 0x8001010E (RPC_E_WRONG_THREAD) Resolution**:
     - Created explicit UI dispatcher abstraction: `IUIThreadDispatcher` with `DispatcherQueueAdapter`, `ImmediateUIThreadDispatcher`, and thread-safe registration via `UIThreadDispatcherProvider`.

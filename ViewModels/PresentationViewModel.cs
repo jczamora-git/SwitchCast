@@ -160,6 +160,9 @@ public partial class PresentationViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(DirectVideoVisibility));
             OnPropertyChanged(nameof(BlackoutVisibility));
             OnPropertyChanged(nameof(PausedIndicatorVisibility));
+            OnPropertyChanged(nameof(DirectImageSource));
+            OnPropertyChanged(nameof(PresentationImageSource));
+            OnPropertyChanged(nameof(MediaPlayer));
         });
     }
 

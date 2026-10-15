@@ -211,7 +211,7 @@
                       ColumnSpacing="4"
                       Padding="2,2,2,0"
                       VerticalAlignment="Center"
-                      Visibility="{x:Bind views:PresenterDockWindow.BoolToVis(ViewModel.IsActiveSourceVideo), Mode=OneWay}">
+                      Visibility="{x:Bind ViewModel.VideoPlaybackRowVisibility, Mode=OneWay}">
                     <Grid.ColumnDefinitions>
                         <!-- Transport Buttons (Restart, Rewind 10s, Play/Pause, Forward 10s) -->
                         <ColumnDefinition Width="Auto" />
@@ -284,7 +284,7 @@
                       ColumnSpacing="8"
                       Padding="6,2,6,0"
                       VerticalAlignment="Center"
-                      Visibility="{x:Bind views:PresenterDockWindow.BoolToVis(ViewModel.IsActiveSourcePowerPoint), Mode=OneWay}">
+                      Visibility="{x:Bind ViewModel.PowerPointRowVisibility, Mode=OneWay}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
