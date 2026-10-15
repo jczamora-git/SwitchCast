@@ -20,6 +20,7 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
     private readonly IApplicationSettingsService _settingsService;
     private readonly IApplicationLifecycleService? _lifecycleService;
     private DispatcherQueue? _dispatcherQueue;
+    private IUIThreadDispatcher? _dispatcher;
     private DispatcherQueueTimer? _playbackTimer;
     private bool _isScrubbing;
     private double _scrubbingPositionSeconds;
@@ -31,7 +32,8 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         IPresentationWindowService presentationWindowService,
         IPresenterDockService dockService,
         IApplicationSettingsService settingsService,
-        IApplicationLifecycleService? lifecycleService = null)
+        IApplicationLifecycleService? lifecycleService = null,
+        IUIThreadDispatcher? uiDispatcher = null)
     {
         _presentationCoordinator = presentationCoordinator ?? throw new ArgumentNullException(nameof(presentationCoordinator));
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
@@ -39,6 +41,9 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         _dockService = dockService ?? throw new ArgumentNullException(nameof(dockService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _lifecycleService = lifecycleService;
+
+        _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+        _dispatcher = UIThreadDispatcherProvider.Resolve(uiDispatcher);
 
         _presentationStateService.PropertyChanged += OnStatePropertyChanged;
         _presentationCoordinator.PropertyChanged += OnCoordinatorPropertyChanged;
@@ -51,8 +56,6 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
             _presentationCoordinator.MediaPresentationService.MediaStateChanged += OnMediaStateChanged;
         }
 
-        // Capture ambient dispatcher if initialized on a UI thread
-        _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         InitializePlaybackTimer();
     }
 
@@ -67,7 +70,16 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         }
 
         _dispatcherQueue = dispatcherQueue;
+        _dispatcher = dispatcherQueue is not null ? new DispatcherQueueAdapter(dispatcherQueue) : null;
         InitializePlaybackTimer();
+    }
+
+    /// <summary>
+    /// Configures a testable UI thread dispatcher for this ViewModel.
+    /// </summary>
+    public void SetUIThreadDispatcher(IUIThreadDispatcher? dispatcher)
+    {
+        _dispatcher = dispatcher;
     }
 
     private void InitializePlaybackTimer()
@@ -129,26 +141,18 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
 
     private void RunOnUIThread(Action action)
     {
-        if (_disposed)
+        if (_disposed || _dispatcher is null)
         {
             return;
         }
 
-        var dispatcher = _dispatcherQueue ?? DispatcherQueue.GetForCurrentThread();
-        if (dispatcher is null)
-        {
-            // Headless unit test environment fallback
-            action();
-            return;
-        }
-
-        if (dispatcher.HasThreadAccess)
+        if (_dispatcher.HasThreadAccess)
         {
             action();
         }
         else
         {
-            bool enqueued = dispatcher.TryEnqueue(() =>
+            bool enqueued = _dispatcher.TryEnqueue(() =>
             {
                 if (!_disposed)
                 {

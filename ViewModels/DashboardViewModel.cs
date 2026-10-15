@@ -12,7 +12,7 @@ namespace SwitchCast.ViewModels;
 /// <summary>
 /// ViewModel managing the presenter dashboard, live preview capture, and dedicated presentation output orchestration.
 /// </summary>
-public partial class DashboardViewModel : ObservableObject
+public partial class DashboardViewModel : ObservableObject, IDisposable
 {
     private readonly IPresentationStateService _presentationStateService;
     private readonly INavigationService _navigationService;
@@ -20,6 +20,8 @@ public partial class DashboardViewModel : ObservableObject
     private readonly IPresentationCoordinator _presentationCoordinator;
     private readonly IPresenterDockService? _dockService;
     private readonly IApplicationSettingsService? _settingsService;
+    private IUIThreadDispatcher? _dispatcher;
+    private bool _disposed;
 
     [ObservableProperty]
     private CaptureSource? _selectedPreviewSource;
@@ -35,7 +37,8 @@ public partial class DashboardViewModel : ObservableObject
         ICaptureCoordinator captureCoordinator,
         IPresentationCoordinator presentationCoordinator,
         IPresenterDockService? dockService = null,
-        IApplicationSettingsService? settingsService = null)
+        IApplicationSettingsService? settingsService = null,
+        IUIThreadDispatcher? uiDispatcher = null)
     {
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
         _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
@@ -43,6 +46,8 @@ public partial class DashboardViewModel : ObservableObject
         _presentationCoordinator = presentationCoordinator ?? throw new ArgumentNullException(nameof(presentationCoordinator));
         _dockService = dockService;
         _settingsService = settingsService;
+
+        _dispatcher = UIThreadDispatcherProvider.Resolve(uiDispatcher);
 
         _presentationStateService.PropertyChanged += OnPresentationStatePropertyChanged;
         _captureCoordinator.PropertyChanged += OnCaptureCoordinatorPropertyChanged;
@@ -54,14 +59,47 @@ public partial class DashboardViewModel : ObservableObject
 
         if (_dockService is not null)
         {
-            _dockService.DockOpened += (s, e) => OnPropertyChanged(nameof(IsPresenterDockOpen));
-            _dockService.DockClosed += (s, e) => OnPropertyChanged(nameof(IsPresenterDockOpen));
+            _dockService.DockOpened += (s, e) => RunOnUIThread(() => OnPropertyChanged(nameof(IsPresenterDockOpen)));
+            _dockService.DockClosed += (s, e) => RunOnUIThread(() => OnPropertyChanged(nameof(IsPresenterDockOpen)));
         }
 
         // Default selected sources if sources are already queued
         var defaultSource = _presentationStateService.SelectedSources.FirstOrDefault(s => s.IsAvailable);
         _selectedPreviewSource = defaultSource;
         _selectedPresentationSource = defaultSource;
+    }
+
+    /// <summary>
+    /// Configures the authoritative UI thread DispatcherQueue for this ViewModel.
+    /// </summary>
+    public void SetDispatcherQueue(Microsoft.UI.Dispatching.DispatcherQueue? queue)
+    {
+        _dispatcher = queue is not null ? new DispatcherQueueAdapter(queue) : null;
+    }
+
+    /// <summary>
+    /// Configures a testable UI thread dispatcher for this ViewModel.
+    /// </summary>
+    public void SetUIThreadDispatcher(IUIThreadDispatcher? dispatcher)
+    {
+        _dispatcher = dispatcher;
+    }
+
+    private void RunOnUIThread(Action action)
+    {
+        if (_disposed || _dispatcher is null)
+        {
+            return;
+        }
+
+        if (_dispatcher.HasThreadAccess)
+        {
+            action();
+        }
+        else
+        {
+            _dispatcher.TryEnqueue(action);
+        }
     }
 
     public PresentationStatus Status => _presentationStateService.Status;
@@ -90,11 +128,15 @@ public partial class DashboardViewModel : ObservableObject
 
     public string SourceSelectorPlaceholderText => HasSelectedSources ? "Select target source..." : "No queued sources";
 
-    public bool CanStartPresentation => HasActivePresentation || HasSelectedSources;
+    public bool IsStarting => Status == PresentationStatus.Starting;
+
+    public bool CanStartPresentation => !IsStarting && (HasActivePresentation || HasSelectedSources);
 
     public string StartPresentingTooltip => HasActivePresentation
         ? "Stop Live Presentation"
-        : (HasSelectedSources ? "Start Live Presentation" : "Add a presentation source first.");
+        : (IsStarting
+            ? "Presentation starting..."
+            : (HasSelectedSources ? "Start Live Presentation" : "Add a presentation source first."));
 
     public bool HasActiveSource => _presentationCoordinator.CurrentPresentationSource is not null ||
                                   _captureCoordinator.CurrentPreviewSource is not null ||
@@ -327,15 +369,48 @@ public partial class DashboardViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Resolves the authoritative target source for starting presentation according to policy:
+    /// 1. An explicitly selected, valid queued target (in SelectedSources and available).
+    /// 2. The first valid queued source (SelectedSources.FirstOrDefault(s => s.IsAvailable)).
+    /// </summary>
+    public CaptureSource? ResolveAuthoritativeStartSource()
+    {
+        if (SelectedPresentationSource is not null &&
+            SelectedPresentationSource.IsAvailable &&
+            SelectedSources.Any(s => s.Id == SelectedPresentationSource.Id))
+        {
+            return SelectedSources.First(s => s.Id == SelectedPresentationSource.Id);
+        }
+
+        return SelectedSources.FirstOrDefault(s => s.IsAvailable);
+    }
+
+    /// <summary>
     /// Starts presenting to the dedicated Presentation Output Window.
     /// </summary>
     [RelayCommand]
     public async Task StartPresentationAsync()
     {
-        var targetSource = SelectedPresentationSource ?? SelectedPreviewSource ?? SelectedSources.FirstOrDefault(s => s.IsAvailable);
+        if (IsStarting || HasActivePresentation)
+        {
+            return;
+        }
+
+        var targetSource = ResolveAuthoritativeStartSource();
         if (targetSource is null)
         {
             return;
+        }
+
+        // Align selected source with the authoritative target being started
+        _isSyncingPresentationSource = true;
+        try
+        {
+            SelectedPresentationSource = targetSource;
+        }
+        finally
+        {
+            _isSyncingPresentationSource = false;
         }
 
         try
@@ -516,6 +591,25 @@ public partial class DashboardViewModel : ObservableObject
             return;
         }
 
+        // Guard against spurious null push from ComboBox when items change/toggle visibility
+        if (value is null && HasSelectedSources && !HasActivePresentation)
+        {
+            var fallback = SelectedSources.FirstOrDefault(s => s.IsAvailable);
+            if (fallback is not null && SelectedPresentationSource != fallback)
+            {
+                _isSyncingPresentationSource = true;
+                try
+                {
+                    SelectedPresentationSource = fallback;
+                }
+                finally
+                {
+                    _isSyncingPresentationSource = false;
+                }
+                return;
+            }
+        }
+
         if (HasActivePresentation && value is not null && value.IsAvailable && value.Id != _presentationCoordinator.CurrentPresentationSource?.Id)
         {
             _ = SwitchPresentationSourceAsync(value);
@@ -524,68 +618,75 @@ public partial class DashboardViewModel : ObservableObject
 
     private void NotifyMediaPlaybackProperties()
     {
-        OnPropertyChanged(nameof(IsActiveSourceVideo));
-        OnPropertyChanged(nameof(IsActiveSourceImage));
-        OnPropertyChanged(nameof(IsVideoPlaying));
-        OnPropertyChanged(nameof(IsVideoPaused));
-        OnPropertyChanged(nameof(IsVideoEnded));
-        OnPropertyChanged(nameof(IsVideoLooping));
-        OnPropertyChanged(nameof(VideoPlaybackButtonGlyph));
-        OnPropertyChanged(nameof(VideoPlaybackButtonText));
-        OnPropertyChanged(nameof(VideoLoopButtonText));
-        OnPropertyChanged(nameof(VideoPositionText));
-        OnPropertyChanged(nameof(VideoControlsVisibility));
-        OnPropertyChanged(nameof(MediaVolume));
-        OnPropertyChanged(nameof(IsMediaMuted));
-        OnPropertyChanged(nameof(MediaVolumePercentText));
-        OnPropertyChanged(nameof(MediaMuteButtonGlyph));
-        OnPropertyChanged(nameof(MediaMuteButtonTooltip));
+        RunOnUIThread(() =>
+        {
+            OnPropertyChanged(nameof(IsActiveSourceVideo));
+            OnPropertyChanged(nameof(IsActiveSourceImage));
+            OnPropertyChanged(nameof(IsVideoPlaying));
+            OnPropertyChanged(nameof(IsVideoPaused));
+            OnPropertyChanged(nameof(IsVideoEnded));
+            OnPropertyChanged(nameof(IsVideoLooping));
+            OnPropertyChanged(nameof(VideoPlaybackButtonGlyph));
+            OnPropertyChanged(nameof(VideoPlaybackButtonText));
+            OnPropertyChanged(nameof(VideoLoopButtonText));
+            OnPropertyChanged(nameof(VideoPositionText));
+            OnPropertyChanged(nameof(VideoControlsVisibility));
+            OnPropertyChanged(nameof(MediaVolume));
+            OnPropertyChanged(nameof(IsMediaMuted));
+            OnPropertyChanged(nameof(MediaVolumePercentText));
+            OnPropertyChanged(nameof(MediaMuteButtonGlyph));
+            OnPropertyChanged(nameof(MediaMuteButtonTooltip));
+        });
     }
 
     private void OnPresentationStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(IPresentationStateService.Status))
         {
-            OnPropertyChanged(nameof(Status));
-            OnPropertyChanged(nameof(StatusDisplayText));
-            OnPropertyChanged(nameof(IsPresenting));
-            OnPropertyChanged(nameof(IsPresentationPaused));
-            OnPropertyChanged(nameof(IsPresentationBlackout));
-            OnPropertyChanged(nameof(HasActivePresentation));
-            OnPropertyChanged(nameof(PresentationButtonText));
-            OnPropertyChanged(nameof(PresentationButtonGlyph));
-            OnPropertyChanged(nameof(PauseButtonText));
-            OnPropertyChanged(nameof(BlackoutButtonText));
-            OnPropertyChanged(nameof(CanStartPresentation));
-            OnPropertyChanged(nameof(StartPresentingTooltip));
-            NotifyMediaPlaybackProperties();
+            RunOnUIThread(() =>
+            {
+                OnPropertyChanged(nameof(Status));
+                OnPropertyChanged(nameof(StatusDisplayText));
+                OnPropertyChanged(nameof(IsStarting));
+                OnPropertyChanged(nameof(IsPresenting));
+                OnPropertyChanged(nameof(IsPresentationPaused));
+                OnPropertyChanged(nameof(IsPresentationBlackout));
+                OnPropertyChanged(nameof(HasActivePresentation));
+                OnPropertyChanged(nameof(PresentationButtonText));
+                OnPropertyChanged(nameof(PresentationButtonGlyph));
+                OnPropertyChanged(nameof(PauseButtonText));
+                OnPropertyChanged(nameof(BlackoutButtonText));
+                OnPropertyChanged(nameof(CanStartPresentation));
+                OnPropertyChanged(nameof(StartPresentingTooltip));
+                NotifyMediaPlaybackProperties();
+            });
         }
         else if (e.PropertyName == nameof(IPresentationStateService.ActiveSource))
         {
             if (_presentationStateService.ActiveSource is not null &&
                 SelectedPresentationSource?.Id != _presentationStateService.ActiveSource.Id)
             {
-                SelectedPresentationSource = _presentationStateService.ActiveSource;
+                _isSyncingPresentationSource = true;
+                try
+                {
+                    SelectedPresentationSource = _presentationStateService.ActiveSource;
+                }
+                finally
+                {
+                    _isSyncingPresentationSource = false;
+                }
             }
-            OnPropertyChanged(nameof(ActiveSourceTitle));
-            OnPropertyChanged(nameof(HasActiveSource));
-            NotifyMediaPlaybackProperties();
+
+            RunOnUIThread(() =>
+            {
+                OnPropertyChanged(nameof(ActiveSourceTitle));
+                OnPropertyChanged(nameof(HasActiveSource));
+                NotifyMediaPlaybackProperties();
+            });
         }
         else if (e.PropertyName == nameof(IPresentationStateService.SelectedSourceCount) ||
                  e.PropertyName == nameof(IPresentationStateService.SelectedSources))
         {
-            OnPropertyChanged(nameof(SelectedSourceCount));
-            OnPropertyChanged(nameof(HasSelectedSources));
-            OnPropertyChanged(nameof(HasNoSelectedSources));
-            OnPropertyChanged(nameof(SourceSelectorPlaceholderText));
-            OnPropertyChanged(nameof(CanStartPresentation));
-            OnPropertyChanged(nameof(StartPresentingTooltip));
-            OnPropertyChanged(nameof(HasSelectedSourcesVisibility));
-            OnPropertyChanged(nameof(NoSelectedSourcesVisibility));
-            OnPropertyChanged(nameof(SelectedSources));
-            OnPropertyChanged(nameof(EmptyWorkspaceVisibility));
-            OnPropertyChanged(nameof(ReadyToPreviewVisibility));
-
             if (SelectedPreviewSource is null || !SelectedSources.Any(s => s.Id == SelectedPreviewSource.Id))
             {
                 SelectedPreviewSource = SelectedSources.FirstOrDefault(s => s.IsAvailable);
@@ -595,7 +696,15 @@ public partial class DashboardViewModel : ObservableObject
             {
                 if (SelectedPresentationSource is null || !SelectedSources.Any(s => s.Id == SelectedPresentationSource.Id))
                 {
-                    SelectedPresentationSource = SelectedSources.FirstOrDefault(s => s.IsAvailable);
+                    _isSyncingPresentationSource = true;
+                    try
+                    {
+                        SelectedPresentationSource = SelectedSources.FirstOrDefault(s => s.IsAvailable);
+                    }
+                    finally
+                    {
+                        _isSyncingPresentationSource = false;
+                    }
                 }
             }
             else
@@ -616,44 +725,79 @@ public partial class DashboardViewModel : ObservableObject
                     }
                 }
             }
+
+            RunOnUIThread(() =>
+            {
+                OnPropertyChanged(nameof(SelectedSourceCount));
+                OnPropertyChanged(nameof(HasSelectedSources));
+                OnPropertyChanged(nameof(HasNoSelectedSources));
+                OnPropertyChanged(nameof(SourceSelectorPlaceholderText));
+                OnPropertyChanged(nameof(CanStartPresentation));
+                OnPropertyChanged(nameof(StartPresentingTooltip));
+                OnPropertyChanged(nameof(HasSelectedSourcesVisibility));
+                OnPropertyChanged(nameof(NoSelectedSourcesVisibility));
+                OnPropertyChanged(nameof(SelectedSources));
+                OnPropertyChanged(nameof(EmptyWorkspaceVisibility));
+                OnPropertyChanged(nameof(ReadyToPreviewVisibility));
+            });
         }
     }
 
     private void OnCaptureCoordinatorPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        OnPropertyChanged(nameof(CaptureState));
-        OnPropertyChanged(nameof(IsCapturing));
-        OnPropertyChanged(nameof(IsStartingCapture));
-        OnPropertyChanged(nameof(IsCaptureIdle));
-        OnPropertyChanged(nameof(HasCaptureError));
-        OnPropertyChanged(nameof(CaptureErrorMessage));
-        OnPropertyChanged(nameof(ActiveSourceTitle));
-        OnPropertyChanged(nameof(HasActiveSource));
-        OnPropertyChanged(nameof(StatusDisplayText));
-        OnPropertyChanged(nameof(PreviewImageSource));
-        OnPropertyChanged(nameof(LivePreviewVisibility));
-        OnPropertyChanged(nameof(StartingCaptureVisibility));
-        OnPropertyChanged(nameof(EmptyWorkspaceVisibility));
-        OnPropertyChanged(nameof(ReadyToPreviewVisibility));
+        RunOnUIThread(() =>
+        {
+            OnPropertyChanged(nameof(CaptureState));
+            OnPropertyChanged(nameof(IsCapturing));
+            OnPropertyChanged(nameof(IsStartingCapture));
+            OnPropertyChanged(nameof(IsCaptureIdle));
+            OnPropertyChanged(nameof(HasCaptureError));
+            OnPropertyChanged(nameof(CaptureErrorMessage));
+            OnPropertyChanged(nameof(ActiveSourceTitle));
+            OnPropertyChanged(nameof(HasActiveSource));
+            OnPropertyChanged(nameof(StatusDisplayText));
+            OnPropertyChanged(nameof(PreviewImageSource));
+            OnPropertyChanged(nameof(LivePreviewVisibility));
+            OnPropertyChanged(nameof(StartingCaptureVisibility));
+            OnPropertyChanged(nameof(EmptyWorkspaceVisibility));
+            OnPropertyChanged(nameof(ReadyToPreviewVisibility));
+        });
     }
 
     private void OnPresentationCoordinatorPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        OnPropertyChanged(nameof(IsOutputWindowOpen));
-        OnPropertyChanged(nameof(PresentationOutputStatusText));
-        OnPropertyChanged(nameof(IsPresenting));
-        OnPropertyChanged(nameof(IsPresentationPaused));
-        OnPropertyChanged(nameof(IsPresentationBlackout));
-        OnPropertyChanged(nameof(HasActivePresentation));
-        OnPropertyChanged(nameof(PresentationButtonText));
-        OnPropertyChanged(nameof(PauseButtonText));
-        OnPropertyChanged(nameof(BlackoutButtonText));
-        OnPropertyChanged(nameof(CanStartPresentation));
-        OnPropertyChanged(nameof(StartPresentingTooltip));
-        OnPropertyChanged(nameof(HasCaptureError));
-        OnPropertyChanged(nameof(CaptureErrorMessage));
-        OnPropertyChanged(nameof(ActiveSourceTitle));
-        OnPropertyChanged(nameof(StatusDisplayText));
-        NotifyMediaPlaybackProperties();
+        RunOnUIThread(() =>
+        {
+            OnPropertyChanged(nameof(IsOutputWindowOpen));
+            OnPropertyChanged(nameof(PresentationOutputStatusText));
+            OnPropertyChanged(nameof(IsStarting));
+            OnPropertyChanged(nameof(IsPresenting));
+            OnPropertyChanged(nameof(IsPresentationPaused));
+            OnPropertyChanged(nameof(IsPresentationBlackout));
+            OnPropertyChanged(nameof(HasActivePresentation));
+            OnPropertyChanged(nameof(PresentationButtonText));
+            OnPropertyChanged(nameof(PauseButtonText));
+            OnPropertyChanged(nameof(BlackoutButtonText));
+            OnPropertyChanged(nameof(CanStartPresentation));
+            OnPropertyChanged(nameof(StartPresentingTooltip));
+            OnPropertyChanged(nameof(HasCaptureError));
+            OnPropertyChanged(nameof(CaptureErrorMessage));
+            OnPropertyChanged(nameof(ActiveSourceTitle));
+            OnPropertyChanged(nameof(StatusDisplayText));
+            NotifyMediaPlaybackProperties();
+        });
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _presentationStateService.PropertyChanged -= OnPresentationStatePropertyChanged;
+        _captureCoordinator.PropertyChanged -= OnCaptureCoordinatorPropertyChanged;
+        _presentationCoordinator.PropertyChanged -= OnPresentationCoordinatorPropertyChanged;
     }
 }

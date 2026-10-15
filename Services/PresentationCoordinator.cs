@@ -220,9 +220,21 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
     public async Task StartPresentationAsync(CaptureSource? source = null)
     {
-        var targetSource = source ??
-                           _presentationStateService.ActiveSource ??
-                           _presentationStateService.SelectedSources.FirstOrDefault(s => s.IsAvailable);
+        var targetSource = source;
+        if (targetSource is null)
+        {
+            if (_presentationStateService.SelectedSource is not null &&
+                _presentationStateService.SelectedSource.IsAvailable &&
+                _presentationStateService.SelectedSources.Any(s => s.Id == _presentationStateService.SelectedSource.Id))
+            {
+                targetSource = _presentationStateService.SelectedSource;
+            }
+            else
+            {
+                targetSource = _presentationStateService.SelectedSources.FirstOrDefault(s => s.IsAvailable) ??
+                               _presentationStateService.ActiveSource;
+            }
+        }
 
         if (targetSource is null || !targetSource.IsAvailable)
         {

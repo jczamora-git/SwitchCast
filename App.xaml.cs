@@ -198,6 +198,24 @@ public partial class App : Application
             powerPointService.SetDispatcherQueue(_mainWindow.DispatcherQueue);
         }
 
+        var dashboardViewModel = Services.GetService<DashboardViewModel>();
+        if (dashboardViewModel is not null && _mainWindow.DispatcherQueue is not null)
+        {
+            dashboardViewModel.SetDispatcherQueue(_mainWindow.DispatcherQueue);
+        }
+
+        var mediaService = Services.GetService<Services.Media.IMediaPresentationService>();
+        if (mediaService is not null && _mainWindow.DispatcherQueue is not null)
+        {
+            mediaService.SetDispatcherQueue(_mainWindow.DispatcherQueue);
+        }
+
+        var sourcesViewModel = Services.GetService<SourcesViewModel>();
+        if (sourcesViewModel is not null && _mainWindow.DispatcherQueue is not null)
+        {
+            sourcesViewModel.SetDispatcherQueue(_mainWindow.DispatcherQueue);
+        }
+
         _mainWindow.Activate();
     }
 }

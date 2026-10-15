@@ -30,6 +30,7 @@ SwitchCast enforces a multi-layered verification strategy designed to maximize t
 - **Scope**: Pure business logic, state machines, view models, and configuration.
 - **Execution Target**: < 1.0 second per test suite run. Zero OS or hardware dependencies.
 - **Key Test Suites**:
+  - `PresentationStartupAndThreadingTests`: Validates first queued source auto-start, authoritative source resolution, idempotent start requests, and UI thread dispatcher marshaling under off-thread worker callbacks.
   - `PresentationCoordinatorTests`: Validates state transitions (`Idle` -> `Active` -> `Paused` -> `Blackout` -> `Disposed`).
   - `SourceSelectionManagerTests`: Validates queuing, duplicate filtering, order re-arrangement, and active selection index bounds.
   - `HotkeyBindingTests`: Validates serialization, key-combo parsing, and conflict detection.

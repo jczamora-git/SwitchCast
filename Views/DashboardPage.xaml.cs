@@ -13,6 +13,7 @@ public sealed partial class DashboardPage : Page
     {
         InitializeComponent();
         ViewModel = App.Current.Services.GetRequiredService<DashboardViewModel>();
+        ViewModel.SetDispatcherQueue(DispatcherQueue);
     }
 
     public DashboardViewModel ViewModel { get; }

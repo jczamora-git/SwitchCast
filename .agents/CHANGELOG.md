@@ -7,6 +7,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Presentation Pipeline Hotfix] - 2026-10-15
+
+### Fixed (fix / ui-threading / first-source-start / dispatcher / camera / video / test)
+- **COMException 0x8001010E (RPC_E_WRONG_THREAD) Resolution**:
+  - Introduced `IUIThreadDispatcher` abstraction with `DispatcherQueueAdapter`, `ImmediateUIThreadDispatcher`, and thread-safe registration.
+  - Implemented explicit UI dispatcher ownership for `DashboardViewModel` (MainWindow's dispatcher), `PresentationViewModel` (PresentationWindow's dispatcher), `PresenterDockViewModel` (Dock's dispatcher), and `SourcesViewModel`.
+  - Marshaled all UI-bound `PropertyChanged` notifications to the respective owning UI threads, preventing worker threads from executing WinUI compiled bindings (`x:Bind`) on `TextBlock.Text`, `Visibility`, `Slider.Value`, etc.
+  - Separated video player initialization and state notification in `MediaPresentationService.PlayVideoAsync`, isolating `MediaStateChanged` invocations outside the try-catch block and eliminating false-positive "Failed to play video (0x8001010E)" alerts.
+  - Replaced unsafe `if (dispatcher is null) action();` fallbacks across ViewModels and services with safe drops/diagnostics so background worker threads never attempt direct UI mutations.
+- **First Queued Source Auto-Start & Authoritative Source Resolution**:
+  - Fixed presentation startup so clicking "Start Presenting" with queued sources immediately takes the first queued source live without requiring manual dropdown selection or re-selection.
+  - Added `DashboardViewModel.ResolveAuthoritativeStartSource()` prioritizing explicit valid queued selection -> first queued source in `SelectedSources` -> null.
+  - Protected `SelectedPresentationSource` against spurious null pushes caused by WinUI `ComboBox` visual template updates.
+  - Enhanced `PresentationCoordinator.StartPresentationAsync` to automatically resolve to the first queued item when invoked without explicit source and the current active source is not queued.
+  - Enforced idempotency during presentation startup: disabled `CanStartPresentation` while `IsStarting` is true to prevent duplicate startup requests.
+- **Automated Regression Suite**:
+  - Added `PresentationStartupAndThreadingTests.cs` (16 new automated tests) covering startup target resolution, queue selection priority, duplicate start prevention, off-thread state dispatching, video/camera/PowerPoint first source starts, and video error classification isolation, bringing the total suite to **326 passing unit tests** (0 failed, 0 skipped). Both Debug and Release builds compile with 0 errors and 0 warnings.
+
+---
+
 ## [Critical Camera Runtime Hotfix] - 2026-10-15
 
 ### Fixed (fix / camera / winrt / direct3d / presentation-coordinator / test)

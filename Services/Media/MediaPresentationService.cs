@@ -14,10 +14,12 @@ namespace SwitchCast.Services.Media;
 /// </summary>
 public sealed partial class MediaPresentationService : ObservableObject, IMediaPresentationService
 {
-    private readonly DispatcherQueue? _dispatcherQueue;
+    private DispatcherQueue? _dispatcherQueue;
+    private IUIThreadDispatcher? _dispatcher;
     private readonly IApplicationSettingsService? _settingsService;
     private MediaPlayer? _player;
     private MediaSource? _currentMediaSource;
+    private bool _disposed;
 
     [ObservableProperty]
     private ImageSource? _directImageSource;
@@ -54,10 +56,11 @@ public sealed partial class MediaPresentationService : ObservableObject, IMediaP
 
     public event EventHandler? MediaStateChanged;
 
-    public MediaPresentationService(IApplicationSettingsService? settingsService = null)
+    public MediaPresentationService(IApplicationSettingsService? settingsService = null, IUIThreadDispatcher? uiDispatcher = null)
     {
         _settingsService = settingsService;
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+        _dispatcher = UIThreadDispatcherProvider.Resolve(uiDispatcher);
 
         if (_settingsService is not null)
         {
@@ -66,6 +69,28 @@ public sealed partial class MediaPresentationService : ObservableObject, IMediaP
         }
 
         InitializePlayer();
+    }
+
+    /// <summary>
+    /// Configures the authoritative UI thread DispatcherQueue for media state and image rendering dispatch.
+    /// </summary>
+    public void SetDispatcherQueue(DispatcherQueue? dispatcherQueue)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _dispatcherQueue = dispatcherQueue;
+        _dispatcher = dispatcherQueue is not null ? new DispatcherQueueAdapter(dispatcherQueue) : null;
+    }
+
+    /// <summary>
+    /// Configures a testable UI thread dispatcher for this service.
+    /// </summary>
+    public void SetUIThreadDispatcher(IUIThreadDispatcher? dispatcher)
+    {
+        _dispatcher = dispatcher;
     }
 
     public MediaPlayer? Player => _player;
@@ -183,12 +208,23 @@ public sealed partial class MediaPresentationService : ObservableObject, IMediaP
 
             IsVideoPlaying = true;
             IsVideoPaused = false;
-            MediaStateChanged?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)
         {
             LastErrorMessage = $"Failed to play video (0x{ex.HResult:X8}): {ex.Message}";
             Diagnostics.SwitchCastDiagnostics.LogException(nameof(MediaPresentationService), nameof(PlayVideoAsync), ex, videoSource.Id);
+            return Task.CompletedTask;
+        }
+
+        // Notify subscribers outside the player playback try/catch block so subscriber UI notification failures
+        // are never falsely reported as video decoder/playback errors.
+        try
+        {
+            MediaStateChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.SwitchCastDiagnostics.LogException(nameof(MediaPresentationService), "MediaStateChanged", ex);
         }
 
         return Task.CompletedTask;
@@ -456,19 +492,30 @@ public sealed partial class MediaPresentationService : ObservableObject, IMediaP
 
     private void RunOnUIThread(Action action)
     {
-        var dispatcher = _dispatcherQueue ?? DispatcherQueue.GetForCurrentThread();
-        if (dispatcher is not null && !dispatcher.HasThreadAccess)
+        if (_disposed || _dispatcher is null)
         {
-            dispatcher.TryEnqueue(() => action());
+            return;
+        }
+
+        if (_dispatcher.HasThreadAccess)
+        {
+            action();
         }
         else
         {
-            action();
+            _dispatcher.TryEnqueue(action);
         }
     }
 
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
         if (_player is not null)
         {
             _player.MediaOpened -= OnPlayerMediaOpened;

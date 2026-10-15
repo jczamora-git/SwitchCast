@@ -131,6 +131,11 @@ public interface IMediaPresentationService : INotifyPropertyChanged, IDisposable
     void SetMuted(bool isMuted);
 
     /// <summary>
+    /// Configures the authoritative UI thread DispatcherQueue for media state and image rendering dispatch.
+    /// </summary>
+    void SetDispatcherQueue(Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue);
+
+    /// <summary>
     /// Toggles the muted state of media playback.
     /// </summary>
     void ToggleMute();

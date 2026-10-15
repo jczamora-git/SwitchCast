@@ -12,7 +12,7 @@ namespace SwitchCast.ViewModels;
 /// <summary>
 /// ViewModel managing presentation source discovery, search filtering, category tabs (Windows, Displays, Media Files), and selection state.
 /// </summary>
-public partial class SourcesViewModel : ObservableObject
+public partial class SourcesViewModel : ObservableObject, IDisposable
 {
     private readonly IPresentationStateService _presentationStateService;
     private readonly IWindowDiscoveryService _windowDiscoveryService;
@@ -23,7 +23,9 @@ public partial class SourcesViewModel : ObservableObject
     private readonly Services.PowerPoint.IPowerPointPresentationService? _powerPointService;
     private readonly Services.Camera.ICameraDiscoveryService? _cameraDiscoveryService;
     private readonly IApplicationSettingsService? _settingsService;
-    private readonly Microsoft.UI.Dispatching.DispatcherQueue? _dispatcherQueue;
+    private Microsoft.UI.Dispatching.DispatcherQueue? _dispatcherQueue;
+    private IUIThreadDispatcher? _dispatcher;
+    private bool _disposed;
 
     private readonly List<SelectableSourceItem> _allWindows = [];
     private readonly List<SelectableSourceItem> _allDisplays = [];
@@ -83,6 +85,7 @@ public partial class SourcesViewModel : ObservableObject
         _cameraDiscoveryService = cameraDiscoveryService;
         _settingsService = settingsService;
         _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        _dispatcher = UIThreadDispatcherProvider.Resolve(null);
 
         DisplayedSources = [];
         _presentationStateService.PropertyChanged += OnPresentationStatePropertyChanged;
@@ -615,31 +618,71 @@ public partial class SourcesViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Configures the authoritative UI thread DispatcherQueue for this ViewModel.
+    /// </summary>
+    public void SetDispatcherQueue(Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue)
+    {
+        _dispatcherQueue = dispatcherQueue;
+        _dispatcher = dispatcherQueue is not null ? new DispatcherQueueAdapter(dispatcherQueue) : null;
+    }
+
+    private void RunOnUIThread(Action action)
+    {
+        if (_disposed || _dispatcher is null)
+        {
+            return;
+        }
+
+        if (_dispatcher.HasThreadAccess)
+        {
+            action();
+        }
+        else
+        {
+            _dispatcher.TryEnqueue(action);
+        }
+    }
+
     private void OnPresentationStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(IPresentationStateService.SelectedSourceCount) ||
             e.PropertyName == nameof(IPresentationStateService.SelectedSources))
         {
-            OnPropertyChanged(nameof(SelectedSourceCount));
-            OnPropertyChanged(nameof(HasSelectedSources));
-
-            _isSyncingSelection = true;
-            try
+            RunOnUIThread(() =>
             {
-                // Sync item selection states across all discovered collections so switching tabs shows accurate state
-                foreach (var item in _allWindows.Concat(_allDisplays).Concat(_allMedia).Concat(_allPowerPoint).Concat(_allCameras))
+                OnPropertyChanged(nameof(SelectedSourceCount));
+                OnPropertyChanged(nameof(HasSelectedSources));
+
+                _isSyncingSelection = true;
+                try
                 {
-                    var isSelected = _presentationStateService.IsSourceSelected(item.Id);
-                    if (item.IsSelected != isSelected)
+                    // Sync item selection states across all discovered collections so switching tabs shows accurate state
+                    foreach (var item in _allWindows.Concat(_allDisplays).Concat(_allMedia).Concat(_allPowerPoint).Concat(_allCameras))
                     {
-                        item.IsSelected = isSelected;
+                        var isSelected = _presentationStateService.IsSourceSelected(item.Id);
+                        if (item.IsSelected != isSelected)
+                        {
+                            item.IsSelected = isSelected;
+                        }
                     }
                 }
-            }
-            finally
-            {
-                _isSyncingSelection = false;
-            }
+                finally
+                {
+                    _isSyncingSelection = false;
+                }
+            });
         }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _presentationStateService.PropertyChanged -= OnPresentationStatePropertyChanged;
     }
 }

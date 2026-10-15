@@ -44,6 +44,8 @@
     <Compile Include="..\Services\Win32HotkeyService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IPresentationCoordinator.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\PresentationCoordinator.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\IUIThreadDispatcher.cs" Link="Linked\Services\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\DispatcherQueueAdapter.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\WindowPositioningHelper.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Media\IMediaDiscoveryService.cs" Link="Linked\Services\Media\%(Filename)%(Extension)" />
     <Compile Include="..\Services\Media\MediaDiscoveryService.cs" Link="Linked\Services\Media\%(Filename)%(Extension)" />

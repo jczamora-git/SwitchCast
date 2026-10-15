@@ -7,15 +7,29 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Local Presentation Expansion — Critical Camera Runtime Hotfix Complete
-- **Overall Status**: **Implemented & Validated (310 Automated Unit Tests Passing, Debug & Release Builds Clean, Native Hardware Verification Pending)**
-- **Last Updated**: 2026-10-15T16:05:00+08:00 (UTC+8)
+- **Current Phase**: Presentation Pipeline Hotfix — First Queued Source Auto-Start & UI State Dispatch Stabilization Complete
+- **Overall Status**: **Implemented & Validated (326 Automated Unit Tests Passing, Debug & Release Builds Clean, Native Hardware Verification Pending)**
+- **Last Updated**: 2026-10-15T17:25:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Presentation Pipeline Hotfix (First Queued Source Auto-Start & UI State Dispatch Stabilization)**:
+  - **COMException 0x8001010E (RPC_E_WRONG_THREAD) Resolution**:
+    - Created explicit UI dispatcher abstraction: `IUIThreadDispatcher` with `DispatcherQueueAdapter`, `ImmediateUIThreadDispatcher`, and thread-safe registration via `UIThreadDispatcherProvider`.
+    - Established explicit per-window dispatcher ownership: `MainWindow` and `DashboardPage` configure `DashboardViewModel` and `SourcesViewModel`; `PresentationWindow` configures `PresentationViewModel`; `PresenterDockWindow` configures `PresenterDockViewModel`.
+    - Dispatched off-thread `PropertyChanged` notifications from `DashboardViewModel`, `PresentationViewModel`, `PresenterDockViewModel`, and `SourcesViewModel` strictly onto their owning UI threads, preventing worker-thread invocation of WinUI compiled bindings (`x:Bind`) on `TextBlock.Text`, `Visibility`, `Slider.Value`, etc.
+    - Repaired `MediaPresentationService.PlayVideoAsync` to isolate worker-thread `MediaStateChanged` invocations outside the player initialization try/catch block, eliminating false-positive "Failed to play video (0x8001010E)" alerts on the Dashboard when UI subscribers execute off-thread.
+    - Strictly enforced that if `TryEnqueue` fails or the dispatcher is unavailable, actions are dropped or logged rather than executing unsafely on the background worker thread.
+  - **First Queued Source Auto-Start & Authoritative Source Resolution**:
+    - Resolved the presentation startup bug where clicking "Start Presenting" with queued sources opened Presentation Output in standby without taking the first source live.
+    - Implemented `DashboardViewModel.ResolveAuthoritativeStartSource()`: resolves target source with strict precedence (explicit queued selection -> first queued source in `SelectedSources` -> null).
+    - Guarded `SelectedPresentationSource` against spurious `null` pushes from WinUI `ComboBox` when templates or views re-evaluate visibility.
+    - Updated `PresentationCoordinator.StartPresentationAsync`: targets the first queued source atomically when no source parameter is passed and current active source is not already in the presentation queue.
+    - Enforced idempotency on `StartPresentationCommand`: disabled when `IsStarting` is true; transitions safely without duplicate transition storms.
+  - **Automated Regression Suite**: Added `PresentationStartupAndThreadingTests.cs` (16 new tests), expanding the test suite to **326 automated unit tests** (100% pass rate). Both Debug and Release builds compile with 0 errors and 0 warnings.
 - [x] **Critical Camera Runtime Hotfix (Camera Starts but Does Not Render / COMException / Stuck STARTING)**:
   - **Catch-22 Frame Rejection Deadlock Resolved**:
     - `PresentationCoordinator.OnCameraFrameArrived` previously checked `if (Status != PresentationStatus.Active || !IsActiveSourceCamera)` and discarded all incoming camera frames while `Status` was `Starting`. Because frames were discarded, no frame was ever rendered; because no frame was ever rendered, `Status` never became `Active`.

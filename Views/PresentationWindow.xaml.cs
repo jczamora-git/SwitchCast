@@ -24,6 +24,7 @@ public sealed partial class PresentationWindow : Window
         InitializeComponent();
 
         ViewModel = App.Current.Services.GetRequiredService<PresentationViewModel>();
+        ViewModel.SetDispatcherQueue(DispatcherQueue);
         _settingsService = App.Current.Services.GetRequiredService<IApplicationSettingsService>();
 
         _settingsService.ThemeChanged += OnThemeChanged;
@@ -316,6 +317,7 @@ public sealed partial class PresentationWindow : Window
 
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
+        ViewModel.SetDispatcherQueue(null);
         _settingsService.ThemeChanged -= OnThemeChanged;
     }
 

@@ -124,8 +124,9 @@ When a presenter switches between presentation sources (e.g., Application Window
 
 | Subsystem | Thread Affinity | Lifecycle / Disposal Rules |
 | :--- | :--- | :--- |
-| **WinUI 3 UI / ViewModels** | UI Thread (Main) | Managed by XAML dispatcher; updates from background use `DispatcherQueue`. |
-| **Capture Frame Pool** | Background Worker / WinRT Thread | Frames must be closed immediately in `FrameArrived` callback. FramePool disposed on source change. |
+| **WinUI 3 UI / ViewModels** | UI Thread (Explicit DispatcherQueue per Window) | Explicitly dispatched via `IUIThreadDispatcher` (`DispatcherQueueAdapter`). Each window (`MainWindow`, `PresentationWindow`, `PresenterDockWindow`) owns its respective `DispatcherQueue`. ViewModels marshal domain state changes to UI-bound XAML bindings strictly on the owning UI thread. |
+| **Camera Capture Pipeline** | Background Worker / WinRT Thread (`MediaFrameReader`) | Acquires BGRA8 frames on camera thread. Never fires direct XAML-bound notifications synchronously from camera worker thread. State transitions (e.g. `Starting` -> `Active`) update domain state and dispatch UI notifications safely. |
+| **Video Playback Pipeline** | Windows Media Playback Thread | Player state changes (`MediaStateChanged`) are isolated from UI error handlers; UI state propagation uses `IUIThreadDispatcher`. |
 | **Direct3D 11 Device & Context** | Rendering Thread / UI Thread Interop | Shared device lifetime tied to Presentation Window; handled via `IDisposable` with device-loss recovery. |
 | **Win32 Hotkeys** | Message Loop Thread | Registered on dedicated hidden window handle or main loop; cleaned up on shutdown. |
 
