@@ -23,8 +23,21 @@ public sealed class PresenterDockService : IPresenterDockService
         RequestShowDashboard?.Invoke(this, EventArgs.Empty);
     }
 
+    private Microsoft.UI.Dispatching.DispatcherQueue? _dispatcherQueue;
+
+    public void SetDispatcherQueue(Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue)
+    {
+        _dispatcherQueue = dispatcherQueue;
+    }
+
     public void ShowDock()
     {
+        if (_dispatcherQueue is not null && !_dispatcherQueue.HasThreadAccess)
+        {
+            _dispatcherQueue.TryEnqueue(ShowDock);
+            return;
+        }
+
         if (_window is null)
         {
             _window = new PresenterDockWindow();
@@ -41,6 +54,12 @@ public sealed class PresenterDockService : IPresenterDockService
 
     public void CloseDock()
     {
+        if (_dispatcherQueue is not null && !_dispatcherQueue.HasThreadAccess)
+        {
+            _dispatcherQueue.TryEnqueue(CloseDock);
+            return;
+        }
+
         if (_window is not null)
         {
             var target = _window;
@@ -53,6 +72,12 @@ public sealed class PresenterDockService : IPresenterDockService
 
     public void ToggleDock()
     {
+        if (_dispatcherQueue is not null && !_dispatcherQueue.HasThreadAccess)
+        {
+            _dispatcherQueue.TryEnqueue(ToggleDock);
+            return;
+        }
+
         if (IsDockOpen)
         {
             CloseDock();

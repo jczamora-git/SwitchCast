@@ -49,4 +49,9 @@ public interface IPresenterDockService
     /// Event raised when the main dashboard is requested to be shown.
     /// </summary>
     event EventHandler? RequestShowDashboard;
+
+    /// <summary>
+    /// Configures the authoritative UI thread DispatcherQueue for Presenter Dock Window lifecycle.
+    /// </summary>
+    void SetDispatcherQueue(Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue);
 }

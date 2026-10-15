@@ -27,6 +27,8 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     private readonly IPowerPointPresentationService _powerPointService;
     private readonly IPowerPointLiveService? _powerPointLiveService;
     private readonly ICameraCaptureService? _cameraCaptureService;
+    private readonly IPresenterDockService? _presenterDockService;
+    private readonly IApplicationSettingsService? _settingsService;
     private readonly SemaphoreSlim _transitionSemaphore = new(1, 1);
 
     private CaptureSource? _targetRequestedPresentationSource;
@@ -50,7 +52,9 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         IExternalDisplayService? externalDisplayService = null,
         IPowerPointPresentationService? powerPointService = null,
         IPowerPointLiveService? powerPointLiveService = null,
-        ICameraCaptureService? cameraCaptureService = null)
+        ICameraCaptureService? cameraCaptureService = null,
+        IPresenterDockService? presenterDockService = null,
+        IApplicationSettingsService? settingsService = null)
     {
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
         _presentationWindowService = presentationWindowService ?? throw new ArgumentNullException(nameof(presentationWindowService));
@@ -63,6 +67,8 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         _powerPointService = powerPointService ?? new PowerPointPresentationService();
         _powerPointLiveService = powerPointLiveService;
         _cameraCaptureService = cameraCaptureService;
+        _presenterDockService = presenterDockService;
+        _settingsService = settingsService;
 
         _presentationStateService.PropertyChanged += (s, e) =>
         {
@@ -83,6 +89,10 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                 OnPropertyChanged(nameof(IsActiveSourceMedia));
                 OnPropertyChanged(nameof(IsActiveSourceVideo));
                 OnPropertyChanged(nameof(IsActiveSourceImage));
+                OnPropertyChanged(nameof(IsActiveSourcePowerPoint));
+                OnPropertyChanged(nameof(IsActiveSourceCamera));
+                OnPropertyChanged(nameof(PowerPointProgressText));
+                OnPropertyChanged(nameof(DirectImageSource));
             }
         };
 
@@ -417,6 +427,12 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             {
                 _presentationStateService.SetStatus(PresentationStatus.Active);
             }
+
+            if (_settingsService?.CurrentSettings.AutoOpenPresenterDock != false)
+            {
+                _presenterDockService?.ShowDock();
+            }
+
             Debug.WriteLine($"[PresentationCoordinator] StartPresentation completed seq={sequence} source={targetSource.Id}");
         }
         catch (Exception ex)
@@ -424,7 +440,12 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             LastErrorMessage = ex.Message;
             _presentationStateService.SetStatus(PresentationStatus.Error);
             _outputRenderer.Clear();
-            Debug.WriteLine($"[PresentationCoordinator] StartPresentation failed seq={sequence} error={ex.Message}");
+            SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.LogException(
+                nameof(PresentationCoordinator),
+                nameof(StartPresentationAsync),
+                ex,
+                $"Seq={sequence}, SourceId={targetSource?.Id}, SourceType={targetSource?.Type}, HResult=0x{ex.HResult:X8}, ThreadId={Environment.CurrentManagedThreadId}");
+            Debug.WriteLine($"[PresentationCoordinator] StartPresentation failed seq={sequence} source={targetSource?.Id} HResult=0x{ex.HResult:X8} thread={Environment.CurrentManagedThreadId} error={ex}\n{ex.StackTrace}");
             throw;
         }
         finally
@@ -696,7 +717,12 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             LastErrorMessage = ex.Message;
             _presentationStateService.SetStatus(PresentationStatus.Error);
             _outputRenderer.Clear();
-            Debug.WriteLine($"[PresentationCoordinator] SwitchPresentation failed seq={sequence} error={ex.Message}");
+            SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.LogException(
+                nameof(PresentationCoordinator),
+                nameof(SwitchPresentationSourceAsync),
+                ex,
+                $"Seq={sequence}, SourceId={newSource.Id}, SourceType={newSource.Type}, HResult=0x{ex.HResult:X8}, ThreadId={Environment.CurrentManagedThreadId}");
+            Debug.WriteLine($"[PresentationCoordinator] SwitchPresentation failed seq={sequence} source={newSource.Id} type={newSource.Type} HResult=0x{ex.HResult:X8} thread={Environment.CurrentManagedThreadId} error={ex}\n{ex.StackTrace}");
             throw;
         }
         finally

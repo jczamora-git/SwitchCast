@@ -216,6 +216,11 @@ public partial class App : Application
             sourcesViewModel.SetDispatcherQueue(_mainWindow.DispatcherQueue);
         }
 
+        if (_mainWindow.DispatcherQueue is not null)
+        {
+            presenterDockService.SetDispatcherQueue(_mainWindow.DispatcherQueue);
+        }
+
         _mainWindow.Activate();
     }
 }
