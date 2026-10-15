@@ -15,10 +15,17 @@ public sealed class PowerPointPresentationService : IPowerPointPresentationServi
     private readonly IPresentationSlideRenderer _slideRenderer;
     private ImageSource? _currentSlideImageSource;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
+    private Microsoft.UI.Dispatching.DispatcherQueue? _dispatcherQueue;
 
     public PowerPointPresentationService(IPresentationSlideRenderer? slideRenderer = null)
     {
         _slideRenderer = slideRenderer ?? new PowerPointComSlideRenderer();
+        _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+    }
+
+    public void SetDispatcherQueue(Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue)
+    {
+        _dispatcherQueue = dispatcherQueue;
     }
 
     public PowerPointSource? ActivePowerPointSource { get; private set; }
@@ -200,27 +207,64 @@ public sealed class PowerPointPresentationService : IPowerPointPresentationServi
         SlideChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private Task UpdateSlideImageAsync(string? imagePath)
+    private async Task UpdateSlideImageAsync(string? imagePath)
     {
         if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath))
         {
             _currentSlideImageSource = null;
-            return Task.CompletedTask;
+            return;
         }
 
-        try
+        var dispatcher = _dispatcherQueue ?? Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        if (dispatcher is null || dispatcher.HasThreadAccess)
         {
-            // WinUI BitmapImage instantiation
-            var bitmap = new BitmapImage(new Uri(imagePath));
-            _currentSlideImageSource = bitmap;
+            try
+            {
+                // WinUI BitmapImage instantiation on owning UI thread
+                var bitmap = new BitmapImage(new Uri(imagePath));
+                _currentSlideImageSource = bitmap;
+            }
+            catch (Exception ex)
+            {
+                Diagnostics.SwitchCastDiagnostics.LogException(
+                    nameof(PowerPointPresentationService),
+                    nameof(UpdateSlideImageAsync),
+                    ex,
+                    sourceDetails: Path.GetFileName(imagePath));
+                _currentSlideImageSource = null;
+            }
+            return;
         }
-        catch (Exception ex)
+
+        var tcs = new TaskCompletionSource<bool>();
+        bool enqueued = dispatcher.TryEnqueue(() =>
         {
-            Debug.WriteLine($"[PowerPointPresentationService] Failed to load slide bitmap: {ex.Message}");
+            try
+            {
+                var bitmap = new BitmapImage(new Uri(imagePath));
+                _currentSlideImageSource = bitmap;
+                tcs.TrySetResult(true);
+            }
+            catch (Exception ex)
+            {
+                Diagnostics.SwitchCastDiagnostics.LogException(
+                    nameof(PowerPointPresentationService),
+                    "UpdateSlideImageAsync (Enqueued)",
+                    ex,
+                    sourceDetails: Path.GetFileName(imagePath));
+                _currentSlideImageSource = null;
+                tcs.TrySetResult(false);
+            }
+        });
+
+        if (!enqueued)
+        {
+            Debug.WriteLine("[PowerPointPresentationService] Failed to enqueue slide bitmap loading to UI DispatcherQueue.");
             _currentSlideImageSource = null;
+            return;
         }
 
-        return Task.CompletedTask;
+        await tcs.Task.ConfigureAwait(false);
     }
 
     private static string GetDeckCacheDirectory(string filePath)

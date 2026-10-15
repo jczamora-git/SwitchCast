@@ -171,7 +171,7 @@ public sealed class PowerPointComSlideRenderer : IPresentationSlideRenderer
             }
             catch (COMException comEx)
             {
-                Debug.WriteLine($"[PowerPointComSlideRenderer] COM error 0x{comEx.ErrorCode:X8}: {comEx.Message}");
+                Diagnostics.SwitchCastDiagnostics.LogException(nameof(PowerPointComSlideRenderer), "RenderDeckAsync (COM)", comEx, sourceDetails: Path.GetFileName(pptxPath));
                 tcs.SetResult(new SlideDeckRenderResult
                 {
                     Success = false,
@@ -180,11 +180,11 @@ public sealed class PowerPointComSlideRenderer : IPresentationSlideRenderer
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[PowerPointComSlideRenderer] Render exception: {ex.Message}");
+                Diagnostics.SwitchCastDiagnostics.LogException(nameof(PowerPointComSlideRenderer), "RenderDeckAsync", ex, sourceDetails: Path.GetFileName(pptxPath));
                 tcs.SetResult(new SlideDeckRenderResult
                 {
                     Success = false,
-                    ErrorMessage = $"Slide rendering failed: {ex.Message}"
+                    ErrorMessage = $"Slide rendering failed (0x{ex.HResult:X8}): {ex.Message}"
                 });
             }
             finally

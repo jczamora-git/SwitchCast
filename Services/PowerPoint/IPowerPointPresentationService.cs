@@ -72,4 +72,9 @@ public interface IPowerPointPresentationService
     /// Clears and unloads the active presentation deck.
     /// </summary>
     void ClearPresentation();
+
+    /// <summary>
+    /// Configures the authoritative UI thread DispatcherQueue for slide bitmap loading.
+    /// </summary>
+    void SetDispatcherQueue(Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue);
 }

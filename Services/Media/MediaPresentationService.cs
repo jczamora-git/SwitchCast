@@ -126,9 +126,9 @@ public sealed partial class MediaPresentationService : ObservableObject, IMediaP
             }
             catch (Exception ex)
             {
-                LastErrorMessage = $"Failed to load image: {ex.Message}";
+                LastErrorMessage = $"Failed to load image (0x{ex.HResult:X8}): {ex.Message}";
                 DirectImageSource = null;
-                Debug.WriteLine($"[MediaPresentationService] LoadImage error: {ex.Message}");
+                Diagnostics.SwitchCastDiagnostics.LogException(nameof(MediaPresentationService), nameof(LoadImageAsync), ex, imageSource.Id);
             }
         });
 
@@ -187,8 +187,8 @@ public sealed partial class MediaPresentationService : ObservableObject, IMediaP
         }
         catch (Exception ex)
         {
-            LastErrorMessage = $"Failed to play video: {ex.Message}";
-            Debug.WriteLine($"[MediaPresentationService] PlayVideo error: {ex.Message}");
+            LastErrorMessage = $"Failed to play video (0x{ex.HResult:X8}): {ex.Message}";
+            Diagnostics.SwitchCastDiagnostics.LogException(nameof(MediaPresentationService), nameof(PlayVideoAsync), ex, videoSource.Id);
         }
 
         return Task.CompletedTask;
@@ -202,34 +202,37 @@ public sealed partial class MediaPresentationService : ObservableObject, IMediaP
 
     private void ClearVideoInternal()
     {
-        try
+        RunOnUIThread(() =>
         {
-            if (_player is not null)
+            try
             {
-                _player.Pause();
-                _player.Source = null;
+                if (_player is not null)
+                {
+                    _player.Pause();
+                    _player.Source = null;
+                }
+
+                _currentMediaSource?.Dispose();
+                _currentMediaSource = null;
+
+                IsVideoPlaying = false;
+                IsVideoPaused = false;
+                IsVideoEnded = false;
+                Position = TimeSpan.Zero;
+                Duration = TimeSpan.Zero;
+
+                if (ActiveMediaSource is VideoMediaSource)
+                {
+                    ActiveMediaSource = null;
+                }
+
+                MediaStateChanged?.Invoke(this, EventArgs.Empty);
             }
-
-            _currentMediaSource?.Dispose();
-            _currentMediaSource = null;
-
-            IsVideoPlaying = false;
-            IsVideoPaused = false;
-            IsVideoEnded = false;
-            Position = TimeSpan.Zero;
-            Duration = TimeSpan.Zero;
-
-            if (ActiveMediaSource is VideoMediaSource)
+            catch (Exception ex)
             {
-                ActiveMediaSource = null;
+                Diagnostics.SwitchCastDiagnostics.LogException(nameof(MediaPresentationService), nameof(ClearVideoInternal), ex);
             }
-
-            MediaStateChanged?.Invoke(this, EventArgs.Empty);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[MediaPresentationService] ClearVideoInternal error: {ex.Message}");
-        }
+        });
     }
 
     private void ClearImageInternal()

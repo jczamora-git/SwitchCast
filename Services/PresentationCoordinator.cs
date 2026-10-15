@@ -98,6 +98,11 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
         _powerPointService.SlideChanged += (s, e) =>
         {
+            if (_powerPointService.ActivePowerPointSource is not null &&
+                _presentationStateService.ActiveSource is PowerPointSource)
+            {
+                _presentationStateService.SetActiveSource(_powerPointService.ActivePowerPointSource);
+            }
             OnPropertyChanged(nameof(PowerPointSlideImageSource));
             OnPropertyChanged(nameof(PowerPointProgressText));
             OnPropertyChanged(nameof(DirectImageSource));
@@ -114,6 +119,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         if (_cameraCaptureService is not null)
         {
             _cameraCaptureService.FrameArrived += OnCameraFrameArrived;
+            _outputRenderer.FrameRenderCompleted += OnOutputRendererFrameRenderCompleted;
         }
 
         _presentationWindowService.WindowOpened += (s, e) => OnPropertyChanged(nameof(IsOutputWindowOpen));
@@ -160,7 +166,10 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                         ? $"Slide {_powerPointLiveService.CurrentSlideIndex} of {_powerPointLiveService.TotalSlideCount}"
                         : "PowerPoint Live";
                 }
-                return ppt.SlideProgressText;
+
+                int current = _powerPointService.CurrentSlideIndex;
+                int total = _powerPointService.TotalSlideCount > 0 ? _powerPointService.TotalSlideCount : ppt.SlideCount;
+                return total > 0 ? $"Slide {current} of {total}" : null;
             }
             return null;
         }
@@ -982,6 +991,10 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         }
 
         bool result = await _powerPointService.NextSlideAsync().ConfigureAwait(false);
+        if (_powerPointService.ActivePowerPointSource is not null)
+        {
+            _presentationStateService.SetActiveSource(_powerPointService.ActivePowerPointSource);
+        }
         OnPropertyChanged(nameof(PowerPointProgressText));
         OnPropertyChanged(nameof(PowerPointSlideImageSource));
         return result;
@@ -1002,6 +1015,10 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         }
 
         bool result = await _powerPointService.PreviousSlideAsync().ConfigureAwait(false);
+        if (_powerPointService.ActivePowerPointSource is not null)
+        {
+            _presentationStateService.SetActiveSource(_powerPointService.ActivePowerPointSource);
+        }
         OnPropertyChanged(nameof(PowerPointProgressText));
         OnPropertyChanged(nameof(PowerPointSlideImageSource));
         return result;
@@ -1022,6 +1039,10 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         }
 
         bool result = await _powerPointService.GoToSlideAsync(slideIndex).ConfigureAwait(false);
+        if (_powerPointService.ActivePowerPointSource is not null)
+        {
+            _presentationStateService.SetActiveSource(_powerPointService.ActivePowerPointSource);
+        }
         OnPropertyChanged(nameof(PowerPointProgressText));
         OnPropertyChanged(nameof(PowerPointSlideImageSource));
         return result;
@@ -1031,6 +1052,8 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     {
         if (Status != PresentationStatus.Active || !IsActiveSourceCamera)
         {
+            bitmap.Dispose();
+            _cameraCaptureService?.NotifyFrameCompleted();
             return;
         }
 
@@ -1040,8 +1063,15 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[PresentationCoordinator] OnCameraFrameArrived handled error: {ex.Message}");
+            bitmap.Dispose();
+            _cameraCaptureService?.NotifyFrameCompleted();
+            Diagnostics.SwitchCastDiagnostics.LogException(nameof(PresentationCoordinator), nameof(OnCameraFrameArrived), ex);
         }
+    }
+
+    private void OnOutputRendererFrameRenderCompleted(object? sender, EventArgs e)
+    {
+        _cameraCaptureService?.NotifyFrameCompleted();
     }
 
     public void Dispose()
@@ -1052,6 +1082,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         if (_cameraCaptureService is not null)
         {
             _cameraCaptureService.FrameArrived -= OnCameraFrameArrived;
+            _outputRenderer.FrameRenderCompleted -= OnOutputRendererFrameRenderCompleted;
         }
 
         _mediaPresentationService.Dispose();
