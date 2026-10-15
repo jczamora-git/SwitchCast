@@ -1,13 +1,30 @@
 using System.Diagnostics;
+using SwitchCast.Models.Diagnostics;
 
 namespace SwitchCast.Services.Diagnostics;
 
 /// <summary>
 /// Authoritative diagnostic instrumentation logger providing structured, high-fidelity logging for COM,
 /// threading, frame pipeline, and hardware operations with exact HRESULTs and stack traces.
+/// Bridges seamlessly to the central IErrorReportingService incident and file logging pipeline.
 /// </summary>
 public static class SwitchCastDiagnostics
 {
+    private static IErrorReportingService? _errorReportingService;
+
+    /// <summary>
+    /// Configures the active IErrorReportingService backend instance.
+    /// </summary>
+    public static void Initialize(IErrorReportingService reportingService)
+    {
+        _errorReportingService = reportingService;
+    }
+
+    /// <summary>
+    /// Gets the current reporting service instance if initialized.
+    /// </summary>
+    public static IErrorReportingService? Service => _errorReportingService;
+
     /// <summary>
     /// Logs a detailed exception event with type, hex HRESULT, thread ID, message, and full stack trace.
     /// Excludes sensitive screen pixels and user credentials.
@@ -33,13 +50,62 @@ public static class SwitchCastDiagnostics
                            $"Stack: {ex.StackTrace}";
 
         Debug.WriteLine(formatted);
+
+        try
+        {
+            _errorReportingService?.RecordException(
+                component,
+                operation,
+                ex,
+                DiagnosticSeverity.Error,
+                category: null,
+                currentSourceType: sourceDetails);
+        }
+        catch (Exception serviceEx)
+        {
+            Debug.WriteLine($"[SwitchCastDiagnostics] Error forwarding to ErrorReportingService: {serviceEx.Message}");
+        }
     }
 
     /// <summary>
     /// Logs an operational diagnostic event for runtime tracking and pipeline instrumentation.
     /// </summary>
-    public static void LogInfo(string component, string message)
+    public static void LogInfo(string component, string message, string? sourceDetails = null)
     {
         Debug.WriteLine($"[{component}] {message} | Thread={Environment.CurrentManagedThreadId}");
+
+        try
+        {
+            _errorReportingService?.RecordEvent(
+                component,
+                message,
+                DiagnosticSeverity.Info,
+                sourceDetails);
+        }
+        catch (Exception serviceEx)
+        {
+            Debug.WriteLine($"[SwitchCastDiagnostics] Error forwarding to ErrorReportingService: {serviceEx.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Logs a warning diagnostic event for runtime tracking and pipeline instrumentation.
+    /// </summary>
+    public static void LogWarning(string component, string message, string? sourceDetails = null)
+    {
+        Debug.WriteLine($"[{component}] WARNING: {message} | Thread={Environment.CurrentManagedThreadId}");
+
+        try
+        {
+            _errorReportingService?.RecordEvent(
+                component,
+                message,
+                DiagnosticSeverity.Warning,
+                sourceDetails);
+        }
+        catch (Exception serviceEx)
+        {
+            Debug.WriteLine($"[SwitchCastDiagnostics] Error forwarding to ErrorReportingService: {serviceEx.Message}");
+        }
     }
 }

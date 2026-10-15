@@ -17,17 +17,71 @@ public partial class App : Application
     {
         InitializeComponent();
         UnhandledException += OnUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
+        System.Threading.Tasks.TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
         Services = ConfigureServices();
+
+        var reportingService = Services.GetRequiredService<SwitchCast.Services.Diagnostics.IErrorReportingService>();
+        SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.Initialize(reportingService);
     }
 
     private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
     {
-        SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.LogException(
-            "App",
-            "UnhandledException",
-            e.Exception,
-            $"HResult=0x{e.Exception.HResult:X8}, Message={e.Message}");
-        System.Diagnostics.Debug.WriteLine($"[App.UnhandledException] HResult=0x{e.Exception.HResult:X8} - {e.Message}\n{e.Exception}");
+        try
+        {
+            SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.LogException(
+                "App",
+                "UnhandledException",
+                e.Exception,
+                $"HResult=0x{e.Exception.HResult:X8}, Message={e.Message}");
+            System.Diagnostics.Debug.WriteLine($"[App.UnhandledException] HResult=0x{e.Exception.HResult:X8} - {e.Message}\n{e.Exception}");
+        }
+        catch
+        {
+            // Fail-safe: prevent error reporting from throwing during crash handling
+        }
+    }
+
+    private void OnAppDomainUnhandledException(object sender, System.UnhandledExceptionEventArgs e)
+    {
+        try
+        {
+            if (e.ExceptionObject is Exception ex)
+            {
+                SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.LogException(
+                    "AppDomain",
+                    "UnhandledException",
+                    ex,
+                    $"IsTerminating={e.IsTerminating}, HResult=0x{ex.HResult:X8}");
+                System.Diagnostics.Debug.WriteLine($"[AppDomain.UnhandledException] IsTerminating={e.IsTerminating} - {ex}");
+            }
+            else
+            {
+                SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.LogWarning("AppDomain", "UnhandledException", $"Non-exception object: {e.ExceptionObject}");
+            }
+        }
+        catch
+        {
+            // Fail-safe
+        }
+    }
+
+    private void OnUnobservedTaskException(object? sender, System.Threading.Tasks.UnobservedTaskExceptionEventArgs e)
+    {
+        try
+        {
+            SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.LogException(
+                "TaskScheduler",
+                "UnobservedTaskException",
+                e.Exception,
+                $"Observed={e.Observed}, HResult=0x{e.Exception.HResult:X8}");
+            System.Diagnostics.Debug.WriteLine($"[TaskScheduler.UnobservedTaskException] {e.Exception}");
+            e.SetObserved();
+        }
+        catch
+        {
+            // Fail-safe
+        }
     }
 
     public static new App Current => (App)Application.Current;
@@ -102,6 +156,11 @@ public partial class App : Application
         services.AddSingleton<IPresenterDockService, PresenterDockService>();
         services.AddSingleton<IHotkeyService, Win32HotkeyService>();
         services.AddSingleton<IApplicationLifecycleService, ApplicationLifecycleService>();
+
+        // Diagnostics & Error Reporting Services
+        services.AddSingleton<SwitchCast.Services.Diagnostics.IDiagnosticRedactionService, SwitchCast.Services.Diagnostics.DiagnosticRedactionService>();
+        services.AddSingleton<SwitchCast.Services.Diagnostics.IDiagnosticReportBuilder, SwitchCast.Services.Diagnostics.DiagnosticReportBuilder>();
+        services.AddSingleton<SwitchCast.Services.Diagnostics.IErrorReportingService, SwitchCast.Services.Diagnostics.ErrorReportingService>();
 
         // ViewModels
         services.AddSingleton<MainViewModel>();

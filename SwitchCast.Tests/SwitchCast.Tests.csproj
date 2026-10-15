@@ -21,7 +21,8 @@
 
   <ItemGroup>
     <Compile Include="..\Models\*.cs" Link="Linked\Models\%(Filename)%(Extension)" />
-    <Compile Include="..\Services\Diagnostics\SwitchCastDiagnostics.cs" Link="Linked\Services\Diagnostics\%(Filename)%(Extension)" />
+    <Compile Include="..\Models\Diagnostics\*.cs" Link="Linked\Models\Diagnostics\%(Filename)%(Extension)" />
+    <Compile Include="..\Services\Diagnostics\*.cs" Link="Linked\Services\Diagnostics\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IPresentationStateService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\PresentationStateService.cs" Link="Linked\Services\%(Filename)%(Extension)" />
     <Compile Include="..\Services\IApplicationSettingsService.cs" Link="Linked\Services\%(Filename)%(Extension)" />

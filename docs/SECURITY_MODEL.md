@@ -60,3 +60,20 @@ All diagnostic and error logs must adhere to strict sanitization rules:
   - Process IDs (`PID`), Window Handles (`HWND` in hex), Display IDs.
   - Frame acquisition timestamps and rendering frame rates (FPS).
   - Exception types, stack traces, and HRESULT error codes.
+
+---
+
+## 5. INCIDENT REPORTING & PRIVACY REDACTION
+
+When errors or crashes occur, SwitchCast provides local incident reports through `IDiagnosticRedactionService`. To prevent inadvertent leak of sensitive user or presentation content:
+
+1. **Automatic Redaction Pipeline**:
+   - **Usernames & Profiles**: Windows usernames are replaced with `[USER]` and profile paths (e.g., `C:\Users\Username\...`) are normalized to `%USERPROFILE%`.
+   - **Email Addresses**: All email addresses matching RFC patterns are scrubbed and replaced with `[REDACTED_EMAIL]`.
+   - **Credentials & Tokens**: Bearer tokens, API keys, passwords, and secrets are replaced with `[REDACTED_SECRET]`.
+2. **Explicit User Review**:
+   - No diagnostic report is ever uploaded automatically or transmitted in the background.
+   - All reports are displayed in `ErrorReportDialog.xaml` for full presenter review prior to clipboard copying, local file export, or voluntary submission to GitHub issues.
+3. **Audience-Facing Isolation**:
+   - No error dialogs, badges, or reporting prompts ever render inside `PresentationWindow`. Audience view integrity is strictly preserved during live screen-sharing sessions.
+

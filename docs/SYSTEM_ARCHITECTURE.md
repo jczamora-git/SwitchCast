@@ -138,3 +138,44 @@ To ensure presenter privacy and software stability:
 1. **Window Destruction / Minimization**: If a captured window terminates or is minimized, `PresentationCoordinator` catches the event, stops frame acquisition, and signals the renderer to display a clean, solid theme background with an intentional "Source Paused" notification.
 2. **Device Loss Recovery**: If the GPU resets (`DXGI_ERROR_DEVICE_REMOVED`), the renderer releases all D3D11 references, recreates the device, and rebinds the swapchain seamlessly.
 3. **Capture Feedback Loop Prevention**: The presentation window is excluded from window enumeration lists and marked with capture exclusion attributes to eliminate recursive mirror feedback.
+
+---
+
+## 6. DIAGNOSTICS & ERROR REPORTING ARCHITECTURE
+
+SwitchCast incorporates a dedicated, production-grade local diagnostics and error reporting engine designed to capture actionable technical data while rigorously protecting user privacy during live presentations:
+
+```
+[ Error / Exception Occurs ]
+  ├── AppDomain / TaskScheduler / App.UnhandledException OR
+  ├── PresentationCoordinator / Capture / Camera / PowerPoint failure OR
+  └── Explicit diagnostic instrumentation (SwitchCastDiagnostics.LogException)
+        │
+        ▼
+[ IErrorReportingService (ErrorReportingService) ]
+  ├── Deduplicates burst errors (5-second component/operation/HRESULT window)
+  ├── Enriches incident with OS, App version, architecture, and 100-event timeline
+  ├── Dispatches event to IDiagnosticRedactionService
+        │
+        ▼
+[ IDiagnosticRedactionService (DiagnosticRedactionService) ]
+  ├── Redacts Windows usernames (-> [USER])
+  ├── Redacts user profile paths (-> %USERPROFILE%)
+  ├── Redacts email addresses (-> [REDACTED_EMAIL])
+  └── Redacts auth tokens, secrets, and API keys (-> [REDACTED_SECRET])
+        │
+        ├─────────────────────────────┬─────────────────────────────┐
+        ▼                             ▼                             ▼
+[ Local Bounded Logs ]      [ Presentation Safe UI ]      [ Community Export ]
+  ├── %LOCALAPPDATA%\SwitchCast\Logs
+  ├── switchcast-YYYYMMDD.log  ├── Presenter Dock / Dashboard  ├── GitHub Issue URL (sanitized)
+  ├── incident-<id>.json       ├── Non-blocking InfoBar        ├── Copy Report (clipboard)
+  ├── 10-incident rotation     └── ErrorReportDialog.xaml      └── Save Report (.txt export)
+  └── 30-day log purge             (NEVER shown in Output)
+```
+
+### Architectural Guarantees:
+1. **Zero Remote Telemetry**: All logs and incidents are written strictly to local storage. No network transmission occurs unless the user explicitly copies, saves, or posts to GitHub.
+2. **Audience-Facing Isolation**: `PresentationWindow` never displays error dialogs, badges, or notification modals. Error reporting is confined to `MainWindow` and `PresenterDockWindow`.
+3. **Reentrancy & Deadlock Prevention**: Error reporting logging operations are asynchronous and non-blocking, isolated from UI threads and frame-delivery callbacks. Failures in the logging subsystem fail silently without crashing the main application.
+
