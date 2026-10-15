@@ -1,0 +1,83 @@
+<Window
+    x:Class="SwitchCast.Views.PresenterDockConfirmationWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="Stop presentation and close Dock?"
+    mc:Ignorable="d">
+
+    <Grid x:Name="RootGrid" Background="{ThemeResource AppBackgroundBrush}">
+        <!-- Modal Card with Border and Drop Shadow Style -->
+        <Border Margin="1"
+                Background="{ThemeResource AppSurfaceBrush}"
+                BorderBrush="{ThemeResource AppBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="24,20">
+            <Grid RowDefinitions="Auto,*,Auto" RowSpacing="14">
+                
+                <!-- Title & Icon -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0"
+                            Width="36"
+                            Height="36"
+                            Background="{ThemeResource AppSurfaceElevatedBrush}"
+                            BorderBrush="{ThemeResource AppBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Margin="0,0,12,0"
+                            VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE7BA;" FontSize="18" Foreground="{ThemeResource AppAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Text="Stop presentation and close Dock?"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                        <TextBlock Text="Action Confirmation"
+                                   FontSize="11"
+                                   Foreground="{ThemeResource AppTextTertiaryBrush}" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- Description Message -->
+                <TextBlock Grid.Row="1"
+                           Text="A presentation is currently running. Closing the Presenter Dock will also stop the presentation and close Presentation Output."
+                           FontSize="13"
+                           LineHeight="19"
+                           Foreground="{ThemeResource AppTextSecondaryBrush}"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center" />
+
+                <!-- Action Buttons Strip -->
+                <StackPanel Grid.Row="2"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            Spacing="10"
+                            VerticalAlignment="Bottom">
+                    <Button x:Name="CancelButton"
+                            Content="Cancel"
+                            Click="OnCancelClick"
+                            MinWidth="95"
+                            Padding="14,8"
+                            CornerRadius="6" />
+
+                    <Button x:Name="StopCloseButton"
+                            Content="Stop &amp; Close"
+                            Click="OnStopCloseClick"
+                            Style="{StaticResource PrimaryAccentButtonStyle}"
+                            MinWidth="120"
+                            Padding="16,8"
+                            CornerRadius="6" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
