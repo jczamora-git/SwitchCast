@@ -101,6 +101,11 @@ public class UserSettings
     public List<string> ImportedMediaPaths { get; set; } = [];
 
     /// <summary>
+    /// Persisted list of imported local PowerPoint presentation file paths.
+    /// </summary>
+    public List<string> ImportedPowerPointPaths { get; set; } = [];
+
+    /// <summary>
     /// Generates the standard default hotkey bindings.
     /// </summary>
     public static List<HotkeyBinding> GetDefaultHotkeys() => new()

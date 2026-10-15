@@ -176,13 +176,58 @@ public partial class SourcesViewModel : ObservableObject
                 }
             }
 
-            // Reconcile existing PowerPoint availability
-            for (int i = 0; i < _allPowerPoint.Count; i++)
+            // Load persisted PowerPoint presentations if not yet loaded
+            if (_allPowerPoint.Count == 0 && _settingsService?.CurrentSettings.ImportedPowerPointPaths is { Count: > 0 } pptPaths)
             {
-                var item = _allPowerPoint[i];
-                if (item.Source is PowerPointSource ppt)
+                foreach (var path in pptPaths)
                 {
-                    item.IsAvailable = File.Exists(ppt.FilePath);
+                    if (string.IsNullOrWhiteSpace(path))
+                    {
+                        continue;
+                    }
+
+                    PowerPointSource pptSource;
+                    if (File.Exists(path))
+                    {
+                        if (_powerPointService is not null)
+                        {
+                            try
+                            {
+                                pptSource = await _powerPointService.ImportPresentationAsync(path).ConfigureAwait(true);
+                            }
+                            catch
+                            {
+                                pptSource = new PowerPointSource(path) { IsAvailable = true };
+                            }
+                        }
+                        else
+                        {
+                            pptSource = new PowerPointSource(path) { IsAvailable = true };
+                        }
+                    }
+                    else
+                    {
+                        pptSource = new PowerPointSource(path) { IsAvailable = false };
+                    }
+
+                    var isSelected = _presentationStateService.IsSourceSelected(pptSource.Id);
+                    var item = new SelectableSourceItem(pptSource, isSelected, OnItemSelectionChanged)
+                    {
+                        IsAvailable = pptSource.IsAvailable
+                    };
+                    _allPowerPoint.Add(item);
+                }
+            }
+            else
+            {
+                // Reconcile existing PowerPoint availability without deleting imported library entries
+                for (int i = 0; i < _allPowerPoint.Count; i++)
+                {
+                    var item = _allPowerPoint[i];
+                    if (item.Source is PowerPointSource ppt)
+                    {
+                        item.IsAvailable = File.Exists(ppt.FilePath);
+                    }
                 }
             }
 
@@ -373,6 +418,18 @@ public partial class SourcesViewModel : ObservableObject
 
             if (addedAny)
             {
+                if (_settingsService is not null)
+                {
+                    _settingsService.CurrentSettings.ImportedPowerPointPaths = _allPowerPoint
+                        .Select(p => (p.Source as PowerPointSource)?.FilePath)
+                        .Where(p => !string.IsNullOrEmpty(p))
+                        .Select(p => p!)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+                    await _settingsService.SaveSettingsAsync().ConfigureAwait(true);
+                }
+
                 UpdateCategoryHeaders();
                 ApplyFilter();
             }
@@ -385,7 +442,7 @@ public partial class SourcesViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public void RemovePowerPoint(SelectableSourceItem? item)
+    public async Task RemovePowerPointAsync(SelectableSourceItem? item)
     {
         if (item is null || item.Source is not PowerPointSource ppt)
         {
@@ -396,6 +453,19 @@ public partial class SourcesViewModel : ObservableObject
         {
             _allPowerPoint.Remove(item);
             _presentationStateService.RemoveSelectedSource(item.Id);
+
+            if (_settingsService is not null)
+            {
+                _settingsService.CurrentSettings.ImportedPowerPointPaths = _allPowerPoint
+                    .Select(p => (p.Source as PowerPointSource)?.FilePath)
+                    .Where(p => !string.IsNullOrEmpty(p))
+                    .Select(p => p!)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                await _settingsService.SaveSettingsAsync().ConfigureAwait(true);
+            }
+
             UpdateCategoryHeaders();
             ApplyFilter();
         }
@@ -404,6 +474,11 @@ public partial class SourcesViewModel : ObservableObject
             HasError = true;
             ErrorMessage = $"Failed to remove PowerPoint presentation: {ex.Message}";
         }
+    }
+
+    public void RemovePowerPoint(SelectableSourceItem? item)
+    {
+        _ = RemovePowerPointAsync(item);
     }
 
     private void UpdateCategoryHeaders()

@@ -94,10 +94,10 @@ public partial class App : Application
 
         // ViewModels
         services.AddSingleton<MainViewModel>();
+        services.AddSingleton<SourcesViewModel>();
         services.AddTransient<DashboardViewModel>();
         services.AddTransient<PresentationViewModel>();
         services.AddTransient<PresenterDockViewModel>();
-        services.AddTransient<SourcesViewModel>();
         services.AddTransient<SettingsViewModel>();
 
         return services.BuildServiceProvider();
@@ -179,6 +179,12 @@ public partial class App : Application
         if (windowIconService is not null && _mainWindow.DispatcherQueue is not null)
         {
             windowIconService.SetDispatcherQueue(_mainWindow.DispatcherQueue);
+        }
+
+        var powerPointService = Services.GetService<Services.PowerPoint.IPowerPointPresentationService>();
+        if (powerPointService is not null && _mainWindow.DispatcherQueue is not null)
+        {
+            powerPointService.SetDispatcherQueue(_mainWindow.DispatcherQueue);
         }
 
         _mainWindow.Activate();
