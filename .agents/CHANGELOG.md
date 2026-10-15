@@ -7,6 +7,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Full Stability & Regression Recovery Pass] - 2026-10-15
+
+### Fixed (fix / lifecycle / presenter-dock / crash-watchdog / camera-queue / powerpoint / video-stutter / test)
+- **Authoritative Lifecycle Contract (Actions A - D)**:
+  - **Action A (Stop Presenting)**: Fully stops active source, releases capture/media/slideshow/camera resources, closes presentation output window, restores and activates `MainWindow`, navigates to Control Dashboard, and preserves process and queue data without duplicate window creation.
+  - **Action B (Dock X Confirmation)**:
+    - Active presentation triggers modal confirmation dialog: "Stop presentation and close Dock?" with options "Cancel" (preserves dock and live presentation) and "Stop & Close" (stops presentation via `StopPresentationAsync`, closes output window, closes dock, activates Dashboard).
+    - Dynamically expands `PresenterDockWindow` bounds to 210 DIPs during confirmation to prevent dialog clipping caused by native `WM_GETMINMAXINFO` height restrictions.
+    - Idle dock closes immediately upon X click without confirmation prompt.
+  - **Action C (Application Shutdown)**: MainWindow confirmed exit coordinates clean teardown of all secondary windows without dock confirmation or Dashboard reactivation.
+  - **Action D (Show/Hide Hotkey)**: Hotkey dock toggle remains non-destructive and never initiates presentation teardown.
+- **Diagnostics Crash & Hang Protection**:
+  - **Synchronous Critical Flush**: Added `FlushCriticalIncident` to `IErrorReportingService` and `LogCritical` to `SwitchCastDiagnostics`. Terminating exceptions (`AppDomain.UnhandledException` with `e.IsTerminating == true`) write incident files synchronously directly to disk, ensuring diagnostics are persisted prior to process termination.
+  - **Proactive UI Hang Watchdog**: Added `UIHangWatchdog` running an independent background timer that monitors WinUI `DispatcherQueue` message loop heartbeats. Emits warnings at 5s latency and critical deadlock incident reports at 15s latency.
+  - **Startup Crash Notification**: Added `GetPreviousCrashReports()` and connected it to `DashboardViewModel` to display an InfoBar banner on startup if previous unacknowledged crash incidents exist, with direct action to open `ErrorReportDialog`.
+- **Camera Frame Task Observation & Bounded Queue**:
+  - Replaced fire-and-forget `_ = _outputRenderer.RenderBitmapAsync(bitmap)` in `PresentationCoordinator.OnCameraFrameArrived` with a sequential, bounded latest-frame-wins asynchronous rendering loop.
+  - Superceded frames are immediately disposed via `bitmap.Dispose()` and backpressure is reported via `_cameraCaptureService.NotifyFrameCompleted()`.
+  - Render exceptions are caught and reported to diagnostics.
+  - Presentation status switches to `Active` only after the first camera frame is rendered successfully.
+- **PowerPoint State Retention Across Switches**:
+  - Added `UpdateSelectedSource` in `IPresentationStateService` / `PresentationStateService`.
+  - Synchronized slide index in `SelectedSources` during slide navigation so switching to Video/Camera and returning to PowerPoint preserves the current slide.
+  - Cleared pending camera frames and validated target source before camera rendering to eliminate transition races.
+- **Video Playback Performance**:
+  - Throttled high-frequency `PositionChanged` dispatches in `MediaPresentationService` to at most 4 times/sec (250ms), preventing UI thread message loop starvation.
+- **Quality Gates & Behavior Contracts**:
+  - Added `FullStabilityRegressionContractTests.cs` covering Scenarios A-E. Total test suite expanded to **366 automated tests** (100% pass rate).
+  - Debug x64 and Release x64 builds compile with **0 errors and 0 warnings**.
+
+---
+
 ## [PowerPoint Switching Hotfix & Production Error Diagnostics System] - 2026-10-15
 
 ### Fixed (fix / ui-threading / powerpoint-switching / dispatcher / dashboard / mvvm / test)

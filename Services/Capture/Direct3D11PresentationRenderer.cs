@@ -117,6 +117,8 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
             return Task.CompletedTask;
         }
 
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
         var enqueued = _dispatcherQueue.TryEnqueue(async () =>
         {
             try
@@ -138,10 +140,12 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
                         Debug.WriteLine($"[Direct3D11PresentationRenderer] Unexpected non-Bgra8 format rejected safely: {bitmap.BitmapPixelFormat}");
                     }
                 }
+                tcs.TrySetResult();
             }
             catch (Exception ex)
             {
                 Diagnostics.SwitchCastDiagnostics.LogException(nameof(Direct3D11PresentationRenderer), nameof(RenderBitmapAsync), ex);
+                tcs.TrySetException(ex);
             }
             finally
             {
@@ -156,9 +160,10 @@ public sealed class Direct3D11PresentationRenderer : IPresentationOutputRenderer
             bitmap.Dispose();
             Interlocked.Exchange(ref _isProcessingFrame, 0);
             FrameRenderCompleted?.Invoke(this, EventArgs.Empty);
+            tcs.TrySetResult();
         }
 
-        return Task.CompletedTask;
+        return tcs.Task;
     }
 
     /// <summary>

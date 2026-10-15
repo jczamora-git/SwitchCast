@@ -482,8 +482,18 @@ public sealed partial class MediaPresentationService : ObservableObject, IMediaP
         });
     }
 
+    private long _lastPositionUpdateTimestamp;
+
     private void OnPositionChanged(MediaPlaybackSession sender, object args)
     {
+        // Throttle UI thread dispatches to at most 4 times per second (250ms)
+        // to prevent high-frequency event storms from starving UI rendering
+        if (Stopwatch.GetElapsedTime(_lastPositionUpdateTimestamp).TotalMilliseconds < 250)
+        {
+            return;
+        }
+        _lastPositionUpdateTimestamp = Stopwatch.GetTimestamp();
+
         RunOnUIThread(() =>
         {
             Position = sender.Position;

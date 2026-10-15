@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml;
@@ -30,6 +31,13 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
     private CaptureSource? _selectedPresentationSource;
 
     private bool _isSyncingPresentationSource;
+    private readonly Services.Diagnostics.IErrorReportingService? _reportingService;
+
+    [ObservableProperty]
+    private bool _hasPreviousCrashReport;
+
+    [ObservableProperty]
+    private Models.Diagnostics.DiagnosticIncident? _latestPreviousCrash;
 
     public DashboardViewModel(
         IPresentationStateService presentationStateService,
@@ -38,6 +46,7 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
         IPresentationCoordinator presentationCoordinator,
         IPresenterDockService? dockService = null,
         IApplicationSettingsService? settingsService = null,
+        Services.Diagnostics.IErrorReportingService? reportingService = null,
         IUIThreadDispatcher? uiDispatcher = null)
     {
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
@@ -46,6 +55,7 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
         _presentationCoordinator = presentationCoordinator ?? throw new ArgumentNullException(nameof(presentationCoordinator));
         _dockService = dockService;
         _settingsService = settingsService;
+        _reportingService = reportingService;
 
         _dispatcher = UIThreadDispatcherProvider.Resolve(uiDispatcher);
 
@@ -67,6 +77,36 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
         var defaultSource = _presentationStateService.SelectedSources.FirstOrDefault(s => s.IsAvailable);
         _selectedPreviewSource = defaultSource;
         _selectedPresentationSource = defaultSource;
+
+        CheckForPreviousCrash();
+    }
+
+    private void CheckForPreviousCrash()
+    {
+        if (_reportingService is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var crashes = _reportingService.GetPreviousCrashReports();
+            if (crashes.Count > 0)
+            {
+                LatestPreviousCrash = crashes[0];
+                HasPreviousCrashReport = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[DashboardViewModel] CheckForPreviousCrash error: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    public void DismissPreviousCrashBanner()
+    {
+        HasPreviousCrashReport = false;
     }
 
     /// <summary>

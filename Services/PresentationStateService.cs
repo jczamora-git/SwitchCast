@@ -111,6 +111,33 @@ public partial class PresentationStateService : ObservableObject, IPresentationS
         }
     }
 
+    public bool UpdateSelectedSource(CaptureSource source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        lock (_lock)
+        {
+            for (int i = 0; i < _selectedSources.Count; i++)
+            {
+                if (_selectedSources[i].Id == source.Id)
+                {
+                    _selectedSources[i] = source;
+                    if (SelectedSource?.Id == source.Id)
+                    {
+                        SelectedSource = source;
+                    }
+                    if (ActiveSource?.Id == source.Id)
+                    {
+                        ActiveSource = source;
+                    }
+                    OnPropertyChanged(nameof(SelectedSources));
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
     public bool RemoveSelectedSource(string sourceId)
     {
         ArgumentNullException.ThrowIfNull(sourceId);

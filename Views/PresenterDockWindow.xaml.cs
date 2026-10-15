@@ -32,11 +32,14 @@ public sealed partial class PresenterDockWindow : Window
     private long _lastMenuClosedTicks;
     private readonly SubclassProc _subclassProc;
 
+    private bool _isShowingConfirmationDialog;
+
     public PresenterDockWindow()
     {
         _subclassProc = DockSubclassProc;
         ViewModel = App.Current.Services.GetRequiredService<PresenterDockViewModel>();
         ViewModel.SetDispatcherQueue(DispatcherQueue);
+        ViewModel.ConfirmCloseAsync = ShowCloseConfirmationDialogAsync;
         InitializeComponent();
         Bindings.Update();
 
@@ -97,6 +100,7 @@ public sealed partial class PresenterDockWindow : Window
             // Install native window subclass to safely intercept and block WM_NCLBUTTONDBLCLK on caption
             SetWindowSubclass(WindowHandle, _subclassProc, new UIntPtr(1001), IntPtr.Zero);
             _appWindow.Changed += OnAppWindowChanged;
+            _appWindow.Closing += OnAppWindowClosing;
 
             ApplyWindowSizingAndPosition(ViewModel.HasSecondaryRow, initialCenter: true);
 
@@ -236,9 +240,9 @@ public sealed partial class PresenterDockWindow : Window
         double scale = dpi / 96.0;
 
         // Baseline width: 680 DIPs (comfortable single row).
-        // Height: 52 DIPs for standard sources, 86 DIPs when adaptive video row is on air.
+        // Height: 52 DIPs for standard sources, 86 DIPs when adaptive video row is on air, 210 DIPs when confirmation dialog is shown.
         double widthDip = 680.0;
-        double heightDip = isVideoActive ? 86.0 : 52.0;
+        double heightDip = _isShowingConfirmationDialog ? 210.0 : (isVideoActive ? 86.0 : 52.0);
 
         int pixelWidth = (int)Math.Round(widthDip * scale);
         int pixelHeight = (int)Math.Round(heightDip * scale);
@@ -381,12 +385,65 @@ public sealed partial class PresenterDockWindow : Window
         }
     }
 
+    private async void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        var lifecycle = App.Current.Services.GetService<Services.IApplicationLifecycleService>();
+        if (lifecycle is not null && (lifecycle.IsShuttingDown || lifecycle.IsShutdownApproved))
+        {
+            return;
+        }
+
+        if (ViewModel.HasActivePresentation)
+        {
+            args.Cancel = true;
+            await ViewModel.CloseDockCommand.ExecuteAsync(null);
+        }
+    }
+
+    private async Task<bool> ShowCloseConfirmationDialogAsync()
+    {
+        if (Content?.XamlRoot is null)
+        {
+            return true;
+        }
+
+        _isShowingConfirmationDialog = true;
+        try
+        {
+            ApplyWindowSizingAndPosition(ViewModel.HasSecondaryRow, initialCenter: false);
+
+            var dialog = new ContentDialog
+            {
+                Title = "Stop presentation and close Dock?",
+                Content = "A presentation is currently running. Closing the Presenter Dock will also stop the presentation and close Presentation Output.",
+                PrimaryButtonText = "Stop & Close",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = Content.XamlRoot
+            };
+
+            var result = await dialog.ShowAsync();
+            return result == ContentDialogResult.Primary;
+        }
+        catch (Exception ex)
+        {
+            Services.Diagnostics.SwitchCastDiagnostics.LogException(nameof(PresenterDockWindow), nameof(ShowCloseConfirmationDialogAsync), ex);
+            return false;
+        }
+        finally
+        {
+            _isShowingConfirmationDialog = false;
+            ApplyWindowSizingAndPosition(ViewModel.HasSecondaryRow, initialCenter: false);
+        }
+    }
+
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
         CloseActiveMenu();
         if (_appWindow is not null)
         {
             _appWindow.Changed -= OnAppWindowChanged;
+            _appWindow.Closing -= OnAppWindowClosing;
         }
         if (WindowHandle != IntPtr.Zero)
         {
@@ -433,7 +490,7 @@ public sealed partial class PresenterDockWindow : Window
                         if (dpi == 0) dpi = 96;
                         double scale = dpi / 96.0;
                         double widthDip = 680.0;
-                        double heightDip = ViewModel.HasSecondaryRow ? 86.0 : 52.0;
+                        double heightDip = _isShowingConfirmationDialog ? 210.0 : (ViewModel.HasSecondaryRow ? 86.0 : 52.0);
                         int pixelWidth = (int)Math.Round(widthDip * scale);
                         int pixelHeight = (int)Math.Round(heightDip * scale);
 

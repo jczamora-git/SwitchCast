@@ -264,8 +264,10 @@ public class PresenterDockViewModelTests
     }
 
     [Fact]
-    public void CloseDockCommand_CallsDockServiceCloseDockAndShowDashboard()
+    public async Task CloseDockCommand_WhenIdle_ClosesDockAndShowsDashboardImmediately()
     {
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Idle);
+
         var vm = new PresenterDockViewModel(
             _mockCoordinator.Object,
             _mockStateService.Object,
@@ -273,15 +275,27 @@ public class PresenterDockViewModelTests
             _mockDockService.Object,
             _mockSettingsService.Object);
 
-        vm.CloseDockCommand.Execute(null);
+        bool confirmationRequested = false;
+        vm.ConfirmCloseAsync = () =>
+        {
+            confirmationRequested = true;
+            return Task.FromResult(true);
+        };
 
+        await vm.CloseDockCommand.ExecuteAsync(null);
+
+        Assert.False(confirmationRequested);
         _mockDockService.Verify(d => d.CloseDock(), Times.Once);
         _mockDockService.Verify(d => d.ShowDashboard(), Times.Once);
+        _mockCoordinator.Verify(c => c.StopPresentationAsync(It.IsAny<bool>()), Times.Never);
     }
 
     [Fact]
-    public void CloseDockCommand_DoesNotStopPresentationOrCloseOutput()
+    public async Task CloseDockCommand_WhenPresentationActive_AndCancelled_PreservesPresentationAndDock()
     {
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+        _mockCoordinator.SetupGet(c => c.IsLive).Returns(true);
+
         var vm = new PresenterDockViewModel(
             _mockCoordinator.Object,
             _mockStateService.Object,
@@ -289,11 +303,47 @@ public class PresenterDockViewModelTests
             _mockDockService.Object,
             _mockSettingsService.Object);
 
-        vm.CloseDockCommand.Execute(null);
+        bool confirmationRequested = false;
+        vm.ConfirmCloseAsync = () =>
+        {
+            confirmationRequested = true;
+            return Task.FromResult(false); // User clicked Cancel
+        };
 
-        // Verification: Closing dock must NOT stop presentation or close output window
+        await vm.CloseDockCommand.ExecuteAsync(null);
+
+        Assert.True(confirmationRequested);
         _mockCoordinator.Verify(c => c.StopPresentationAsync(It.IsAny<bool>()), Times.Never);
-        _mockWindowService.Verify(w => w.ClosePresentationWindow(), Times.Never);
+        _mockDockService.Verify(d => d.CloseDock(), Times.Never);
+        _mockDockService.Verify(d => d.ShowDashboard(), Times.Never);
+    }
+
+    [Fact]
+    public async Task CloseDockCommand_WhenPresentationActive_AndConfirmed_StopsPresentationClosesDockAndShowsDashboard()
+    {
+        _mockStateService.SetupGet(s => s.Status).Returns(PresentationStatus.Active);
+        _mockCoordinator.SetupGet(c => c.IsLive).Returns(true);
+
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object);
+
+        bool confirmationRequested = false;
+        vm.ConfirmCloseAsync = () =>
+        {
+            confirmationRequested = true;
+            return Task.FromResult(true); // User clicked Stop & Close
+        };
+
+        await vm.CloseDockCommand.ExecuteAsync(null);
+
+        Assert.True(confirmationRequested);
+        _mockCoordinator.Verify(c => c.StopPresentationAsync(false), Times.Once);
+        _mockDockService.Verify(d => d.CloseDock(), Times.Once);
+        _mockDockService.Verify(d => d.ShowDashboard(), Times.Once);
     }
 
     [Fact]

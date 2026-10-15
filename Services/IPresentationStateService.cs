@@ -79,6 +79,11 @@ public interface IPresentationStateService : INotifyPropertyChanged
     bool AddSelectedSource(CaptureSource source);
 
     /// <summary>
+    /// Updates the state/properties of an existing queued source (e.g. current slide index).
+    /// </summary>
+    bool UpdateSelectedSource(CaptureSource source);
+
+    /// <summary>
     /// Removes a source from the presenter's active queue by identifier.
     /// </summary>
     bool RemoveSelectedSource(string sourceId);

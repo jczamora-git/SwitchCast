@@ -85,3 +85,30 @@ When manual validation is requested or required before major milestone releases:
    - Share the SwitchCast Presentation Output Window.
    - Switch active sources in SwitchCast.
    - Verify on receiving client device that video feed remains continuous without stutter or black flash.
+
+---
+
+## 6. REGRESSION BEHAVIOR CONTRACTS
+
+To ensure previously functioning features do not regress during future development, executable behavior contracts are maintained in `SwitchCast.Tests/Services/FullStabilityRegressionContractTests.cs`.
+
+Every pull request and release gate MUST verify the following 5 contract domains:
+
+### Domain A: Window & Session Lifecycle
+- **Stop Presenting**: Closes `PresentationWindow`, activates `MainWindow` Control Dashboard, clears output renderers, and preserves the queued sources intact (`Contract_A1`).
+- **Dock X with Active Presentation**: Displays custom modal confirmation ("Stop presentation and close Dock?"); clicking Cancel preserves presentation and dock (`Contract_A2`); clicking Stop & Close stops presentation, closes output, closes dock, and activates Dashboard (`Contract_A3`).
+- **Dock X while Idle**: Closes Floating Dock immediately without confirmation prompt and activates Dashboard (`Contract_A4`).
+- **Full Application Exit**: Closes all secondary windows without secondary dock confirmation prompts and terminates cleanly without Dashboard reactivation (`Contract_A5`).
+
+### Domain B: PowerPoint Slide State Retention
+- **Slide Index Retention Across Switches**: Advancing slides in PowerPoint and switching to Video or Camera preserves the current slide index in `SelectedSources`. When returning to PowerPoint, the presentation resumes at the exact slide (`Contract_B1`).
+
+### Domain C: Video Playback Performance
+- **Dispatcher Throttle Protection**: High-frequency playback position callbacks from `MediaPlaybackSession` are throttled to at most once per 250ms in `MediaPresentationService`, preventing UI message loop starvation (`Contract_C1`).
+
+### Domain D: Camera Bounded Frame Delivery
+- **Backpressure & Disposal**: Video frame arrival uses a bounded latest-frame-wins delivery loop with `NotifyFrameCompleted()` backpressure signaling and immediate disposal of dropped frames (`Contract_D1`).
+
+### Domain E: Diagnostics & Hang Watchdog
+- **Synchronous Critical Flush**: Critical and terminating exceptions (`IsTerminating == true`) bypass thread-pool queues and write incident files synchronously to disk prior to process exit (`Contract_E1`).
+- **UI Hang Watchdog Lifecycle**: Background watchdog safely tracks UI message loop heartbeat and records diagnostic incidents upon detecting dispatcher starvation (`Contract_E2`).

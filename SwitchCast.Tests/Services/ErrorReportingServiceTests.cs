@@ -184,4 +184,48 @@ public class ErrorReportingServiceTests : IDisposable
         var incidents = _reportingService.GetRecentIncidents();
         Assert.Contains(incidents, i => i.Component == "DiagnosticsBridgeTest" && i.Operation == "ExecuteTest");
     }
+
+    [Fact]
+    public void FlushCriticalIncident_SynchronouslyWritesFile_WithoutBackgroundThread()
+    {
+        var ex = new AccessViolationException("Native memory corruption");
+        var incident = new DiagnosticIncident
+        {
+            Id = "SC-CRIT-001",
+            Component = "Direct3D11Renderer",
+            Operation = "RenderBitmapAsync",
+            Severity = DiagnosticSeverity.Critical,
+            SafeMessage = ex.Message,
+            ExceptionType = ex.GetType().FullName,
+            HResult = ex.HResult,
+            StackTrace = ex.StackTrace ?? "at Direct3D11Renderer.RenderBitmapAsync()",
+            Timestamp = DateTimeOffset.UtcNow
+        };
+
+        _reportingService.FlushCriticalIncident(incident);
+
+        var incidentFiles = Directory.GetFiles(_testLogsDirectory, "incident-SC-CRIT-001*.json");
+        Assert.Single(incidentFiles);
+
+        string content = File.ReadAllText(incidentFiles[0]);
+        Assert.Contains("SC-CRIT-001", content);
+        Assert.Contains("Direct3D11Renderer", content);
+    }
+
+    [Fact]
+    public void GetPreviousCrashReports_ReturnsCriticalIncidents()
+    {
+        var ex = new Exception("Critical terminating crash");
+        var incident = _reportingService.RecordException(
+            "App",
+            "OnUnhandledException",
+            ex,
+            severity: DiagnosticSeverity.Critical);
+
+        _reportingService.FlushCriticalIncident(incident);
+
+        var crashReports = _reportingService.GetPreviousCrashReports();
+        Assert.NotEmpty(crashReports);
+        Assert.Contains(crashReports, r => r.Id == incident.Id);
+    }
 }

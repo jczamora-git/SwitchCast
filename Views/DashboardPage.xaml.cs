@@ -17,4 +17,19 @@ public sealed partial class DashboardPage : Page
     }
 
     public DashboardViewModel ViewModel { get; }
+
+    private async void OnViewPreviousCrashReportClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (ViewModel.LatestPreviousCrash is not null && XamlRoot is not null)
+        {
+            var reportingService = App.Current.Services.GetRequiredService<Services.Diagnostics.IErrorReportingService>();
+            var reportBuilder = App.Current.Services.GetRequiredService<Services.Diagnostics.IDiagnosticReportBuilder>();
+            await Dialogs.ErrorReportDialog.ShowAsync(XamlRoot, ViewModel.LatestPreviousCrash, reportingService, reportBuilder);
+        }
+    }
+
+    private void OnDismissCrashInfoBar(InfoBar sender, object args)
+    {
+        ViewModel.DismissPreviousCrashBanner();
+    }
 }

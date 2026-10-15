@@ -178,4 +178,41 @@ SwitchCast incorporates a dedicated, production-grade local diagnostics and erro
 1. **Zero Remote Telemetry**: All logs and incidents are written strictly to local storage. No network transmission occurs unless the user explicitly copies, saves, or posts to GitHub.
 2. **Audience-Facing Isolation**: `PresentationWindow` never displays error dialogs, badges, or notification modals. Error reporting is confined to `MainWindow` and `PresenterDockWindow`.
 3. **Reentrancy & Deadlock Prevention**: Error reporting logging operations are asynchronous and non-blocking, isolated from UI threads and frame-delivery callbacks. Failures in the logging subsystem fail silently without crashing the main application.
+4. **Synchronous Critical Flush**: High-severity and terminating incidents (e.g. `AppDomain.UnhandledException` where `IsTerminating == true`) bypass asynchronous thread-pool queues and flush synchronously to disk before process death.
+5. **UI Hang Watchdog**: An independent background timer monitors UI `DispatcherQueue` responsiveness and emits warnings (5s) and deadlock incidents (15s) if the message loop becomes unresponsive.
+
+---
+
+## 7. AUTHORITATIVE WINDOW & PRESENTATION LIFECYCLE CONTRACT
+
+SwitchCast enforces an authoritative 4-action lifecycle contract governing presentation teardown and window management:
+
+### Action A — Stop Presenting
+Triggered from Dashboard, Floating Presenter Dock, or global hotkey:
+- Stops active capture, media playback, PowerPoint slideshow, and camera reader.
+- Clears visual renderers and closes the Presentation Output window (`PresentationWindow`).
+- Restores and activates `MainWindow` and navigates to the Control Dashboard.
+- Preserves the application process, source library, and queued source items intact without creating duplicate window instances.
+
+### Action B — Presenter Dock X Button (User Close Request)
+- **Active Presentation Running (Active, Paused, Blackout)**:
+  - Intercepts close request and displays custom confirmation dialog:
+    - Title: "Stop presentation and close Dock?"
+    - Message: "A presentation is currently running. Closing the Presenter Dock will also stop the presentation and close Presentation Output."
+    - Options: `Cancel` and `Stop & Close`.
+  - Window bounds dynamically expand to 210 DIPs to ensure dialog visibility within Win32 subclass constraints (`WM_GETMINMAXINFO`).
+  - `Cancel`: Keeps Floating Dock open, keeps presentation live, and leaves output unaffected.
+  - `Stop & Close`: Calls authoritative `StopPresentationAsync`, closes Presentation Output, closes Floating Dock, and activates Control Dashboard. Does not terminate application.
+- **No Active Presentation (Idle)**:
+  - Closes Floating Dock immediately with zero confirmation prompt.
+  - Activates Control Dashboard.
+
+### Action C — Full Application Exit
+- Initiated via `MainWindow` close button.
+- Displays standard exit confirmation dialog.
+- Upon confirmed exit: stops active presentation, coordinates teardown across all managed windows (`PresentationWindow`, `PresenterDockWindow`), disposes hotkeys and native resources, and exits the process without secondary dock confirmation prompts or Dashboard reactivation.
+
+### Action D — Dock Show/Hide Hotkey
+- Toggles dock visibility non-destructively via `IPresenterDockService.ToggleDock()`.
+- Never triggers stop presentation or close confirmation dialogs.
 

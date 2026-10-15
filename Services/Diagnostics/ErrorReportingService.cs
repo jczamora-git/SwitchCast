@@ -187,7 +187,7 @@ public sealed class ErrorReportingService : IErrorReportingService
             severity,
             $"HResult=0x{hresult:X8}");
 
-        PersistIncidentAsync(incident);
+        PersistIncidentInternal(incident, isSynchronous: severity == DiagnosticSeverity.Critical);
 
         try
         {
@@ -324,9 +324,55 @@ public sealed class ErrorReportingService : IErrorReportingService
         });
     }
 
-    private void PersistIncidentAsync(DiagnosticIncident incident)
+    public void FlushCriticalIncident(DiagnosticIncident incident)
     {
-        _ = Task.Run(async () =>
+        ArgumentNullException.ThrowIfNull(incident);
+        PersistIncidentInternal(incident, isSynchronous: true);
+    }
+
+    public IReadOnlyList<DiagnosticIncident> GetPreviousCrashReports()
+    {
+        var crashes = new List<DiagnosticIncident>();
+        try
+        {
+            if (!Directory.Exists(_logsDirectory))
+            {
+                return crashes;
+            }
+
+            var files = Directory.GetFiles(_logsDirectory, "incident-*.json");
+            foreach (var file in files)
+            {
+                try
+                {
+                    string json = File.ReadAllText(file);
+                    var incident = JsonSerializer.Deserialize<DiagnosticIncident>(json);
+                    if (incident is not null &&
+                        (incident.Severity == DiagnosticSeverity.Critical ||
+                         string.Equals(incident.Recoverability, "Unrecoverable", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(incident.Operation, "UnhandledException", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(incident.Category, "Crash", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        crashes.Add(incident);
+                    }
+                }
+                catch
+                {
+                    // Ignore corrupted individual files
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ErrorReportingService] GetPreviousCrashReports error: {ex.Message}");
+        }
+
+        return crashes.OrderByDescending(c => c.Timestamp).ToList();
+    }
+
+    private void PersistIncidentInternal(DiagnosticIncident incident, bool isSynchronous)
+    {
+        void WriteFiles()
         {
             try
             {
@@ -335,21 +381,30 @@ public sealed class ErrorReportingService : IErrorReportingService
                 // Write plain text report
                 string txtFile = Path.Combine(_logsDirectory, $"incident-{incident.Id}.txt");
                 string txtReport = _reportBuilder.BuildPlainTextReport(incident);
-                await File.WriteAllTextAsync(txtFile, txtReport).ConfigureAwait(false);
+                File.WriteAllText(txtFile, txtReport);
 
                 // Write JSON representation
                 string jsonFile = Path.Combine(_logsDirectory, $"incident-{incident.Id}.json");
                 string jsonReport = _reportBuilder.BuildJsonReport(incident);
-                await File.WriteAllTextAsync(jsonFile, jsonReport).ConfigureAwait(false);
+                File.WriteAllText(jsonFile, jsonReport);
 
                 // Enforce max stored incident files
                 RotateIncidentFiles();
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[ErrorReportingService] PersistIncidentAsync failure: {ex.Message}");
+                Debug.WriteLine($"[ErrorReportingService] PersistIncidentInternal failure: {ex.Message}");
             }
-        });
+        }
+
+        if (isSynchronous)
+        {
+            WriteFiles();
+        }
+        else
+        {
+            _ = Task.Run(WriteFiles);
+        }
     }
 
     private void RotateIncidentFiles()

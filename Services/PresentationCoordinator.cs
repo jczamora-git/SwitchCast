@@ -37,6 +37,9 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     private volatile bool _isStoppingOrShuttingDown;
     private int _firstCameraFrameRendered;
     private CancellationTokenSource? _cameraStartupCts;
+    private readonly object _cameraFrameLock = new();
+    private SoftwareBitmap? _pendingCameraFrame;
+    private bool _isRenderingCameraFrame;
 
     [ObservableProperty]
     private string? _lastErrorMessage;
@@ -479,6 +482,13 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             _cameraStartupCts?.Cancel();
             Interlocked.Exchange(ref _firstCameraFrameRendered, 0);
 
+            lock (_cameraFrameLock)
+            {
+                _pendingCameraFrame?.Dispose();
+                _pendingCameraFrame = null;
+                _isRenderingCameraFrame = false;
+            }
+
             if (_cameraCaptureService is not null)
             {
                 await _cameraCaptureService.StopCaptureAsync().ConfigureAwait(false);
@@ -596,6 +606,12 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                 _mediaPresentationService.ClearImage();
                 _cameraStartupCts?.Cancel();
                 Interlocked.Exchange(ref _firstCameraFrameRendered, 0);
+                lock (_cameraFrameLock)
+                {
+                    _pendingCameraFrame?.Dispose();
+                    _pendingCameraFrame = null;
+                    _isRenderingCameraFrame = false;
+                }
                 if (_cameraCaptureService is not null)
                 {
                     await _cameraCaptureService.StopCaptureAsync().ConfigureAwait(false);
@@ -1094,6 +1110,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         if (_powerPointService.ActivePowerPointSource is not null)
         {
             _presentationStateService.SetActiveSource(_powerPointService.ActivePowerPointSource);
+            _presentationStateService.UpdateSelectedSource(_powerPointService.ActivePowerPointSource);
         }
         OnPropertyChanged(nameof(PowerPointProgressText));
         OnPropertyChanged(nameof(PowerPointSlideImageSource));
@@ -1118,6 +1135,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         if (_powerPointService.ActivePowerPointSource is not null)
         {
             _presentationStateService.SetActiveSource(_powerPointService.ActivePowerPointSource);
+            _presentationStateService.UpdateSelectedSource(_powerPointService.ActivePowerPointSource);
         }
         OnPropertyChanged(nameof(PowerPointProgressText));
         OnPropertyChanged(nameof(PowerPointSlideImageSource));
@@ -1142,6 +1160,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         if (_powerPointService.ActivePowerPointSource is not null)
         {
             _presentationStateService.SetActiveSource(_powerPointService.ActivePowerPointSource);
+            _presentationStateService.UpdateSelectedSource(_powerPointService.ActivePowerPointSource);
         }
         OnPropertyChanged(nameof(PowerPointProgressText));
         OnPropertyChanged(nameof(PowerPointSlideImageSource));
@@ -1150,34 +1169,98 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
     private void OnCameraFrameArrived(object? sender, SoftwareBitmap bitmap)
     {
-        if ((Status != PresentationStatus.Active && Status != PresentationStatus.Starting) || !IsActiveSourceCamera)
+        if ((Status != PresentationStatus.Active && Status != PresentationStatus.Starting) ||
+            !IsActiveSourceCamera ||
+            _isStoppingOrShuttingDown ||
+            _targetRequestedPresentationSource?.Type != SourceType.Camera)
         {
             bitmap.Dispose();
             _cameraCaptureService?.NotifyFrameCompleted();
             return;
         }
 
-        try
-        {
-            _ = _outputRenderer.RenderBitmapAsync(bitmap);
+        SoftwareBitmap? droppedFrame = null;
+        bool startRenderLoop = false;
 
-            // Once the first valid camera frame has been delivered to the renderer,
-            // transition presentation state from Starting to Active (LIVE).
-            if (Status == PresentationStatus.Starting && IsActiveSourceCamera)
+        lock (_cameraFrameLock)
+        {
+            if (_isRenderingCameraFrame)
             {
-                if (Interlocked.CompareExchange(ref _firstCameraFrameRendered, 1, 0) == 0)
-                {
-                    _cameraStartupCts?.Cancel();
-                    Debug.WriteLine("[PresentationCoordinator] First camera frame delivered to renderer. Status transitioned to Active (LIVE).");
-                    _presentationStateService.SetStatus(PresentationStatus.Active);
-                }
+                // Bounded latest-frame-wins: drop older pending frame in favor of the latest incoming frame
+                droppedFrame = _pendingCameraFrame;
+                _pendingCameraFrame = bitmap;
+            }
+            else
+            {
+                _isRenderingCameraFrame = true;
+                _pendingCameraFrame = bitmap;
+                startRenderLoop = true;
             }
         }
-        catch (Exception ex)
+
+        if (droppedFrame is not null)
         {
-            bitmap.Dispose();
+            droppedFrame.Dispose();
             _cameraCaptureService?.NotifyFrameCompleted();
-            Diagnostics.SwitchCastDiagnostics.LogException(nameof(PresentationCoordinator), nameof(OnCameraFrameArrived), ex);
+        }
+
+        if (startRenderLoop)
+        {
+            _ = ProcessCameraFramesLoopAsync();
+        }
+    }
+
+    private async Task ProcessCameraFramesLoopAsync()
+    {
+        while (true)
+        {
+            SoftwareBitmap? frameToRender = null;
+            lock (_cameraFrameLock)
+            {
+                frameToRender = _pendingCameraFrame;
+                _pendingCameraFrame = null;
+                if (frameToRender is null)
+                {
+                    _isRenderingCameraFrame = false;
+                    break;
+                }
+            }
+
+            if ((Status != PresentationStatus.Active && Status != PresentationStatus.Starting) ||
+                !IsActiveSourceCamera ||
+                _isStoppingOrShuttingDown ||
+                _targetRequestedPresentationSource?.Type != SourceType.Camera)
+            {
+                frameToRender.Dispose();
+                _cameraCaptureService?.NotifyFrameCompleted();
+                lock (_cameraFrameLock)
+                {
+                    _pendingCameraFrame?.Dispose();
+                    _pendingCameraFrame = null;
+                    _isRenderingCameraFrame = false;
+                }
+                break;
+            }
+
+            try
+            {
+                await _outputRenderer.RenderBitmapAsync(frameToRender).ConfigureAwait(false);
+
+                // Transition state from Starting to Active only after successfully completing the first frame render milestone
+                if (Status == PresentationStatus.Starting && IsActiveSourceCamera)
+                {
+                    if (Interlocked.CompareExchange(ref _firstCameraFrameRendered, 1, 0) == 0)
+                    {
+                        _cameraStartupCts?.Cancel();
+                        Debug.WriteLine("[PresentationCoordinator] First camera frame successfully rendered. Transitioning to Active (LIVE).");
+                        _presentationStateService.SetStatus(PresentationStatus.Active);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Diagnostics.SwitchCastDiagnostics.LogException(nameof(PresentationCoordinator), nameof(ProcessCameraFramesLoopAsync), ex);
+            }
         }
     }
 

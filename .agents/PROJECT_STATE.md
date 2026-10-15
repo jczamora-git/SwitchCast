@@ -7,15 +7,43 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: PowerPoint Switching Hotfix & Production Error Diagnostics Complete
-- **Overall Status**: **Implemented & Validated (353 Automated Unit Tests Passing, Debug & Release Builds Clean, Native Hardware Verification Pending)**
-- **Last Updated**: 2026-10-15T19:40:00+08:00 (UTC+8)
+- **Current Phase**: Full Stability & Regression Recovery Pass Complete
+- **Overall Status**: **Implemented & Validated (366 Automated Unit & Contract Tests Passing, Debug & Release Builds Clean [0 warnings, 0 errors], Native Hardware Verification Pending)**
+- **Last Updated**: 2026-10-15T20:30:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Full Stability & Regression Recovery Pass (Stop/Dock Lifecycle Contract, Diagnostic Crash/Hang Watchdog, Camera Frame Task Observation, PowerPoint Slide Preservation, Video Stutter Fix)**:
+  - **Authoritative Lifecycle Contract (Actions A - D)**:
+    - **Action A (Stop Presenting)**: Fully terminates active capture/media/slideshow/camera, clears and closes Presentation Output window, restores and activates MainWindow, navigates to Control Dashboard, preserves the application process, and leaves source library and queue data intact without creating duplicate windows.
+    - **Action B (Dock X Confirmation)**:
+      - *Active presentation*: Displays custom modal confirmation dialog ("Stop presentation and close Dock?", "A presentation is currently running. Closing the Presenter Dock will also stop the presentation and close Presentation Output.", Actions: "Cancel", "Stop & Close"). Dynamically expands window bounds to 210 DIPs to prevent dialog clipping. "Cancel" preserves presentation and dock; "Stop & Close" calls authoritative `StopPresentationAsync`, closes output window, closes dock, and activates Dashboard without terminating application.
+      - *Idle*: Closes Floating Dock immediately with zero confirmation prompt, activating Dashboard.
+    - **Action C (Application Shutdown)**: MainWindow exit confirmation coordinates clean termination; secondary dock confirmation is bypassed, Dashboard is never reactivated, and all resources are properly disposed.
+    - **Action D (Show/Hide Hotkey)**: Non-destructive visibility toggle via `ToggleDock()`; never triggers stop presentation or close confirmation.
+  - **Crash and UI Hang Diagnostics & Startup Previous-Crash Banner**:
+    - **Synchronous Critical Flush**: Added `FlushCriticalIncident` to `IErrorReportingService`/`ErrorReportingService` and `LogCritical` to `SwitchCastDiagnostics`. Fatal unhandled exceptions (`AppDomain.UnhandledException` where `e.IsTerminating` is true) bypass thread-pool asynchronous queues and write JSON incident files synchronously before process exit.
+    - **Proactive UI Hang Watchdog**: Added `UIHangWatchdog` running an independent background timer monitoring WinUI `DispatcherQueue` message loop latency. Dispatches heartbeats every 2s; logs warning incident at 5s unresponsive and critical deadlock incident at 15s.
+    - **Startup Crash Detection**: Added `GetPreviousCrashReports()` to inspect previous sessions. `DashboardViewModel` checks for previous crashes on initialization and displays a dismissible warning InfoBar on the Dashboard with a direct "View Crash Report" action invoking `ErrorReportDialog`.
+  - **Camera Frame Task Observation & Bounded Latest-Frame-Wins Loop**:
+    - Replaced fire-and-forget `_ = _outputRenderer.RenderBitmapAsync(bitmap)` in `PresentationCoordinator.OnCameraFrameArrived`.
+    - Added sequential asynchronous rendering loop with backpressure signaling via `_cameraCaptureService.NotifyFrameCompleted()`.
+    - Dropped/superseded frames are immediately disposed via `bitmap.Dispose()`.
+    - Render exceptions are caught and reported to diagnostics.
+    - Coordinator marks camera source status as `Active` only after the first frame render succeeds.
+  - **PowerPoint Slide State Preservation & Switch Race Elimination**:
+    - Added `UpdateSelectedSource(CaptureSource source)` in `IPresentationStateService` / `PresentationStateService`.
+    - Slide advance/retreat actions in `PresentationCoordinator` synchronize slide index in `SelectedSources` so returning to PowerPoint from Video or Camera restores the exact slide index (e.g. Slide 4).
+    - Camera-to-PowerPoint switch race eliminated: pending camera frames are discarded and `_targetRequestedPresentationSource` is validated before rendering camera bitmaps.
+  - **Video Playback Performance & Stutter Prevention**:
+    - Throttled high-frequency `MediaPlaybackSession.PositionChanged` events in `MediaPresentationService` to at most once per 250ms, eliminating UI message loop starvation caused by 60fps position callbacks.
+  - **Quality Gates & Test Coverage**:
+    - Added `FullStabilityRegressionContractTests.cs` (10 executable contract tests across all 5 requirement domains A-E).
+    - Total test suite expanded to **366 automated tests** (100% pass rate).
+    - Debug x64 and Release x64 builds compile with **0 errors and 0 warnings**.
 - [x] **PowerPoint Source-Switching Hotfix & Production Error Diagnostics System**:
   - **PowerPoint Threading Hotfix (0x8001010E RPC_E_WRONG_THREAD)**:
     - **Confirmed Root Cause**: `PresentationStateService.ActiveSource` changes on worker threads triggered `DashboardViewModel.OnPresentationStatePropertyChanged`, which synchronously set `SelectedPresentationSource = _presentationStateService.ActiveSource;`. Because `SelectedPresentationSource` is two-way bound to `ComboBox.SelectedItem` in `DashboardPage.xaml`, WinUI threw COMException `0x8001010E (RPC_E_WRONG_THREAD)`. This escaped out of `SetActiveSource` into `PresentationCoordinator.SwitchPresentationSourceAsync`, setting `Status = Error` and showing `ERROR` on the Floating Dock.

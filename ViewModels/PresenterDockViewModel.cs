@@ -626,13 +626,78 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         _dockService.ShowDashboard();
     }
 
+    private int _isConfirmingClose;
+
+    /// <summary>
+    /// Gets whether a presentation session is currently active (running, starting, paused, blackout, or output window open).
+    /// </summary>
+    public bool HasActivePresentation =>
+        _presentationStateService.Status != PresentationStatus.Idle ||
+        _presentationCoordinator.IsLive ||
+        _presentationCoordinator.IsPaused ||
+        _presentationCoordinator.IsBlackout ||
+        _presentationWindowService.IsWindowOpen ||
+        _presentationCoordinator.CurrentPresentationSource is not null;
+
+    /// <summary>
+    /// Optional confirmation handler for closing dock while a presentation is live.
+    /// Returns true if the user confirmed "Stop & Close", or false if canceled.
+    /// </summary>
+    public Func<Task<bool>>? ConfirmCloseAsync { get; set; }
+
     [RelayCommand]
-    private void CloseDock()
+    public async Task CloseDockAsync()
     {
-        _dockService.CloseDock();
-        if (_lifecycleService is null || (!_lifecycleService.IsShuttingDown && !_lifecycleService.IsShutdownApproved))
+        if (_lifecycleService is not null && (_lifecycleService.IsShuttingDown || _lifecycleService.IsShutdownApproved))
         {
-            _dockService.ShowDashboard();
+            _dockService.CloseDock();
+            return;
+        }
+
+        if (Interlocked.CompareExchange(ref _isConfirmingClose, 1, 0) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            if (HasActivePresentation)
+            {
+                bool confirmed = ConfirmCloseAsync is not null
+                    ? await ConfirmCloseAsync().ConfigureAwait(true)
+                    : false;
+
+                if (!confirmed)
+                {
+                    // Cancel: keep Dock open, presentation live, output unchanged
+                    return;
+                }
+
+                // Stop & Close: stop presentation, wait for cleanup, close dock, show dashboard
+                await _presentationCoordinator.StopPresentationAsync().ConfigureAwait(true);
+                _dockService.CloseDock();
+                if (_lifecycleService is null || (!_lifecycleService.IsShuttingDown && !_lifecycleService.IsShutdownApproved))
+                {
+                    _dockService.ShowDashboard();
+                }
+            }
+            else
+            {
+                // No active presentation: close immediately without confirmation
+                _dockService.CloseDock();
+                if (_lifecycleService is null || (!_lifecycleService.IsShuttingDown && !_lifecycleService.IsShutdownApproved))
+                {
+                    _dockService.ShowDashboard();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            SwitchCastDiagnostics.LogException(nameof(PresenterDockViewModel), nameof(CloseDockAsync), ex);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _isConfirmingClose, 0);
         }
     }
 

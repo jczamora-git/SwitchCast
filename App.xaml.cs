@@ -48,11 +48,22 @@ public partial class App : Application
         {
             if (e.ExceptionObject is Exception ex)
             {
-                SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.LogException(
-                    "AppDomain",
-                    "UnhandledException",
-                    ex,
-                    $"IsTerminating={e.IsTerminating}, HResult=0x{ex.HResult:X8}");
+                if (e.IsTerminating)
+                {
+                    SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.LogCritical(
+                        "AppDomain",
+                        "UnhandledException",
+                        ex,
+                        $"IsTerminating=True, HResult=0x{ex.HResult:X8}");
+                }
+                else
+                {
+                    SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.LogException(
+                        "AppDomain",
+                        "UnhandledException",
+                        ex,
+                        $"IsTerminating=False, HResult=0x{ex.HResult:X8}");
+                }
                 System.Diagnostics.Debug.WriteLine($"[AppDomain.UnhandledException] IsTerminating={e.IsTerminating} - {ex}");
             }
             else
@@ -278,8 +289,13 @@ public partial class App : Application
         if (_mainWindow.DispatcherQueue is not null)
         {
             presenterDockService.SetDispatcherQueue(_mainWindow.DispatcherQueue);
+
+            var reportingService = Services.GetService<SwitchCast.Services.Diagnostics.IErrorReportingService>();
+            _uiHangWatchdog = new SwitchCast.Services.Diagnostics.UIHangWatchdog(_mainWindow.DispatcherQueue, reportingService);
         }
 
         _mainWindow.Activate();
     }
+
+    private SwitchCast.Services.Diagnostics.UIHangWatchdog? _uiHangWatchdog;
 }

@@ -108,4 +108,44 @@ public static class SwitchCastDiagnostics
             Debug.WriteLine($"[SwitchCastDiagnostics] Error forwarding to ErrorReportingService: {serviceEx.Message}");
         }
     }
+
+    /// <summary>
+    /// Logs a critical or terminating unhandled exception, synchronously writing incident files to prevent data loss on crash.
+    /// </summary>
+    public static void LogCritical(
+        string component,
+        string operation,
+        Exception ex,
+        string? sourceDetails = null)
+    {
+        ArgumentNullException.ThrowIfNull(component);
+        ArgumentNullException.ThrowIfNull(operation);
+        ArgumentNullException.ThrowIfNull(ex);
+
+        int hresult = ex.HResult;
+        string formatted = $"[{component}] CRITICAL {operation} FAILED | Type={ex.GetType().FullName} | HResult=0x{hresult:X8} | Thread={Environment.CurrentManagedThreadId}\n" +
+                           $"Message: {(string.IsNullOrWhiteSpace(ex.Message) ? "<empty message>" : ex.Message)}\n" +
+                           $"Stack: {ex.StackTrace}";
+        Debug.WriteLine(formatted);
+
+        try
+        {
+            var incident = _errorReportingService?.RecordException(
+                component,
+                operation,
+                ex,
+                DiagnosticSeverity.Critical,
+                category: "Crash",
+                currentSourceType: sourceDetails);
+
+            if (incident is not null)
+            {
+                _errorReportingService?.FlushCriticalIncident(incident);
+            }
+        }
+        catch (Exception serviceEx)
+        {
+            Debug.WriteLine($"[SwitchCastDiagnostics] Error synchronously recording critical exception: {serviceEx.Message}");
+        }
+    }
 }

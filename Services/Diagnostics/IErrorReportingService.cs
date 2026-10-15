@@ -60,6 +60,16 @@ public interface IErrorReportingService
     Task<string> ExportIncidentReportAsync(string incidentId, string destinationFilePath);
 
     /// <summary>
+    /// Synchronously persists a critical or terminating incident immediately to prevent data loss on sudden process exit.
+    /// </summary>
+    void FlushCriticalIncident(DiagnosticIncident incident);
+
+    /// <summary>
+    /// Scans local incident history for previous unhandled crash reports.
+    /// </summary>
+    IReadOnlyList<DiagnosticIncident> GetPreviousCrashReports();
+
+    /// <summary>
     /// Generates a sanitized URL pre-populating a new GitHub issue for community reporting.
     /// </summary>
     string GenerateGitHubIssueUrl(DiagnosticIncident incident);
