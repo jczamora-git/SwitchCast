@@ -3,69 +3,52 @@
 ---
 
 ## Task Details
-- **Task**: Mandatory Dual-Player Isolation Guards (Video MediaPlayer vs Background Music MediaPlayer) & Regression Test Matrix
-- **Date**: 2026-10-19T21:07:00+08:00 (UTC+8)
-- **Status**: Completed, Validated & Ready for Local Commit (411 Tests Passing, 0 Build Warnings/Errors, Strict Dual-Player Coexistence Verified)
+- **Task**: OBS-Inspired Lightweight Performance Audit: Adaptive GPU/CPU Rendering & Low-End Windows Compatibility
+- **Date**: 2026-10-19T21:12:00+08:00 (UTC+8)
+- **Status**: Completed, Validated & Ready for Local Commit (Audit Published, 411 Tests Passing, 0 Build Warnings/Errors, No Invasive Changes Applied)
 
 ---
 
-## 1. Objectives & Implementation Details
+## 1. Objectives & Audit Outcomes
 
-1. **Strict Service Isolation**:
-   - `MediaPresentationService` exclusively owns its dedicated `MediaPlayer` for presentation output video.
-   - `BackgroundMusicService` exclusively owns its dedicated `MediaPlayer` for background music.
-   - Neither service shares `MediaPlayer` instances, `MediaSource` instances, mutable state, or disposal logic.
-   - `BackgroundMusicService` never calls `MediaPresentationService.StopVideoAsync`, `ClearVideoInternal`, or `PlayVideoAsync`.
+1. **Architecture & Performance Audit Completed**:
+   - Researched production patterns in OBS Studio (`libobs-winrt/winrt-capture.cpp`, `libobs-d3d11/`, `libobs/media-io/video-io.c`, `plugins/win-capture/window-capture.c`, `plugins/win-dshow/win-dshow.cpp`, `libobs/obs-audio-controls.c`).
+   - Zero GPL source code copied or ported; independent .NET / WinUI architectural designs extracted.
+   - Published comprehensive master document: `docs/PERFORMANCE_OPTIMIZATION_PLAN.md` covering sections A through M.
 
-2. **Command Ownership**:
-   - Video transport commands exclusively control `MediaPresentationService`:
-     - `ToggleVideoPlaybackCommand`, `RestartVideoCommand`, `SeekBackward10Command`, `SeekForward10Command`, `ToggleMediaMuteCommand`, `StartScrubbing`, `CompleteScrubbing`.
-   - Music transport commands exclusively control `BackgroundMusicService`:
-     - `ToggleBackgroundMusicPlayPauseCommand`, `NextBackgroundMusicTrackCommand`, `PreviousBackgroundMusicTrackCommand`, `ToggleBackgroundMusicShuffleCommand`, `CycleBackgroundMusicRepeatModeCommand`, `ToggleBackgroundMusicMuteCommand`, `StartMusicScrubbing`, `CompleteMusicScrubbing`.
-   - Source switching commands (`NextSourceCommand`, `PreviousSourceCommand`, `SwitchSourceCommand`) and PowerPoint slide commands (`PowerPointNextSlideCommand`, `PowerPointPreviousSlideCommand`) remain strictly isolated from music track transport.
+2. **Key Forensic Findings & Bottleneck Categorization**:
+   - **Confirmed Defects**:
+     - *WGC GPU-to-CPU-to-GPU Roundtrip*: `SoftwareBitmap.CreateCopyFromSurfaceAsync` reads 497 MB/s across the bus at 1080p60 into CPU RAM; `SoftwareBitmapSource.SetBitmapAsync` uploads it back to GPU via UI thread.
+     - *CPU-Bound Webcam Color Conversion*: `CameraCaptureService.ConvertNv12ToBgra8` executes managed C# loops per pixel, saturating a CPU core on mobile processors.
+     - *Synchronous UI Thread PowerPoint Decode*: `BitmapImage(new Uri(path))` instantiated directly on UI thread for every slide advance without memory caching.
+     - *Background Preview Active When Dashboard Hidden*: Local preview renderer continues processing at 15 FPS when presenter is presenting exclusively via SwitchDeck.
+   - **Likely Bottlenecks**:
+     - Simultaneous UI thread dispatching (`DispatcherQueue.TryEnqueue`) from both Preview and Presentation Output renderers.
+     - Memory allocation churn in `RefCountedSoftwareBitmap` before drop checks.
+   - **Untested Hypotheses**:
+     - WARP software rasterization battery/thermal impact vs integrated GPU on low-end hardware.
+     - `SwapChainPanel` native Direct3D 11 swapchain vs WinUI 3 Composition surface performance on Intel HD 520/620.
+   - **Future Improvements**:
+     - Hardware-accelerated `ID3D11VideoProcessor` for webcam NV12 decoding.
+     - Sliding-window in-memory LRU slide cache.
+     - Native zero-copy Direct3D 11 swapchain presentation.
 
-3. **Independent State and Settings**:
-   - Video state: `VideoPositionSeconds`, `VideoDurationSeconds`, `VideoPositionText`, `MediaVolume`, `IsMediaMuted`, `IsVideoPlaying`, `IsVideoPaused`, `IsVideoEnded`.
-   - Music state: `BackgroundMusicPositionSeconds`, `BackgroundMusicDurationSeconds`, `BackgroundMusicPositionText`, `BackgroundMusicVolume`, `IsBackgroundMusicMuted`, `IsBackgroundMusicPlaying`, `BackgroundMusicTrackTitle`, `BackgroundMusicPlaylistName`, `BackgroundMusicRepeatMode`, `IsBackgroundMusicShuffleEnabled`.
-   - Settings isolation: Added `BackgroundMusicVolume` and `IsBackgroundMusicMuted` to `UserSettings.cs`. Added explicit helper methods `SetMediaVolumeAsync`, `SetMediaMutedAsync`, `SetBackgroundMusicVolumeAsync`, and `SetBackgroundMusicMutedAsync` to `IApplicationSettingsService` and `ApplicationSettingsService`.
+3. **Adaptive GPU/CPU Rendering Modes Defined**:
+   - `AUTO` (Default): Automatically selects hardware D3D11 with graceful per-source fallbacks; integrated GPUs (Intel UHD/Iris Xe, AMD Vega) fully supported.
+   - `HARDWARE`: Strict Direct3D 11 hardware acceleration with strict diagnostic reporting on failure.
+   - `COMPATIBILITY`: Safe-mode software rasterization (`WARP`) and GDI `PrintWindow` capture for problematic GPU drivers.
 
-4. **Independent Playback Lifecycle**:
-   - Source transitions (`Window -> Video -> PowerPoint -> Camera -> Video`) do not stop, recreate, or reset background music.
-   - Music track changes do not alter On Air presentation source.
-   - Pausing video does not pause music; pausing music does not pause video.
-   - Video ended does not advance music playlist; music ended does not advance presentation sources.
-   - The only intentional coordination is the explicit `StopPresentationAsync` session-stop policy in `PresentationCoordinator.ExecuteStopPresentationAsync`, which stops both video and background music when a presentation session concludes.
+4. **Audio & Media Isolation Guards Preserved**:
+   - Confirmed `MediaPresentationService` (Video) and `BackgroundMusicService` (BGM) remain strictly independent.
+   - No audio changes or master volume mutations introduced.
 
-5. **Player Lifetime Safety**:
-   - `MediaPresentationService.Dispose()` and `BackgroundMusicService.Dispose()` are completely independent.
-   - No shared `MediaSource`, no stale callbacks, no unobserved playback tasks, and no double disposal.
+5. **Empirical 16-Metric Benchmark Plan**:
+   - Defined across Low-End (Intel HD 520/620), Mid-Range (Iris Xe / AMD Vega), and High-End (Discrete GPU) laptops.
+   - Covers startup, idle resources, latency, frame rates, drop rates, memory growth, and stress cycling.
 
-6. **Audio Safeguards**:
-   - Both players play through the default Windows audio output simultaneously without master system volume mutation.
-   - Per-instance volume and mute controls; no automatic ducking or mutual muting.
-
-7. **SwitchDeck UI Isolation**:
-   - Music controls live in a dedicated contextual popup available across all sources.
-   - Source-specific secondary rows (Video playback controls, PowerPoint slide controls) remain completely intact and functional.
-
-8. **Mandatory 16-Test Regression Matrix**:
-   - Implemented in `SwitchCast.Tests/Services/DualPlayerIsolationTests.cs`:
-     - `Test01`: Play Video & Music simultaneously -> Pause Video -> Music continues.
-     - `Test02`: Play Video & Music simultaneously -> Pause Music -> Video continues.
-     - `Test03`: Change Music volume -> Video volume remains unchanged.
-     - `Test04`: Mute Video -> Music remains audible / unmuted.
-     - `Test05`: Mute Music -> Video remains audible / unmuted.
-     - `Test06`: Seek Video -> Music position remains unchanged.
-     - `Test07`: Seek Music -> Video position remains unchanged.
-     - `Test08`: Video reaches end -> Music playlist and track remain unaffected.
-     - `Test09`: Music reaches end -> Music advances according to repeat mode -> Video unaffected.
-     - `Test10`: Switch Video -> PowerPoint -> Camera -> Video -> Music continues without restarting.
-     - `Test11`: Change music playlist while Video is live -> On Air source remains unchanged.
-     - `Test12`: Click SwitchDeck Next Source -> Music track does not change.
-     - `Test13`: Click SwitchDeck Next Music Track -> Presentation source does not change.
-     - `Test14`: Stop Presenting -> Both player sessions stop per explicit session-stop policy -> MainWindow remains alive.
-     - `Test15`: Close/hide SwitchDeck non-destructively -> Music and presentation continue uninterrupted.
-     - `Test16`: Rapidly switch sources while changing tracks -> No deadlock, player disposal race, or unhandled exceptions.
+6. **Strict Non-Implementation Directive Obeyed**:
+   - **Zero invasive code refactors performed in this audit phase.**
+   - All 411 existing tests remain 100% passing.
 
 ---
 
@@ -79,18 +62,17 @@
 
 ---
 
-## 3. Important Files Modified
+## 3. Important Files Created / Modified
 
-- `SwitchCast/Models/UserSettings.cs`: Added `BackgroundMusicVolume` and `IsBackgroundMusicMuted`.
-- `SwitchCast/Services/IApplicationSettingsService.cs`: Added `SetMediaVolumeAsync`, `SetMediaMutedAsync`, `SetBackgroundMusicVolumeAsync`, and `SetBackgroundMusicMutedAsync`.
-- `SwitchCast/Services/ApplicationSettingsService.cs`: Implemented isolated media and background music volume/mute persistence methods.
-- `SwitchCast/Services/Media/MediaPresentationService.cs`: Cleanly wired settings updates.
-- `SwitchCast.Tests/Services/DualPlayerIsolationTests.cs` *(New)*: Complete 16-test mandatory regression matrix verifying player independence, command separation, settings isolation, and concurrency safety.
+- `SwitchCast/docs/PERFORMANCE_OPTIMIZATION_PLAN.md` *(New)*: Comprehensive OBS-inspired lightweight performance audit, adaptive rendering architecture, and benchmark plan.
+- `SwitchCast/.agents/PROJECT_STATE.md`: Updated current phase to performance audit completed.
+- `SwitchCast/.agents/HANDOFF.md`: Updated handoff record for performance audit.
+- `SwitchCast/.agents/CHANGELOG.md`: Added entry for performance audit.
 
 ---
 
 ## 4. Next Steps for Next Agent
 
-1. Maintain dual-player isolation in any future audio ducking or master transport feature requests.
-2. Ensure new presentation source types (e.g. browser, PDF) respect the non-interference rule for `BackgroundMusicService`.
-3. Keep the 0-error and 0-warning compiler gate intact across Debug and Release x64 builds.
+1. Review `docs/PERFORMANCE_OPTIMIZATION_PLAN.md` with stakeholders before scheduling implementation phases.
+2. Execute Phase 1 optimizations (zero-risk in-memory slide cache and background preview deactivation).
+3. Preserve the 411 passing unit tests and 0-error / 0-warning compiler gate.

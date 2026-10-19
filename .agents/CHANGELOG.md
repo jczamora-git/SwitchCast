@@ -7,6 +7,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [OBS-Inspired Lightweight Performance Audit] - 2026-10-19
+
+### Documentation & Architecture Audit (docs / performance / architecture / capture / direct3d)
+- **Completed Comprehensive Performance Audit (`docs/PERFORMANCE_OPTIMIZATION_PLAN.md`)**:
+  - Analyzed current screen capture, preview rendering, webcam capture, PowerPoint slide display, and video playback pipelines.
+  - Studied production patterns from OBS Studio (`winrt-capture.cpp`, `libobs-d3d11/`, `video-io.c`, `window-capture.c`, `obs-audio-controls.c`) without copying GPL code.
+  - Categorized findings into Confirmed Defects (GPU-to-CPU-to-GPU frame roundtrips, CPU-bound NV12 conversions, synchronous slide decodes), Likely Bottlenecks, Untested Hypotheses, and Future Improvements.
+  - Defined Adaptive Rendering Architecture with `AUTO`, `HARDWARE`, and `COMPATIBILITY` modes, fully accommodating integrated Intel/AMD GPUs alongside discrete graphics.
+  - Formulated source-specific fallback matrix and technical limitation documentation for window occlusion, minimized windows, and hybrid multi-GPU laptops.
+  - Preserved strict Video vs Background Music dual-player isolation.
+  - Established a 16-metric empirical benchmark plan across Low-End, Mid-Range, and High-End hardware tiers.
+  - Defined 4-phase incremental implementation roadmap; deferred all code changes to future phases.
+- **Verification Gates Preserved**:
+  - 411 unit and contract tests passing (100% pass rate).
+  - Debug x64 and Release x64 builds verified with 0 warnings and 0 errors.
+
+---
+
 ## [Dual-Player Isolation Guards & Mandatory Regression Matrix] - 2026-10-19
 
 ### Added (feat / audio / media / music / isolation / test)
