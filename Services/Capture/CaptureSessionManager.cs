@@ -306,8 +306,12 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
                 comEx.HResult == unchecked((int)0x887A0007) /* DXGI_ERROR_DEVICE_RESET */ ||
                 comEx.HResult == unchecked((int)0x887A0006) /* DXGI_ERROR_DEVICE_HUNG */)
             {
-                SwitchCastDiagnostics.LogWarning(nameof(CaptureSessionManager), $"DirectX device removed/reset detected (0x{comEx.HResult:X8}). Triggering device recovery.");
-                _metricsService?.RecordDeviceReset();
+                var mode = _deviceProvider?.ActiveMode.ToString() ?? "Unknown";
+                var backend = _deviceProvider?.ActiveBackendDescription ?? "Unknown";
+                SwitchCastDiagnostics.LogWarning(
+                    nameof(CaptureSessionManager),
+                    $"Genuine DirectX device loss detected | HResult=0x{comEx.HResult:X8} | Operation=CaptureFrameProcessing | Mode={mode} | Backend={backend} | Generation={currentGen} | RecoveryAttempt=1");
+
                 try
                 {
                     _deviceProvider?.ResetDevice();
@@ -322,10 +326,16 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
                                 _lastSize);
                         }
                     }
+                    SwitchCastDiagnostics.LogInfo(
+                        nameof(CaptureSessionManager),
+                        $"DirectX device recovery succeeded | Mode={mode} | Backend={_deviceProvider?.ActiveBackendDescription}");
                 }
                 catch (Exception recoveryEx)
                 {
-                    SwitchCastDiagnostics.LogException(nameof(CaptureSessionManager), "DeviceRecovery", recoveryEx);
+                    SwitchCastDiagnostics.LogException(
+                        nameof(CaptureSessionManager),
+                        $"DeviceRecoveryFailed | HResult=0x{comEx.HResult:X8} | Mode={mode}",
+                        recoveryEx);
                     CaptureError?.Invoke(this, comEx);
                 }
             }

@@ -66,13 +66,18 @@ public sealed class Direct3D11DeviceProvider : IDirect3D11DeviceProvider
     {
         lock (_lock)
         {
-            if (_activeMode == mode && _winrtDevice is not null)
+            if (_activeMode == mode)
             {
                 return;
             }
 
             _activeMode = mode;
-            ResetDevice();
+            if (_winrtDevice is not null)
+            {
+                // Recreate device for the new rendering mode without counting as an unexpected device loss/reset event
+                ReleaseDeviceUnsafe();
+                EnsureDevice();
+            }
         }
     }
 
