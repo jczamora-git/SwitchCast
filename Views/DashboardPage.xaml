@@ -884,7 +884,9 @@
                                         StepFrequency="0.5"
                                         Padding="0"
                                         Margin="0"
-                                        VerticalAlignment="Center" />
+                                        VerticalAlignment="Center"
+                                        PointerPressed="OnMusicSeekSliderPointerPressed"
+                                        PointerCaptureLost="OnMusicSeekSliderPointerCaptureLost" />
                                 <TextBlock Grid.Column="1"
                                            Text="{x:Bind ViewModel.MusicPositionText, Mode=OneWay}"
                                            FontSize="10"

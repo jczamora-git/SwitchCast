@@ -7,6 +7,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.4.0 — UI & Playback Stability Recovery] - 2026-10-20
+
+### Fixed (fix / ui / playback / transport / concurrency)
+- **Immediate Import Refresh**:
+  - `SourcesViewModel.AddPowerPointAsync`: Automatically selects PowerPoint category (or All Sources), clears search queries that would filter imported presentations, and refreshes `DisplayedSources` and category counts immediately on `DispatcherQueue`.
+  - `MusicLibraryViewModel.SelectedPlaylistTracks`: Updated return type to `ObservableCollection<MusicTrack>`, ensuring WinUI `ListView` receives real-time collection mutation notifications on `DispatcherQueue` without needing page navigation or manual refresh.
+- **Audio Stutter and 1-Second Rewind**:
+  - Eliminated slider position feedback loop in `DashboardViewModel.cs` where two-way binding on `MusicPositionSeconds` triggered programmatic seek callbacks on every 250ms timer tick when Slider snapped floating values, constantly flushing the MediaPlayer audio buffer and causing 1-second skips.
+  - Decoupled timer progress updates from seeking; seeking is now strictly restricted to genuine user scrubbing (`_isMusicScrubbing` via `PointerPressed` and `PointerCaptureLost`).
+  - Added 50ms deduplication guard and structured diagnostic logging in `BackgroundMusicService.Seek`.
+
+### Refactored (refactor / ui / xaml / responsive)
+- **Redesigned Sources Filter**:
+  - Replaced horizontal radio buttons with a compact category selector dropdown (`ComboBox`) featuring all 6 categories with live counts: All Sources, Application Windows, Displays & Monitors, Media Files, PowerPoint, Cameras.
+  - Paired with a dedicated full-width search `TextBox` featuring an inline clear-search action button.
+  - Responsive at narrow window sizes (895x690, 1024x768) and maximized (1920x1080) without horizontal clipping.
+- **Enhanced Search Filtering**:
+  - Real-time case-insensitive partial matching across source title, process name, process path, media file path, PowerPoint presentation path, monitor device name, and camera device ID.
+
+### Added (feat / ui / deck / music)
+- **SwitchDeck Direct Song Picker**:
+  - Added bounded scrollable track list (`ListView` with `MaxHeight="115"`) inside the Music popup of `PresenterDockMenuWindow.xaml`.
+  - Displays track title, duration, playing indicator, and one-click play action.
+  - Allows direct song selection while presenting without interrupting PowerPoint, Camera, Video, or window capture.
+- **Music Library UI Refinement**:
+  - Added direct play button to each track row to play exact tracks directly, regardless of shuffle state.
+  - Added green speaker playing indicator (`\uE767`) bound to `PlayingIndicatorVisibility` on actively playing tracks.
+  - Added full file path hover tooltips on track titles.
+- **Targeted Playback Diagnostics**:
+  - Structured diagnostics in `BackgroundMusicService` and `MediaPresentationService` recording `TrackStarted`, `MediaOpened`, `MediaEnded`, `MediaFailed`, `PlaybackStateChanged`, `RepeatModeChanged`, `ShuffleChanged`, player initialization/disposal, and `Seek` requests (recording request source, previous position, requested position, track ID, sequence number, and thread ID).
+
+### Tests & Verification (test / build / quality-gates)
+- **432 Passing Tests**: Automated unit tests passing across all test fixtures (100% pass rate).
+- **Zero Compiler Warnings/Errors**: Both Debug x64 and Release x64 builds verified clean (0 warnings, 0 errors).
+
+---
+
 ## [v1.4.0 — Diagnostics & Logs UX Rework] - 2026-10-19
 
 ### Fixed (fix / ui / ux / diagnostics / settings)

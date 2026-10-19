@@ -3,36 +3,42 @@
 ---
 
 ## Task Details
-- **Task**: SWITCHCAST v1.4.0 — Diagnostics & Logs UX Rework: Remove Intrusive Crash Banners, Centralize Reports, and Fix Dialog Positioning
-- **Date**: 2026-10-19T23:20:00+08:00 (UTC+8)
-- **Status**: Completed, Validated & Ready for Local Commit (429 Tests Passing, 0 Build Warnings/Errors, Clean UI Architecture)
+- **Task**: SWITCHCAST v1.4.0 — UI & Playback Stability Recovery: Immediate Import Refresh, Responsive Sources, Direct Playlist Track Selection and Stutter Fixes
+- **Date**: 2026-10-20T00:15:00+08:00 (UTC+8)
+- **Status**: Completed, Validated & Ready for Local Commit (432 Tests Passing, 0 Build Warnings/Errors, Clean UI Architecture)
 
 ---
 
 ## 1. Objectives & Outcomes
 
-1. **Dashboard Crash Banner Removed**:
-   - **Root Cause of Resurfacing Incident**: `DashboardViewModel.cs` called `CheckForPreviousCrash()` in its constructor querying `GetPreviousCrashReports()` on disk, finding `SC-20261019-D7EC6B4C` (which occurred earlier before the converter fix), setting `HasPreviousCrashReport = true` and displaying the large recovery `InfoBar` on every startup even after normal clean shutdowns.
-   - **Remediation**: Removed `CheckForPreviousCrash()` query from `DashboardViewModel.cs`. Removed the recovery `InfoBar` and its event handlers from `Views/DashboardPage.xaml` and `Views/DashboardPage.xaml.cs`. Dashboard remains clean and focused on presentation workflow.
+1. **Delayed Import Refresh Resolved**:
+   - **Root Cause**: Mutations to source and playlist collections were not always marshalled onto the WinUI `DispatcherQueue`, and `SourcesViewModel` did not automatically switch categories or clear restrictive search queries after an import completed. `MusicLibraryViewModel.SelectedPlaylistTracks` was previously exposed as `IReadOnlyList<MusicTrack>` rather than `ObservableCollection<MusicTrack>`, which caused the XAML ListView not to bind to `INotifyCollectionChanged`.
+   - **Fix**: Updated `SelectedPlaylistTracks` to return `ObservableCollection<MusicTrack>`. In `SourcesViewModel.AddPowerPointAsync` and `AddMediaAsync`, the view model now automatically switches to the imported category (or All Sources), clears non-matching search queries, and refreshes the list on the UI thread immediately.
 
-2. **Centralized Diagnostics & Logs in Settings**:
-   - Updated Category 5 in `Views/SettingsPage.xaml` and `MainWindow.xaml` navigation to "Diagnostics & Logs".
-   - Implemented standard SwitchCast header, description, and 3-card summary grid: Recent Incidents count (`IncidentsCountText`), Last Recorded Error (`LastRecordedErrorText` + `LastRecordedErrorTimestamp`), and Storage Location (`LogsDirectoryPath`).
-   - Clean empty state banner ("No errors recorded") when incident list is empty.
-   - Incident list items with severity badge, component badge, incident ID, hex HRESULT, formatted timestamp, error title, and technical operation details.
-   - Wired "View Report" button to `ErrorReportDialog` and "Clear Incident History" button to a confirmation `ContentDialog`.
+2. **Redesigned Responsive Sources Filtering**:
+   - Replaced horizontal radio buttons with a compact category selector dropdown (`ComboBox`) featuring all 6 categories with live counts: All Sources, Application Windows, Displays & Monitors, Media Files, PowerPoint, Cameras.
+   - Paired with a dedicated full-width search `TextBox` featuring an inline clear-search action button.
+   - Clean responsive layout that eliminates clipping and horizontal page scrolling at narrow window sizes (895x690, 1024x768).
 
-3. **Disk Incident History Loading in `ErrorReportingService`**:
-   - Enhanced `ErrorReportingService.GetRecentIncidents()` to enumerate stored `incident-*.json` files from disk, deserialize them safely, deduplicate with in-memory incidents, and sort newest first.
-   - Historical crash and exception reports remain persisted on disk and inspectable in Settings without resurfacing as intrusive startup crash banners.
+3. **Enhanced Search Behavior**:
+   - Case-insensitive partial matching across display title, process name, process path, media file path, PowerPoint presentation path, monitor device name, and camera device ID.
 
-4. **Centered Error Report Dialog**:
-   - Configured `ErrorReportDialog.xaml` with `Width="580"`, `MinWidth="480"`, `MaxWidth="640"`, `HorizontalAlignment="Center"`, and `VerticalAlignment="Center"`.
-   - Exposed `App.MainWindowInstance` and set dialog `XamlRoot` to `App.MainWindowInstance.Content.XamlRoot` when invoked.
-   - Resolved native HWND via `App.MainWindowInstance` for file save picker operations.
+4. **Music Library UI Refinement**:
+   - Added direct play button to each track row to play exact tracks directly, regardless of shuffle state.
+   - Added playing indicator (`\uE767`, green speaker) bound to `PlayingIndicatorVisibility` on actively playing tracks.
+   - Added full file path hover tooltips on track titles.
 
-5. **Clean Shutdown Preserved**:
-   - Clean user shutdowns (`ShutdownApproved = true` via `ApplicationLifecycleService`) do not record false crashes.
+5. **SwitchDeck Direct Song Picker**:
+   - Added bounded scrollable track list (`ListView` with `MaxHeight="115"`) inside the Music popup of `PresenterDockMenuWindow.xaml`.
+   - Displays track title, duration, playing indicator, and one-click play action.
+   - Completely independent from presentation source switching and PowerPoint slide control.
+
+6. **Audio Stutter and 1-Second Rewind Fix**:
+   - **Root Cause**: WinUI `Slider` two-way binding on `MusicPositionSeconds` snapped values during progress timer ticks (every 250ms), invoking the property setter which called `_backgroundMusicService.Seek(...)`. This continuously flushed the MediaPlayer buffer, causing audible rewinds of ~1 second and lag.
+   - **Fix**: Decoupled timer progress updates from seeking; seeking is now strictly restricted to genuine user scrubbing (`_isMusicScrubbing` via `PointerPressed` and `PointerCaptureLost`). Added 50ms deduplication guard in `BackgroundMusicService.Seek`.
+
+7. **Targeted Playback Diagnostics**:
+   - Structured diagnostics logging request source, previous position, requested position, track ID, sequence number, and thread ID for seeks, along with playback session state events.
 
 ---
 

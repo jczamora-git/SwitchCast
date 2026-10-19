@@ -176,7 +176,7 @@ public class DualPlayerIsolationTests : IDisposable
         mockVideoService.Setup(v => v.Seek(It.IsAny<TimeSpan>())).Callback<TimeSpan>(p => videoPos = p);
 
         mockMusicService.SetupGet(m => m.Position).Returns(() => musicPos);
-        mockMusicService.Setup(m => m.Seek(It.IsAny<TimeSpan>())).Callback<TimeSpan>(p => musicPos = p);
+        mockMusicService.Setup(m => m.Seek(It.IsAny<TimeSpan>(), It.IsAny<string?>())).Callback<TimeSpan, string?>((p, _) => musicPos = p);
 
         // Seek video
         mockVideoService.Object.Seek(TimeSpan.FromSeconds(25));
@@ -199,7 +199,7 @@ public class DualPlayerIsolationTests : IDisposable
         mockVideoService.Setup(v => v.Seek(It.IsAny<TimeSpan>())).Callback<TimeSpan>(p => videoPos = p);
 
         mockMusicService.SetupGet(m => m.Position).Returns(() => musicPos);
-        mockMusicService.Setup(m => m.Seek(It.IsAny<TimeSpan>())).Callback<TimeSpan>(p => musicPos = p);
+        mockMusicService.Setup(m => m.Seek(It.IsAny<TimeSpan>(), It.IsAny<string?>())).Callback<TimeSpan, string?>((p, _) => musicPos = p);
 
         // Seek music
         mockMusicService.Object.Seek(TimeSpan.FromSeconds(55));

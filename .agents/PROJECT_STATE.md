@@ -7,15 +7,42 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Version**: v1.4.0 — Diagnostics & Logs UX Rework (Remove Intrusive Crash Banners, Centralize Reports in Settings, Fix Dialog Positioning)
-- **Overall Status**: **Implemented & Validated (429 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
-- **Last Updated**: 2026-10-19T23:20:00+08:00 (UTC+8)
+- **Current Version**: v1.4.0 — UI & Playback Stability Recovery (Immediate Import Refresh, Responsive Sources, Direct Playlist Track Selection, Audio Stutter & Rewind Fixes)
+- **Overall Status**: **Implemented & Validated (432 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
+- **Last Updated**: 2026-10-20T00:15:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **v1.4.0 UI & Playback Stability Recovery (Immediate Import Refresh, Responsive Sources, Direct Playlist Track Selection, Audio Stutter & Rewind Fixes)**:
+  - **Immediate Import Refresh**:
+    - PowerPoint Import (`SourcesViewModel.AddPowerPointAsync`): Automatically switches to PowerPoint category (or All Sources), clears stale search query if non-empty, and refreshes `DisplayedSources` and category counts immediately on `DispatcherQueue` without manual page navigation or manual refresh.
+    - Audio Import (`MusicLibraryViewModel.ImportAudioAsync`): `SelectedPlaylistTracks` returns `ObservableCollection<MusicTrack>`, and collection changes notify immediately on UI thread without needing page reload or restart.
+  - **Redesigned Responsive Sources Filtering**:
+    - Replaced horizontal radio buttons with a compact category selector dropdown (`ComboBox`) featuring all 6 categories with live counts: All Sources, Application Windows, Displays & Monitors, Media Files, PowerPoint, Cameras.
+    - Paired with a dedicated full-width search `TextBox` featuring an inline clear-search action button.
+    - Fully responsive across windowed (895x690, 1024x768, 1280x720) and maximized (1920x1080) viewports without horizontal clipping.
+  - **Enhanced Search Filtering**:
+    - Real-time case-insensitive partial matching across source title, process name, process path, media file path, PowerPoint presentation path, monitor device name, and camera device ID.
+  - **Music Library UI Refinement**:
+    - Direct play button on each track row playing the exact selected song immediately, even when shuffle mode is active.
+    - Added green speaker playing indicator (`\uE767`) bound to `PlayingIndicatorVisibility` on actively playing track.
+    - Full file path hover tooltips on track titles.
+    - Clear distinction between selected playlist row and currently playing track.
+  - **SwitchDeck Direct Song Picker**:
+    - Implemented bounded scrollable track list (`ListView` with `MaxHeight="115"`) inside the Music popup of `PresenterDockMenuWindow.xaml`.
+    - Shows track title, duration, playing indicator, and one-click play action.
+    - Allows direct song selection while presenting without interrupting PowerPoint, Camera, Video, or window capture.
+  - **Audio Stutter and 1-Second Rewind Fix**:
+    - Root cause identified: In `DashboardViewModel.cs`, two-way binding on `MusicPositionSeconds` triggered programmatic seek callbacks on every 250ms timer tick when Slider snapped floating values, constantly flushing the MediaPlayer audio buffer and causing 1-second skips.
+    - Fixed slider binding by decoupling progress display from programmatic seeking, implementing dedicated user scrubbing state (`_isMusicScrubbing`), adding `PointerPressed` and `PointerCaptureLost` handlers, and introducing a 50ms deduplication guard on `BackgroundMusicService.Seek`.
+  - **Targeted Playback Diagnostics**:
+    - Structured diagnostics in `BackgroundMusicService` and `MediaPresentationService` recording `TrackStarted`, `MediaOpened`, `MediaEnded`, `MediaFailed`, `PlaybackStateChanged`, `RepeatModeChanged`, `ShuffleChanged`, player initialization/disposal, and `Seek` requests (recording request source, previous position, requested position, track ID, sequence number, and thread ID).
+  - **Preserved Dual-Player Isolation**:
+    - Video `MediaPlayer` in `MediaPresentationService` and Audio `MediaPlayer` in `BackgroundMusicService` remain completely isolated.
+  - **Automated Test Matrix**: 432 tests passing (100% pass rate).
 - [x] **v1.4.0 Diagnostics & Logs UX Rework (Remove Intrusive Crash Banners, Centralize Reports, Fix Dialog Positioning)**:
   - **Removed Dashboard Crash Banner**:
     - Completely removed the large recovery `InfoBar` from `Views/DashboardPage.xaml` and code-behind event handlers.

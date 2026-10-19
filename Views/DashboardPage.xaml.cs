@@ -50,4 +50,17 @@ public sealed partial class DashboardPage : Page
         var navService = App.Current.Services.GetService<Services.INavigationService>();
         navService?.NavigateToMusicLibrary();
     }
+
+    private void OnMusicSeekSliderPointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        ViewModel.StartMusicScrubbing();
+    }
+
+    private void OnMusicSeekSliderPointerCaptureLost(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (sender is Slider slider)
+        {
+            ViewModel.CompleteMusicScrubbing(slider.Value);
+        }
+    }
 }

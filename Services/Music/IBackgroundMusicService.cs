@@ -175,9 +175,9 @@ public interface IBackgroundMusicService : INotifyPropertyChanged, IDisposable
     Task PreviousTrackAsync();
 
     /// <summary>
-    /// Seeks playback to the specified position.
+    /// Seeks playback to the specified position with an optional diagnostic request source.
     /// </summary>
-    void Seek(TimeSpan position);
+    void Seek(TimeSpan position, string? source = null);
 
     /// <summary>
     /// Toggles between Play and Pause.

@@ -39,6 +39,9 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
     private bool _isSyncingPresentationSource;
     private readonly Services.Diagnostics.IErrorReportingService? _reportingService;
 
+    private bool _isMusicScrubbing;
+    private double _musicScrubbingPositionSeconds;
+
     [ObservableProperty]
     private bool _hasPreviousCrashReport;
 
@@ -963,13 +966,30 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
 
     public double MusicPositionSeconds
     {
-        get => _backgroundMusicService?.Position.TotalSeconds ?? 0;
+        get => _isMusicScrubbing ? _musicScrubbingPositionSeconds : (_backgroundMusicService?.Position.TotalSeconds ?? 0.0);
         set
         {
-            _backgroundMusicService?.Seek(TimeSpan.FromSeconds(value));
-            OnPropertyChanged(nameof(MusicPositionSeconds));
-            OnPropertyChanged(nameof(MusicPositionText));
+            if (_isMusicScrubbing)
+            {
+                _musicScrubbingPositionSeconds = value;
+                OnPropertyChanged(nameof(MusicPositionSeconds));
+                OnPropertyChanged(nameof(MusicPositionText));
+            }
         }
+    }
+
+    public void StartMusicScrubbing()
+    {
+        _isMusicScrubbing = true;
+        _musicScrubbingPositionSeconds = _backgroundMusicService?.Position.TotalSeconds ?? 0.0;
+    }
+
+    public void CompleteMusicScrubbing(double targetSeconds)
+    {
+        _isMusicScrubbing = false;
+        _backgroundMusicService?.Seek(TimeSpan.FromSeconds(targetSeconds), "DashboardUserScrubbing");
+        OnPropertyChanged(nameof(MusicPositionSeconds));
+        OnPropertyChanged(nameof(MusicPositionText));
     }
 
     public double MusicDurationSeconds => _backgroundMusicService?.Duration.TotalSeconds ?? 0;
@@ -978,7 +998,7 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
     {
         get
         {
-            var pos = _backgroundMusicService?.Position ?? TimeSpan.Zero;
+            var pos = _isMusicScrubbing ? TimeSpan.FromSeconds(_musicScrubbingPositionSeconds) : (_backgroundMusicService?.Position ?? TimeSpan.Zero);
             var dur = _backgroundMusicService?.Duration ?? TimeSpan.Zero;
             return $"{pos:mm\\:ss} / {dur:mm\\:ss}";
         }
@@ -1028,6 +1048,11 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
 
     private void OnBackgroundMusicPositionChanged(object? sender, TimeSpan pos)
     {
+        if (_isMusicScrubbing)
+        {
+            return;
+        }
+
         RunOnUIThread(() =>
         {
             OnPropertyChanged(nameof(MusicPositionSeconds));

@@ -4,6 +4,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using SwitchCast.Models;
+using SwitchCast.Services.Diagnostics;
 using Windows.Media.Core;
 using Windows.Media.Playback;
 
@@ -117,6 +118,8 @@ public sealed partial class MediaPresentationService : ObservableObject, IMediaP
             _player.MediaFailed += OnPlayerMediaFailed;
             _player.PlaybackSession.PlaybackStateChanged += OnPlaybackStateChanged;
             _player.PlaybackSession.PositionChanged += OnPositionChanged;
+
+            SwitchCastDiagnostics.LogInfo(nameof(MediaPresentationService), "VideoPlayerInitialized");
         }
         catch (Exception ex)
         {
@@ -360,6 +363,10 @@ public sealed partial class MediaPresentationService : ObservableObject, IMediaP
         {
             if (_player is not null && position >= TimeSpan.Zero && position <= Duration)
             {
+                SwitchCastDiagnostics.LogInfo(
+                    nameof(MediaPresentationService),
+                    $"VideoSeek | ReqPos={position:mm\\:ss\\.fff} | PrevPos={Position:mm\\:ss\\.fff} | Media={ActiveMediaSource?.Title ?? "None"} | Thread={Environment.CurrentManagedThreadId}");
+
                 _player.PlaybackSession.Position = position;
                 Position = position;
                 MediaStateChanged?.Invoke(this, EventArgs.Empty);
@@ -538,6 +545,7 @@ public sealed partial class MediaPresentationService : ObservableObject, IMediaP
             _player.Source = null;
             _player.Dispose();
             _player = null;
+            SwitchCastDiagnostics.LogInfo(nameof(MediaPresentationService), "VideoPlayerDisposed");
         }
 
         _currentMediaSource?.Dispose();

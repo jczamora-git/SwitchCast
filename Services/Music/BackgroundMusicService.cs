@@ -29,6 +29,7 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
     private readonly SemaphoreSlim _fileLock = new(1, 1);
     private readonly object _stateLock = new();
     private readonly Random _random = new();
+    private long _seekSequence;
 
     private MediaPlayer? _player;
     private MediaSource? _currentMediaSource;
@@ -119,8 +120,12 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
             };
 
             _player.CommandManager.IsEnabled = false;
+            _player.MediaOpened += OnPlayerMediaOpened;
             _player.MediaEnded += OnPlayerMediaEnded;
             _player.MediaFailed += OnPlayerMediaFailed;
+            _player.PlaybackSession.PlaybackStateChanged += OnPlaybackSessionPlaybackStateChanged;
+
+            SwitchCastDiagnostics.LogInfo(nameof(BackgroundMusicService), "MusicPlayerInitialized | AudioCategory=Media");
         }
         catch (Exception ex)
         {
@@ -129,8 +134,26 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
         }
     }
 
+    private void OnPlayerMediaOpened(MediaPlayer sender, object args)
+    {
+        var duration = sender.PlaybackSession?.NaturalDuration ?? TimeSpan.Zero;
+        SwitchCastDiagnostics.LogInfo(
+            nameof(BackgroundMusicService),
+            $"MediaOpened | Track={CurrentTrack?.Title} | Duration={duration:mm\\:ss\\.fff}");
+    }
+
+    private void OnPlaybackSessionPlaybackStateChanged(MediaPlaybackSession sender, object args)
+    {
+        SwitchCastDiagnostics.LogInfo(
+            nameof(BackgroundMusicService),
+            $"PlaybackStateChanged | State={sender.PlaybackState} | Track={CurrentTrack?.Title}");
+    }
+
     private void OnPlayerMediaEnded(MediaPlayer sender, object args)
     {
+        SwitchCastDiagnostics.LogInfo(
+            nameof(BackgroundMusicService),
+            $"MediaEnded | Track={CurrentTrack?.Title} | RepeatMode={RepeatMode}");
         _ = HandleTrackEndedAsync();
     }
 
@@ -140,7 +163,7 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
         {
             if (RepeatMode == MusicRepeatMode.RepeatOne && CurrentTrack is not null)
             {
-                Seek(TimeSpan.Zero);
+                Seek(TimeSpan.Zero, "TrackRestart");
                 Resume();
                 return;
             }
@@ -638,6 +661,26 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
             IsPaused = false;
             LastErrorMessage = null;
 
+            lock (_stateLock)
+            {
+                if (CurrentPlaylist is not null)
+                {
+                    foreach (var t in CurrentPlaylist.Tracks)
+                    {
+                        t.IsCurrentlyPlaying = (t.Id == track.Id);
+                    }
+                }
+
+                if (IsShuffleEnabled && !_shuffleHistory.Contains(index))
+                {
+                    _shuffleHistory.Add(index);
+                }
+            }
+
+            SwitchCastDiagnostics.LogInfo(
+                nameof(BackgroundMusicService),
+                $"TrackStarted | Track={track.Title} | Duration={track.Duration:mm\\:ss\\.fff} | File={track.FilePath}");
+
             StartThrottledPositionTimer();
 
             PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
@@ -717,10 +760,22 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
             // Ignore transient shutdown errors
         }
 
+        lock (_stateLock)
+        {
+            if (CurrentPlaylist is not null)
+            {
+                foreach (var t in CurrentPlaylist.Tracks)
+                {
+                    t.IsCurrentlyPlaying = false;
+                }
+            }
+        }
+
         IsPlaying = false;
         IsPaused = false;
         Position = TimeSpan.Zero;
         StopPositionTimer();
+        SwitchCastDiagnostics.LogInfo(nameof(BackgroundMusicService), "PlaybackStopped");
         PlaybackStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -782,7 +837,7 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
         // If played more than 3 seconds into current track, restart current track
         if (Position.TotalSeconds > 3.0)
         {
-            Seek(TimeSpan.Zero);
+            Seek(TimeSpan.Zero, "TrackRestart");
             return;
         }
 
@@ -797,7 +852,9 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
         await PlayTrackInternalAsync(track, prevIndex).ConfigureAwait(false);
     }
 
-    public void Seek(TimeSpan position)
+    public void Seek(TimeSpan position) => Seek(position, "Programmatic");
+
+    public void Seek(TimeSpan position, string? source = null)
     {
         if (_player?.PlaybackSession is null)
         {
@@ -814,6 +871,22 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
             {
                 position = Duration;
             }
+
+            var prevPos = _player.PlaybackSession.Position;
+            long seq = Interlocked.Increment(ref _seekSequence);
+            int threadId = Environment.CurrentManagedThreadId;
+            string trackId = CurrentTrack?.Id ?? "None";
+            string reqSource = source ?? "Programmatic";
+
+            // If seek request is identical to current position within 50ms, skip redundant seeking unless restarting track
+            if (Math.Abs((prevPos - position).TotalMilliseconds) < 50 && reqSource != "TrackRestart")
+            {
+                return;
+            }
+
+            SwitchCastDiagnostics.LogInfo(
+                nameof(BackgroundMusicService),
+                $"Seek | Source={reqSource} | PrevPos={prevPos:mm\\:ss\\.fff} | ReqPos={position:mm\\:ss\\.fff} | Track={trackId} | Seq={seq} | Thread={threadId}");
 
             _player.PlaybackSession.Position = position;
             Position = position;
@@ -857,11 +930,13 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
 
     partial void OnRepeatModeChanged(MusicRepeatMode value)
     {
+        SwitchCastDiagnostics.LogInfo(nameof(BackgroundMusicService), $"RepeatModeChanged | Mode={value}");
         _ = SavePlaylistsAsync();
     }
 
     partial void OnIsShuffleEnabledChanged(bool value)
     {
+        SwitchCastDiagnostics.LogInfo(nameof(BackgroundMusicService), $"ShuffleChanged | Enabled={value}");
         _shuffleHistory.Clear();
         _ = SavePlaylistsAsync();
     }
@@ -922,11 +997,17 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
         {
             try
             {
+                _player.MediaOpened -= OnPlayerMediaOpened;
                 _player.MediaEnded -= OnPlayerMediaEnded;
                 _player.MediaFailed -= OnPlayerMediaFailed;
+                if (_player.PlaybackSession is not null)
+                {
+                    _player.PlaybackSession.PlaybackStateChanged -= OnPlaybackSessionPlaybackStateChanged;
+                }
                 _player.Pause();
                 _player.Source = null;
                 _player.Dispose();
+                SwitchCastDiagnostics.LogInfo(nameof(BackgroundMusicService), "MusicPlayerDisposed");
             }
             catch
             {
