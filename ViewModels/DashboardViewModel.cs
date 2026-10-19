@@ -888,6 +888,14 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
 
     public bool HasCurrentPlaylistTracks => (PlaylistTracks?.Count ?? 0) > 0;
 
+    public Microsoft.UI.Xaml.Visibility EmptyPlaylistVisibility => HasCurrentPlaylistTracks
+        ? Microsoft.UI.Xaml.Visibility.Collapsed
+        : Microsoft.UI.Xaml.Visibility.Visible;
+
+    public Microsoft.UI.Xaml.Visibility PlaylistTracksVisibility => HasCurrentPlaylistTracks
+        ? Microsoft.UI.Xaml.Visibility.Visible
+        : Microsoft.UI.Xaml.Visibility.Collapsed;
+
     [ObservableProperty]
     private MusicTrack? _selectedMusicTrack;
 
@@ -947,7 +955,11 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
         _ => "Repeat: Off"
     };
 
+    public double MusicRepeatOpacity => MusicRepeatMode != MusicRepeatMode.RepeatOff ? 1.0 : 0.4;
+
     public bool IsMusicShuffleEnabled => _backgroundMusicService?.IsShuffleEnabled ?? false;
+
+    public double MusicShuffleOpacity => IsMusicShuffleEnabled ? 1.0 : 0.4;
 
     public string MusicShuffleTooltip => IsMusicShuffleEnabled ? "Shuffle: On" : "Shuffle: Off";
 
@@ -1009,6 +1021,8 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(PlaylistTracks));
             OnPropertyChanged(nameof(HasPlaylists));
             OnPropertyChanged(nameof(HasCurrentPlaylistTracks));
+            OnPropertyChanged(nameof(EmptyPlaylistVisibility));
+            OnPropertyChanged(nameof(PlaylistTracksVisibility));
             OnPropertyChanged(nameof(CurrentMusicTrack));
             OnPropertyChanged(nameof(MusicTrackTitle));
         });
@@ -1088,6 +1102,7 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(MusicRepeatMode));
             OnPropertyChanged(nameof(MusicRepeatGlyph));
             OnPropertyChanged(nameof(MusicRepeatTooltip));
+            OnPropertyChanged(nameof(MusicRepeatOpacity));
         }
     }
 
@@ -1098,6 +1113,7 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
         {
             _backgroundMusicService.IsShuffleEnabled = !_backgroundMusicService.IsShuffleEnabled;
             OnPropertyChanged(nameof(IsMusicShuffleEnabled));
+            OnPropertyChanged(nameof(MusicShuffleOpacity));
             OnPropertyChanged(nameof(MusicShuffleTooltip));
         }
     }

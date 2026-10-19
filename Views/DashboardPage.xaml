@@ -6,6 +6,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:SwitchCast.Models"
     xmlns:music="using:SwitchCast.Models.Music"
+    xmlns:views="using:SwitchCast.Views"
     xmlns:vm="using:SwitchCast.ViewModels"
     mc:Ignorable="d">
 
@@ -844,7 +845,7 @@
                     <!-- Track List or Empty State -->
                     <Grid MinHeight="100" MaxHeight="220">
                         <!-- Empty State -->
-                        <Border Visibility="{x:Bind ViewModel.HasCurrentPlaylistTracks, Mode=OneWay, Converter={StaticResource InvertedBoolToVisibilityConverter}, FallbackValue=Collapsed}"
+                        <Border Visibility="{x:Bind ViewModel.EmptyPlaylistVisibility, Mode=OneWay}"
                                 Background="{ThemeResource AppBackgroundBrush}"
                                 BorderBrush="{ThemeResource AppBorderBrush}"
                                 BorderThickness="1"
@@ -866,6 +867,7 @@
 
                         <!-- Tracks List -->
                         <ListView ItemsSource="{x:Bind ViewModel.PlaylistTracks, Mode=OneWay}"
+                                  Visibility="{x:Bind ViewModel.PlaylistTracksVisibility, Mode=OneWay}"
                                   SelectedItem="{x:Bind ViewModel.SelectedMusicTrack, Mode=TwoWay}"
                                   SelectionMode="Single"
                                   ScrollViewer.VerticalScrollBarVisibility="Auto">
@@ -900,7 +902,7 @@
 
                                         <!-- Missing file indicator -->
                                         <Border Grid.Column="2"
-                                                Visibility="{x:Bind IsAvailable, Mode=OneWay, Converter={StaticResource InvertedBoolToVisibilityConverter}}"
+                                                Visibility="{x:Bind views:DashboardPage.InvertBoolToVisibility(IsAvailable), Mode=OneWay}"
                                                 Background="#33FF0000"
                                                 Padding="4,1"
                                                 CornerRadius="3"
@@ -1010,13 +1012,13 @@
                                         Style="{StaticResource SubtleButtonStyle}"
                                         Padding="6,4"
                                         ToolTipService.ToolTip="{x:Bind ViewModel.MusicShuffleTooltip, Mode=OneWay}">
-                                    <FontIcon Glyph="&#xE8B1;" FontSize="11" Foreground="{x:Bind ViewModel.IsMusicShuffleEnabled, Mode=OneWay, Converter={StaticResource BoolToAccentBrushConverter}}" />
+                                    <FontIcon Glyph="&#xE8B1;" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" Opacity="{x:Bind ViewModel.MusicShuffleOpacity, Mode=OneWay}" />
                                 </Button>
                                 <Button Command="{x:Bind ViewModel.CycleMusicRepeatModeCommand}"
                                         Style="{StaticResource SubtleButtonStyle}"
                                         Padding="6,4"
                                         ToolTipService.ToolTip="{x:Bind ViewModel.MusicRepeatTooltip, Mode=OneWay}">
-                                    <FontIcon Glyph="{x:Bind ViewModel.MusicRepeatGlyph, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" />
+                                    <FontIcon Glyph="{x:Bind ViewModel.MusicRepeatGlyph, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" Opacity="{x:Bind ViewModel.MusicRepeatOpacity, Mode=OneWay}" />
                                 </Button>
                             </StackPanel>
 

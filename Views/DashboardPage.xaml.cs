@@ -18,6 +18,9 @@ public sealed partial class DashboardPage : Page
 
     public DashboardViewModel ViewModel { get; }
 
+    public static Microsoft.UI.Xaml.Visibility InvertBoolToVisibility(bool value) =>
+        value ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
+
     private async void OnViewPreviousCrashReportClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         if (ViewModel.LatestPreviousCrash is not null && XamlRoot is not null)

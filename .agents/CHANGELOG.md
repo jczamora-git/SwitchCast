@@ -7,6 +7,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Startup Termination Hotfix — COMException 0x80004005 Fixed] - 2026-10-19
+
+### Fixed (fix / winui / xaml / startup / bindings / diagnostics)
+- **Eliminated Fatal Startup `COMException` (`0x80004005` `E_FAIL`)**:
+  - **Identified Root Cause**: In `Views/DashboardPage.xaml`, references to missing static resource converters `{StaticResource BoolToAccentBrushConverter}` and `{StaticResource InvertedBoolToVisibilityConverter}` caused WinUI 3 XAML compiled bindings during `Loading` (`Bindings.Initialize()`) to query native COM `ResourceDictionary::Lookup` on the UI ASTA message loop. Missing resources throw native COM `E_FAIL` (`0x80004005`), which escaped as an unhandled terminating exception with exit code `-1` (`0xFFFFFFFF`).
+  - **Replaced with Strongly-Typed ViewModel Properties & Method Binding**:
+    - Added `EmptyPlaylistVisibility` and `PlaylistTracksVisibility` to `DashboardViewModel`.
+    - Added `MusicShuffleOpacity` and `MusicRepeatOpacity` to `DashboardViewModel` with `ThemeResource AppAccentBrush`.
+    - Replaced `InvertedBoolToVisibilityConverter` in `DataTemplate` with statically-qualified compile-time method binding `{x:Bind views:DashboardPage.InvertBoolToVisibility(IsAvailable), Mode=OneWay}`.
+- **Synchronous Crash Telemetry Flush**:
+  - Hardened `App.OnUnhandledException` to call `SwitchCastDiagnostics.LogCritical(...)` instead of `LogException`.
+  - Updated `ErrorReportingService.FlushCriticalIncident(...)` to synchronously append full exception type, hex HRESULT, message, thread ID, and stack trace to the daily log file before returning, preventing log loss on immediate process termination.
+- **Quality Gates**:
+  - 395 unit tests passing (100% pass rate).
+  - 3-cycle automated native Windows launch, verification, and clean close verified.
+  - Native Release x64 binary execution verified: `PID=24940, HWND=462294, Responding=True`.
+
+---
+
 ## [Critical Dock Close & Application Exit Hotfix] - 2026-10-16
 
 ### Fixed (fix / presenter-dock / window-lifetime / access-violation / winui / activation / test)

@@ -7,15 +7,49 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Critical Dock Close & Application Exit Hotfix (AccessViolationException on Window.Close Resolved, Single Dashboard Activation Verified, MainWindow Lifetime Preserved)
-- **Overall Status**: **Implemented & Validated (379 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
-- **Last Updated**: 2026-10-16T01:15:00+08:00 (UTC+8)
+- **Current Phase**: Startup Termination Investigation & Hotfix (WinRT COMException 0x80004005 Resolved, Synchronous Critical Flush Added, SwitchDeck Music & Cursor Controls Verified)
+- **Overall Status**: **Implemented & Validated (395 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors], Native Windows Startup 3-Cycle Verified)**
+- **Last Updated**: 2026-10-19T20:45:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **P0 Startup Termination Resolution — COMException (0x80004005) in WinRT.Runtime.dll Fixed**:
+  - **Runtime Evidence & Forensic Investigation**:
+    - `MainWindow` successfully initialized (`HWND=0x70DDC | PID=12136 | Thread=1`).
+    - Immediately after, `MainWindow.Activate()` and `OnNavViewLoaded` navigated to `DashboardPage`.
+    - WinRT threw unhandled `System.Runtime.InteropServices.COMException` (`HResult=0x80004005 (E_FAIL / Unspecified error)`), crashing `SwitchCast.exe` with exit code `0xFFFFFFFF (-1)`.
+    - Stack trace captured via newly hardened synchronous incident flush:
+      ```
+      at ABI.System.Collections.Generic.IDictionaryMethods`2.Indexer_Get(IObjectReference obj, Dictionary`2 __lookupCache, K key)
+      at Microsoft.UI.Xaml.ResourceDictionary.get_Item(Object key)
+      at SwitchCast.Views.DashboardPage.DashboardPage_obj1_Bindings.LookupConverter(String key)
+      at SwitchCast.Views.DashboardPage.DashboardPage_obj1_Bindings.Update_ViewModel_IsMusicShuffleEnabled(Boolean obj, Int32 phase)
+      at SwitchCast.Views.DashboardPage.DashboardPage_obj1_Bindings.Initialize()
+      at SwitchCast.Views.DashboardPage.DashboardPage_obj1_Bindings.Loading(FrameworkElement src, Object data)
+      ```
+  - **Confirmed Root Cause**:
+    - In commit `8af982d`, `Views/DashboardPage.xaml` referenced `{StaticResource BoolToAccentBrushConverter}` and `{StaticResource InvertedBoolToVisibilityConverter}` without registering them in `App.xaml` or `Page.Resources`.
+    - When WinUI 3 XAML bindings initialized on page loading on the ASTA UI thread, `DashboardPage_obj1_Bindings.LookupConverter` queried native COM `ResourceDictionary::Lookup` for `"BoolToAccentBrushConverter"`. Missing resource lookups throw native COM `E_FAIL` (`0x80004005`).
+    - Because WinUI `App.OnUnhandledException` previously logged using asynchronous background tasks (`LogException`), fast process termination prevented the exception details from being written to disk.
+  - **Remediation**:
+    - **Eliminated Missing Dynamic Converters**: Replaced dynamic string-based resource lookups in `DashboardPage.xaml` with direct ViewModel properties:
+      - Added `EmptyPlaylistVisibility` and `PlaylistTracksVisibility` to `DashboardViewModel`.
+      - Added `MusicShuffleOpacity` and `MusicRepeatOpacity` to `DashboardViewModel` with `ThemeResource AppAccentBrush`.
+      - Replaced `InvertedBoolToVisibilityConverter` in `DataTemplate` with a statically-qualified compile-time method binding `{x:Bind views:DashboardPage.InvertBoolToVisibility(IsAvailable), Mode=OneWay}`.
+    - **Synchronous Critical Incident Log Flushing**:
+      - Updated `App.OnUnhandledException` to call `SwitchCastDiagnostics.LogCritical(...)` instead of `LogException`.
+      - Hardened `ErrorReportingService.FlushCriticalIncident(...)` to synchronously append the full exception type, hex HRESULT, message, thread ID, and stack trace to the daily log file before returning, guaranteeing diagnostic capture during unhandled terminating crashes.
+  - **Validation & Native Testing**:
+    - 3-cycle automated native launch, verification, and clean close loop passed without errors.
+    - Native Release x64 binary execution verified: `PID=24940, HWND=462294, Responding=True`.
+    - Full automated test suite: **395 tests passing (0 failures, 0 skipped)**.
+- [x] **SwitchDeck Independent Background Music Playlists & Cursor Controls**:
+  - Independent audio playlist management (Create, Rename, Delete, Reorder, Import audio files) via `BackgroundMusicService`.
+  - Floating SwitchDeck mini music player and expanded menu popup.
+  - Presentation cursor visibility toggle (`ShowPresentationCursor`) synchronized between settings, capture sessions (`ICaptureSessionManager.IsCursorCaptureEnabled`), and audience-facing presentation output window (`WM_SETCURSOR` client subclassing).
 - [x] **Critical Dock Close & Application Exit Hotfix (MainWindow Preservation & AccessViolationException Fix)**:
   - **Confirmed Root Causes**:
     1. **Synchronous Task Continuation Reentrancy & Window Destruction Order Inversion**: In `PresenterDockConfirmationWindow.xaml.cs`, `Dismiss(bool confirmed)` called `_tcs?.TrySetResult(confirmed)` before `Close()`. Because `_tcs` was instantiated without `TaskCreationOptions.RunContinuationsAsynchronously`, setting the result executed continuations inline synchronously on the UI thread. The awaiting method `CloseDockAsync` immediately called `StopPresentationAsync` and then `PresenterDockService.CloseDock()`, which destroyed `PresenterDockWindow`.

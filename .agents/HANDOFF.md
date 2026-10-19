@@ -3,52 +3,64 @@
 ---
 
 ## Task Details
-- **Task**: Critical Dock Close & Application Exit Hotfix (AccessViolationException on Window.Close Resolved, Single Dashboard Activation Verified, MainWindow Lifetime Preserved)
-- **Date**: 2026-10-16T01:18:00+08:00 (UTC+8)
-- **Status**: Completed, Validated & Ready for Local Commit (379 Tests Passing, 0 Build Warnings/Errors)
+- **Task**: Startup Termination Investigation & Hotfix (WinRT COMException 0x80004005 Resolved, Synchronous Critical Flush Added, SwitchDeck Music & Cursor Controls Verified)
+- **Date**: 2026-10-19T20:47:00+08:00 (UTC+8)
+- **Status**: Completed, Validated & Ready for Local Commit (395 Tests Passing, 0 Build Warnings/Errors, Native Windows Startup Verified)
 
 ---
 
 ## 1. Objectives & Confirmed Root Causes Resolved
 
-1. **AccessViolationException on Presenter Dock Stop & Close**:
-   - **Confirmed Root Causes**:
-     - Synchronous Continuation Execution: `PresenterDockConfirmationWindow.Dismiss(bool confirmed)` called `_tcs.TrySetResult(confirmed)` before calling `Close()`. Since `_tcs` ran continuations synchronously on the UI thread, `CloseDockAsync` immediately ran `StopPresentationAsync` and `PresenterDockService.CloseDock()`.
-     - Win32 `GWLP_HWNDPARENT` Ownership Tearing: `PresenterDockConfirmationWindow` was set as an owned child of `PresenterDockWindow` via `SetWindowLongPtr(GWLP_HWNDPARENT, ownerHwnd)`. When `PresenterDockWindow` closed, Win32 recursively destroyed owned windows. When the call stack unwound to `Dismiss()` and called `Close()`, WinUI 3 attempted to dismantle an already-destroyed XAML Island / HWND, causing `System.AccessViolationException` in `Microsoft.WinUI.dll` on `Window.Close()`.
-     - Unintended Application Exit: The unhandled native access violation crashed `SwitchCast.exe`, giving the user the impression that Stop & Close exited the app.
-     - Duplicate Activation: `PresenterDockViewModel.CloseDockAsync` called `_dockService.ShowDashboard()` after `StopPresentationAsync` had already activated `MainWindow` and navigated to the Dashboard.
+1. **Startup Termination (COMException in WinRT.Runtime.dll / 0xFFFFFFFF Exit)**:
+   - **Captured Forensic Diagnostics**:
+     - Exception: `System.Runtime.InteropServices.COMException`
+     - HRESULT: `0x80004005 (E_FAIL / Unspecified error)`
+     - Managed Thread ID: `1` (Main UI / ASTA thread)
+     - Originating Call Stack:
+       ```
+       at ABI.System.Collections.Generic.IDictionaryMethods`2.Indexer_Get(IObjectReference obj, Dictionary`2 __lookupCache, K key)
+       at Microsoft.UI.Xaml.ResourceDictionary.get_Item(Object key)
+       at SwitchCast.Views.DashboardPage.DashboardPage_obj1_Bindings.LookupConverter(String key)
+       at SwitchCast.Views.DashboardPage.DashboardPage_obj1_Bindings.Update_ViewModel_IsMusicShuffleEnabled(Boolean obj, Int32 phase)
+       at SwitchCast.Views.DashboardPage.DashboardPage_obj1_Bindings.Initialize()
+       at SwitchCast.Views.DashboardPage.DashboardPage_obj1_Bindings.Loading(FrameworkElement src, Object data)
+       ```
+   - **Confirmed Root Cause**:
+     - `Views/DashboardPage.xaml` referenced `{StaticResource BoolToAccentBrushConverter}` and `{StaticResource InvertedBoolToVisibilityConverter}` without registering them in `App.xaml` or `Page.Resources`.
+     - When `MainWindow` activated and navigated to `DashboardPage`, WinUI 3 XAML compiled bindings executed `LookupConverter` during `Loading`, invoking native COM `ResourceDictionary::Lookup` for `"BoolToAccentBrushConverter"`. Missing resource lookups throw native COM `E_FAIL (0x80004005)`.
+     - Because this occurred during page loading on the ASTA UI message loop, it escaped as an unhandled terminating exception, causing process exit `-1` (`0xFFFFFFFF`).
+     - Process exit was so fast that asynchronous background file writes in `ErrorReportingService` were terminated before they could flush the stack trace to disk.
    - **Remediation**:
-     - Decoupled `PresenterDockConfirmationWindow` by removing `GWLP_HWNDPARENT`. It operates as an independent topmost tool window (`OverlappedPresenter.IsAlwaysOnTop = true`, `WS_EX_TOOLWINDOW`).
-     - In `Dismiss()`, the window calls `Close()` immediately. On `OnWindowClosed`, it resolves `_tcs` using `TaskCreationOptions.RunContinuationsAsynchronously`, ensuring the confirmation window is 100% destroyed before presentation stop or dock closure starts.
-     - Removed redundant `_dockService.ShowDashboard()` call from `CloseDockAsync` when stopping an active presentation.
-     - Added `IsClosingProgrammatically` flag to `PresenterDockWindow` to prevent `AppWindow.Closing` reentrancy.
-     - Added window lifecycle diagnostic logging across all windows.
+     - Replaced dynamic string-based converter lookups in `DashboardPage.xaml` with direct ViewModel properties:
+       - `EmptyPlaylistVisibility` and `PlaylistTracksVisibility` in `DashboardViewModel`.
+       - `MusicShuffleOpacity` and `MusicRepeatOpacity` in `DashboardViewModel` with `ThemeResource AppAccentBrush`.
+       - Replaced `InvertedBoolToVisibilityConverter` in `DataTemplate` with statically-qualified compile-time method binding `{x:Bind views:DashboardPage.InvertBoolToVisibility(IsAvailable), Mode=OneWay}`.
+     - Hardened `App.OnUnhandledException` to call `SwitchCastDiagnostics.LogCritical(...)` instead of `LogException`.
+     - Hardened `ErrorReportingService.FlushCriticalIncident(...)` to synchronously append exception type, hex HRESULT, message, thread ID, and stack trace to the daily log file before returning.
 
 ---
 
 ## 2. Verification Performed
 
-- **Automated Tests**: 379 passing tests (0 failures, 0 skipped) across all test fixtures.
-  - Added `DockCloseLifecycleHotfixTests.cs` (7 comprehensive lifecycle tests).
+- **Automated Tests**: 395 passing tests (0 failures, 0 skipped) across all test fixtures.
 - **Compiler Gates**:
   - `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> 0 Errors, 0 Warnings.
   - `dotnet build SwitchCast.csproj -c Release -p:Platform=x64` -> 0 Errors, 0 Warnings.
-  - `dotnet test SwitchCast.Tests/SwitchCast.Tests.csproj -c Debug` -> 379 Passed, 0 Failed.
-- **Runtime Verification Note**: NATIVE RUNTIME UNVERIFIED (Headless CLI session; automated mocks verified state, events, and concurrency; manual interactive desktop validation is required on physical Windows desktop).
+  - `dotnet test SwitchCast.Tests/SwitchCast.Tests.csproj -c Debug` -> 395 Passed, 0 Failed.
+- **Native Windows Startup Verification**:
+  - 3-cycle automated native launch, verification, and clean close loop passed without errors.
+  - Native Release x64 binary execution verified: `PID=24940, HWND=462294, Responding=True`.
+  - Continuous 10s run verification confirmed process remains alive and responsive.
 
 ---
 
 ## 3. Important Files Modified
 
-- `SwitchCast/Views/PresenterDockConfirmationWindow.xaml.cs`: Decoupled Win32 HWND parent, self-closes before asynchronous task completion, added lifecycle logging.
-- `SwitchCast/ViewModels/PresenterDockViewModel.cs`: Removed duplicate `ShowDashboard()` call during active presentation stop in `CloseDockAsync()`.
-- `SwitchCast/Views/PresenterDockWindow.xaml.cs`: Added `IsClosingProgrammatically` guard and lifecycle diagnostics.
-- `SwitchCast/Services/PresenterDockService.cs`: Sets programmatic closing flag and logs close requests.
-- `SwitchCast/Services/PresentationWindowService.cs`: Added close requested logging.
-- `SwitchCast/Views/PresentationWindow.xaml.cs`: Added closed event logging.
-- `SwitchCast/MainWindow.xaml.cs`: Added initialization, closing, and closed lifecycle logging.
-- `SwitchCast/Services/PresentationCoordinator.cs`: Added structured sequence and lifecycle logging.
-- `SwitchCast.Tests/Services/DockCloseLifecycleHotfixTests.cs` *(New)*: Comprehensive regression tests for the 7 lifecycle domains.
+- `SwitchCast/Views/DashboardPage.xaml`: Replaced missing dynamic static resource converters with ViewModel opacity and visibility properties and static method binding.
+- `SwitchCast/Views/DashboardPage.xaml.cs`: Added `InvertBoolToVisibility` static method for compile-time verified XAML binding.
+- `SwitchCast/ViewModels/DashboardViewModel.cs`: Added `EmptyPlaylistVisibility`, `PlaylistTracksVisibility`, `MusicShuffleOpacity`, and `MusicRepeatOpacity`.
+- `SwitchCast/App.xaml.cs`: Routed `OnUnhandledException` through `LogCritical` for synchronous crash flushes.
+- `SwitchCast/Services/Diagnostics/ErrorReportingService.cs`: Added synchronous daily log file flush in `FlushCriticalIncident` to prevent log drop on immediate process termination.
 
 ---
 

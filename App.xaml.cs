@@ -29,7 +29,7 @@ public partial class App : Application
     {
         try
         {
-            SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.LogException(
+            SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.LogCritical(
                 "App",
                 "UnhandledException",
                 e.Exception,

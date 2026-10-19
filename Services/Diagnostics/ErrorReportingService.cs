@@ -328,6 +328,18 @@ public sealed class ErrorReportingService : IErrorReportingService
     {
         ArgumentNullException.ThrowIfNull(incident);
         PersistIncidentInternal(incident, isSynchronous: true);
+
+        try
+        {
+            Directory.CreateDirectory(_logsDirectory);
+            string logFile = Path.Combine(_logsDirectory, $"switchcast-{DateTime.UtcNow:yyyyMMdd}.log");
+            string line = $"[{incident.Timestamp:HH:mm:ss.fff}] [Critical] [{incident.Component}] {incident.Operation} FAILED | Type={incident.ExceptionType} | HResult=0x{incident.HResult:X8} | Thread={Environment.CurrentManagedThreadId} | Message={incident.SafeMessage}\nStack: {incident.StackTrace}\n";
+            File.AppendAllText(logFile, line);
+        }
+        catch
+        {
+            // Fail-safe
+        }
     }
 
     public IReadOnlyList<DiagnosticIncident> GetPreviousCrashReports()
