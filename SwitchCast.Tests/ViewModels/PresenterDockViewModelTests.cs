@@ -639,7 +639,7 @@ public class PresenterDockViewModelTests
         vm.StartMusicScrubbing();
         vm.BackgroundMusicPositionSeconds = 90.0;
         vm.CompleteMusicScrubbing(90.0);
-        mockMusicService.Verify(m => m.Seek(TimeSpan.FromSeconds(90.0)), Times.Once);
+        mockMusicService.Verify(m => m.Seek(TimeSpan.FromSeconds(90.0), It.IsAny<string?>()), Times.Once);
     }
 
     [Fact]
@@ -683,6 +683,36 @@ public class PresenterDockViewModelTests
 
         mockActivationService.Verify(a => a.ActivateMainWindow(), Times.Once);
         mockNavService.Verify(n => n.NavigateToMusicLibrary(null), Times.Once);
+    }
+
+    [Fact]
+    public async Task PlayMusicTrackCommand_PlaysSpecificTrackDirectly()
+    {
+        var mockMusicService = new Mock<IBackgroundMusicService>();
+        var testTrack1 = new MusicTrack { Id = "t1", Title = "Song 1", Duration = TimeSpan.FromMinutes(2) };
+        var testTrack2 = new MusicTrack { Id = "t2", Title = "Song 2", Duration = TimeSpan.FromMinutes(3) };
+        var testPlaylist = new MusicPlaylist { Id = "p1", Name = "Direct Playlist" };
+        testPlaylist.Tracks.Add(testTrack1);
+        testPlaylist.Tracks.Add(testTrack2);
+
+        mockMusicService.SetupGet(m => m.CurrentPlaylist).Returns(testPlaylist);
+        mockMusicService.SetupGet(m => m.CurrentTrack).Returns(testTrack2);
+
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object,
+            backgroundMusicService: mockMusicService.Object);
+
+        Assert.NotNull(vm.ActivePlaylistTracks);
+        Assert.Equal(2, vm.ActivePlaylistTracks.Count);
+        Assert.True(vm.HasActivePlaylistTracks);
+
+        await vm.PlayMusicTrackCommand.ExecuteAsync(testTrack2);
+
+        mockMusicService.Verify(m => m.PlayTrackAsync(testTrack2), Times.Once);
     }
 }
 

@@ -5,6 +5,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:SwitchCast.Models"
+    xmlns:music="using:SwitchCast.Models.Music"
     xmlns:views="using:SwitchCast.Views"
     mc:Ignorable="d"
     Title="SwitchCast Presenter Dock Menu">
@@ -348,7 +349,7 @@
                             CornerRadius="4"
                             Padding="8,5"
                             Margin="4,2,4,2">
-                        <StackPanel Spacing="1">
+                        <StackPanel Spacing="2">
                             <TextBlock Text="{x:Bind ViewModel.BackgroundMusicTrackTitle, Mode=OneWay}"
                                        FontSize="11"
                                        FontWeight="SemiBold"
@@ -357,11 +358,77 @@
                                        TextWrapping="NoWrap"
                                        MaxLines="1"
                                        ToolTipService.ToolTip="{x:Bind ViewModel.BackgroundMusicTrackTitle, Mode=OneWay}" />
-                            <TextBlock Text="{x:Bind ViewModel.BackgroundMusicPositionText, Mode=OneWay}"
-                                       FontSize="9"
-                                       FontFamily="Consolas"
-                                       Foreground="{ThemeResource AppTextTertiaryBrush}" />
+                            <Grid>
+                                <TextBlock Text="{x:Bind ViewModel.BackgroundMusicStatusText, Mode=OneWay}"
+                                           FontSize="9"
+                                           FontWeight="SemiBold"
+                                           Foreground="{ThemeResource AppAccentBrush}"
+                                           HorizontalAlignment="Left" />
+                                <TextBlock Text="{x:Bind ViewModel.BackgroundMusicPositionText, Mode=OneWay}"
+                                           FontSize="9"
+                                           FontFamily="Consolas"
+                                           Foreground="{ThemeResource AppTextTertiaryBrush}"
+                                           HorizontalAlignment="Right" />
+                            </Grid>
                         </StackPanel>
+                    </Border>
+
+                    <!-- Track Selection List (Bounded & Scrollable) -->
+                    <Border Background="{ThemeResource AppSurfaceBrush}"
+                            BorderBrush="{ThemeResource AppBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Margin="4,1,4,2"
+                            MaxHeight="115">
+                        <ListView ItemsSource="{x:Bind ViewModel.ActivePlaylistTracks, Mode=OneWay}"
+                                  IsItemClickEnabled="True"
+                                  ItemClick="OnMusicTrackItemClick"
+                                  SelectionMode="None"
+                                  Padding="2"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="music:MusicTrack">
+                                    <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="6" Padding="4,3">
+                                        <!-- Play button -->
+                                        <Button Grid.Column="0"
+                                                Click="OnPlayTrackButtonClick"
+                                                Tag="{x:Bind}"
+                                                Style="{StaticResource SubtleButtonStyle}"
+                                                Padding="4,2"
+                                                ToolTipService.ToolTip="Play this song">
+                                            <FontIcon Glyph="&#xE768;" FontSize="10" Foreground="{ThemeResource AppAccentBrush}" />
+                                        </Button>
+
+                                        <!-- Playing indicator -->
+                                        <FontIcon Grid.Column="1"
+                                                  Glyph="&#xE767;"
+                                                  FontSize="10"
+                                                  Foreground="#34D399"
+                                                  VerticalAlignment="Center"
+                                                  Visibility="{x:Bind PlayingIndicatorVisibility, Mode=OneWay}"
+                                                  ToolTipService.ToolTip="Currently Playing" />
+
+                                        <!-- Track Title -->
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{x:Bind Title, Mode=OneWay}"
+                                                   FontSize="10"
+                                                   Foreground="{ThemeResource AppTextPrimaryBrush}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   MaxLines="1"
+                                                   VerticalAlignment="Center"
+                                                   ToolTipService.ToolTip="{x:Bind FilePath, Mode=OneWay}" />
+
+                                        <!-- Duration -->
+                                        <TextBlock Grid.Column="3"
+                                                   Text="{x:Bind FormattedDuration, Mode=OneWay}"
+                                                   FontSize="9"
+                                                   FontFamily="Consolas"
+                                                   Foreground="{ThemeResource AppTextTertiaryBrush}"
+                                                   VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
                     </Border>
 
                     <!-- Seek Slider -->
@@ -373,6 +440,7 @@
                             Margin="4,0"
                             Padding="0"
                             VerticalAlignment="Center"
+                            PointerPressed="OnMusicSeekSliderPointerPressed"
                             PointerCaptureLost="OnMusicSeekSliderPointerCaptureLost" />
 
                     <!-- Transport Controls: Shuffle, Prev, Play/Pause, Next, Repeat -->

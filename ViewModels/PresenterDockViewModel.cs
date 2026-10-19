@@ -958,6 +958,22 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         }
     }
 
+    public System.Collections.ObjectModel.ObservableCollection<Models.Music.MusicTrack>? ActivePlaylistTracks => ActivePlaylist?.Tracks;
+
+    public bool HasActivePlaylistTracks => (ActivePlaylist?.Tracks.Count ?? 0) > 0;
+
+    public bool IsBackgroundMusicPaused => _backgroundMusicService?.IsPaused ?? false;
+
+    public string BackgroundMusicStatusText => IsBackgroundMusicPlaying ? "Playing" : (IsBackgroundMusicPaused ? "Paused" : "Stopped");
+
+    [RelayCommand]
+    public async Task PlayMusicTrackAsync(Models.Music.MusicTrack? track)
+    {
+        if (_backgroundMusicService is null || track is null) return;
+        await _backgroundMusicService.PlayTrackAsync(track);
+        NotifyBackgroundMusicProperties();
+    }
+
     public string MusicButtonTooltip => IsBackgroundMusicPlaying
         ? $"Background Music: {BackgroundMusicTrackTitle} (Playing)"
         : "Background Music (SwitchDeck)";
@@ -1035,7 +1051,7 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
     public void CompleteMusicScrubbing(double targetSeconds)
     {
         _isMusicScrubbing = false;
-        _backgroundMusicService?.Seek(TimeSpan.FromSeconds(targetSeconds));
+        _backgroundMusicService?.Seek(TimeSpan.FromSeconds(targetSeconds), "PresenterDockUserScrubbing");
         NotifyBackgroundMusicProperties();
     }
 
@@ -1050,6 +1066,8 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(Playlists));
         OnPropertyChanged(nameof(ActivePlaylist));
+        OnPropertyChanged(nameof(ActivePlaylistTracks));
+        OnPropertyChanged(nameof(HasActivePlaylistTracks));
         OnPropertyChanged(nameof(BackgroundMusicPlaylistName));
         OnPropertyChanged(nameof(BackgroundMusicTrackTitle));
     });
@@ -1071,6 +1089,10 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(HasBackgroundMusic));
         OnPropertyChanged(nameof(IsBackgroundMusicPlaying));
+        OnPropertyChanged(nameof(IsBackgroundMusicPaused));
+        OnPropertyChanged(nameof(BackgroundMusicStatusText));
+        OnPropertyChanged(nameof(ActivePlaylistTracks));
+        OnPropertyChanged(nameof(HasActivePlaylistTracks));
         OnPropertyChanged(nameof(BackgroundMusicTrackTitle));
         OnPropertyChanged(nameof(BackgroundMusicPlaylistName));
         OnPropertyChanged(nameof(BackgroundMusicVolume));

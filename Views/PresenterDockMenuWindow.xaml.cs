@@ -134,8 +134,8 @@ public sealed partial class PresenterDockMenuWindow : Window
 
             case PresenterDockMenuType.Music:
                 MusicMenuPanel.Visibility = Visibility.Visible;
-                desiredWidthDip = 260.0;
-                desiredHeightDip = 245.0;
+                desiredWidthDip = 270.0;
+                desiredHeightDip = 350.0;
                 break;
 
             case PresenterDockMenuType.MoreOptions:
@@ -330,11 +330,32 @@ public sealed partial class PresenterDockMenuWindow : Window
         _viewModel.ToggleFullscreenCommand.Execute(null);
     }
 
+    private void OnMusicSeekSliderPointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        _viewModel.StartMusicScrubbing();
+    }
+
     private void OnMusicSeekSliderPointerCaptureLost(object sender, PointerRoutedEventArgs e)
     {
         if (sender is Slider slider)
         {
             _viewModel.CompleteMusicScrubbing(slider.Value);
+        }
+    }
+
+    private async void OnMusicTrackItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is Models.Music.MusicTrack track)
+        {
+            await _viewModel.PlayMusicTrackAsync(track);
+        }
+    }
+
+    private async void OnPlayTrackButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && (fe.DataContext is Models.Music.MusicTrack track || (fe as Button)?.Tag is Models.Music.MusicTrack track2 && (track = track2) != null))
+        {
+            await _viewModel.PlayMusicTrackAsync(track);
         }
     }
 
