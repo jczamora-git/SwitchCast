@@ -5,6 +5,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:SwitchCast.Models"
+    xmlns:music="using:SwitchCast.Models.Music"
     xmlns:vm="using:SwitchCast.ViewModels"
     mc:Ignorable="d">
 
@@ -757,6 +758,324 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </StackPanel>
+
+            <!-- Background Music Management & Playback Section -->
+            <Border Padding="16"
+                    Background="{ThemeResource AppSurfaceBrush}"
+                    BorderBrush="{ThemeResource AppBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <StackPanel Spacing="14">
+                    <!-- Section Header -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <FontIcon Glyph="&#xE8D6;" FontSize="15" Foreground="{ThemeResource AppAccentBrush}" VerticalAlignment="Center" />
+                                <TextBlock Text="Background Music &amp; Playlists"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                            </StackPanel>
+                            <TextBlock Text="Independent audio tracks that play continuously during presentations."
+                                       FontSize="11"
+                                       Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                        </StackPanel>
+
+                        <!-- Playlist Management Toolbar -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <!-- Active Playlist Selector -->
+                            <ComboBox ItemsSource="{x:Bind ViewModel.Playlists, Mode=OneWay}"
+                                      SelectedItem="{x:Bind ViewModel.ActivePlaylist, Mode=TwoWay}"
+                                      MinWidth="160"
+                                      MaxWidth="220"
+                                      VerticalAlignment="Center">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="music:MusicPlaylist">
+                                        <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+
+                            <!-- New Playlist Button with Flyout -->
+                            <Button Style="{StaticResource SubtleButtonStyle}"
+                                    ToolTipService.ToolTip="Create a new playlist">
+                                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE710;" FontSize="11" />
+                                    <TextBlock Text="New Playlist" FontSize="11" />
+                                </StackPanel>
+                                <Button.Flyout>
+                                    <Flyout>
+                                        <StackPanel Spacing="8" Width="200">
+                                            <TextBlock Text="New Playlist Name" FontSize="12" FontWeight="SemiBold" />
+                                            <TextBox Text="{x:Bind ViewModel.NewPlaylistName, Mode=TwoWay}" PlaceholderText="Enter name..." />
+                                            <Button Content="Create"
+                                                    Command="{x:Bind ViewModel.CreateNewPlaylistCommand}"
+                                                    Style="{StaticResource PrimaryAccentButtonStyle}"
+                                                    HorizontalAlignment="Right" />
+                                        </StackPanel>
+                                    </Flyout>
+                                </Button.Flyout>
+                            </Button>
+
+                            <!-- Import Audio Files -->
+                            <Button Command="{x:Bind ViewModel.ImportAudioFilesCommand}"
+                                    Style="{StaticResource SubtleButtonStyle}"
+                                    ToolTipService.ToolTip="Import local audio files (.mp3, .wav, .wma, .m4a, .aac, .flac)">
+                                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE8B5;" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" />
+                                    <TextBlock Text="Import Audio" FontSize="11" />
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Delete Playlist -->
+                            <Button Command="{x:Bind ViewModel.DeleteCurrentPlaylistCommand}"
+                                    Style="{StaticResource SubtleButtonStyle}"
+                                    ToolTipService.ToolTip="Delete active playlist">
+                                <FontIcon Glyph="&#xE74D;" FontSize="11" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Track List or Empty State -->
+                    <Grid MinHeight="100" MaxHeight="220">
+                        <!-- Empty State -->
+                        <Border Visibility="{x:Bind ViewModel.HasCurrentPlaylistTracks, Mode=OneWay, Converter={StaticResource InvertedBoolToVisibilityConverter}, FallbackValue=Collapsed}"
+                                Background="{ThemeResource AppBackgroundBrush}"
+                                BorderBrush="{ThemeResource AppBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="20,16">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6">
+                                <FontIcon Glyph="&#xE8D6;" FontSize="22" Foreground="{ThemeResource AppTextTertiaryBrush}" HorizontalAlignment="Center" />
+                                <TextBlock Text="No tracks in this playlist"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Text="Click 'Import Audio' to add MP3, WAV, M4A, or FLAC files."
+                                           FontSize="11"
+                                           Foreground="{ThemeResource AppTextTertiaryBrush}"
+                                           HorizontalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Tracks List -->
+                        <ListView ItemsSource="{x:Bind ViewModel.PlaylistTracks, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.SelectedMusicTrack, Mode=TwoWay}"
+                                  SelectionMode="Single"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="music:MusicTrack">
+                                    <Grid ColumnSpacing="8" Padding="4,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Play Track Icon -->
+                                        <FontIcon Grid.Column="0" Glyph="&#xE768;" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" VerticalAlignment="Center" />
+
+                                        <!-- Title and Artist -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                                            <TextBlock Text="{x:Bind Title}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{ThemeResource AppTextPrimaryBrush}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       MaxLines="1" />
+                                            <TextBlock Text="{x:Bind Artist}"
+                                                       FontSize="9"
+                                                       Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       MaxLines="1" />
+                                        </StackPanel>
+
+                                        <!-- Missing file indicator -->
+                                        <Border Grid.Column="2"
+                                                Visibility="{x:Bind IsAvailable, Mode=OneWay, Converter={StaticResource InvertedBoolToVisibilityConverter}}"
+                                                Background="#33FF0000"
+                                                Padding="4,1"
+                                                CornerRadius="3"
+                                                VerticalAlignment="Center">
+                                            <TextBlock Text="File Missing" FontSize="9" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                                        </Border>
+
+                                        <!-- Duration -->
+                                        <TextBlock Grid.Column="3"
+                                                   Text="{x:Bind DurationText}"
+                                                   FontSize="10"
+                                                   FontFamily="Consolas"
+                                                   Foreground="{ThemeResource AppTextTertiaryBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="8,0" />
+
+                                        <!-- Row Action Buttons (Move Up, Move Down, Remove) -->
+                                        <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                            <Button Click="OnMoveTrackUpClick"
+                                                    Tag="{x:Bind}"
+                                                    Style="{StaticResource SubtleButtonStyle}"
+                                                    Padding="4,2"
+                                                    ToolTipService.ToolTip="Move Up">
+                                                <FontIcon Glyph="&#xE74A;" FontSize="9" />
+                                            </Button>
+                                            <Button Click="OnMoveTrackDownClick"
+                                                    Tag="{x:Bind}"
+                                                    Style="{StaticResource SubtleButtonStyle}"
+                                                    Padding="4,2"
+                                                    ToolTipService.ToolTip="Move Down">
+                                                <FontIcon Glyph="&#xE74B;" FontSize="9" />
+                                            </Button>
+                                            <Button Click="OnRemoveTrackClick"
+                                                    Tag="{x:Bind}"
+                                                    Style="{StaticResource SubtleButtonStyle}"
+                                                    Padding="4,2"
+                                                    ToolTipService.ToolTip="Remove track from playlist">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="9" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Grid>
+
+                    <!-- Transport and Audio Strip -->
+                    <Border Background="{ThemeResource AppBackgroundBrush}"
+                            BorderBrush="{ThemeResource AppBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12,8">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <!-- Current song info -->
+                                <ColumnDefinition Width="1.5*" />
+                                <!-- Transport buttons -->
+                                <ColumnDefinition Width="Auto" />
+                                <!-- Progress/Timeline -->
+                                <ColumnDefinition Width="2*" />
+                                <!-- Volume & Mute -->
+                                <ColumnDefinition Width="1.2*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Current song display -->
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="1">
+                                <TextBlock Text="{x:Bind ViewModel.MusicTrackTitle, Mode=OneWay}"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="{ThemeResource AppTextPrimaryBrush}"
+                                           TextTrimming="CharacterEllipsis"
+                                           MaxLines="1" />
+                                <TextBlock Text="{x:Bind ViewModel.ActivePlaylist.Name, Mode=OneWay}"
+                                           FontSize="10"
+                                           Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                           TextTrimming="CharacterEllipsis"
+                                           MaxLines="1" />
+                            </StackPanel>
+
+                            <!-- Transport buttons -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                <Button Command="{x:Bind ViewModel.PreviousMusicTrackCommand}"
+                                        Style="{StaticResource SubtleButtonStyle}"
+                                        Padding="6,4"
+                                        ToolTipService.ToolTip="Previous Track">
+                                    <FontIcon Glyph="&#xE76B;" FontSize="11" />
+                                </Button>
+                                <Button Command="{x:Bind ViewModel.ToggleMusicPlayPauseCommand}"
+                                        Style="{StaticResource PrimaryAccentButtonStyle}"
+                                        Padding="8,5"
+                                        ToolTipService.ToolTip="{x:Bind ViewModel.MusicPlayPauseTooltip, Mode=OneWay}">
+                                    <FontIcon Glyph="{x:Bind ViewModel.MusicPlayPauseGlyph, Mode=OneWay}" FontSize="12" />
+                                </Button>
+                                <Button Command="{x:Bind ViewModel.NextMusicTrackCommand}"
+                                        Style="{StaticResource SubtleButtonStyle}"
+                                        Padding="6,4"
+                                        ToolTipService.ToolTip="Next Track">
+                                    <FontIcon Glyph="&#xE76C;" FontSize="11" />
+                                </Button>
+                                <Button Command="{x:Bind ViewModel.StopMusicCommand}"
+                                        Style="{StaticResource SubtleButtonStyle}"
+                                        Padding="6,4"
+                                        ToolTipService.ToolTip="Stop Music">
+                                    <FontIcon Glyph="&#xE71A;" FontSize="10" />
+                                </Button>
+                                <Button Command="{x:Bind ViewModel.ToggleMusicShuffleCommand}"
+                                        Style="{StaticResource SubtleButtonStyle}"
+                                        Padding="6,4"
+                                        ToolTipService.ToolTip="{x:Bind ViewModel.MusicShuffleTooltip, Mode=OneWay}">
+                                    <FontIcon Glyph="&#xE8B1;" FontSize="11" Foreground="{x:Bind ViewModel.IsMusicShuffleEnabled, Mode=OneWay, Converter={StaticResource BoolToAccentBrushConverter}}" />
+                                </Button>
+                                <Button Command="{x:Bind ViewModel.CycleMusicRepeatModeCommand}"
+                                        Style="{StaticResource SubtleButtonStyle}"
+                                        Padding="6,4"
+                                        ToolTipService.ToolTip="{x:Bind ViewModel.MusicRepeatTooltip, Mode=OneWay}">
+                                    <FontIcon Glyph="{x:Bind ViewModel.MusicRepeatGlyph, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" />
+                                </Button>
+                            </StackPanel>
+
+                            <!-- Progress timeline -->
+                            <Grid Grid.Column="2" ColumnSpacing="6" VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Slider Grid.Column="0"
+                                        Minimum="0"
+                                        Maximum="{x:Bind ViewModel.MusicDurationSeconds, Mode=OneWay}"
+                                        Value="{x:Bind ViewModel.MusicPositionSeconds, Mode=TwoWay}"
+                                        StepFrequency="0.5"
+                                        Padding="0"
+                                        Margin="0"
+                                        VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{x:Bind ViewModel.MusicPositionText, Mode=OneWay}"
+                                           FontSize="10"
+                                           FontFamily="Consolas"
+                                           Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+
+                            <!-- Volume slider & Mute button -->
+                            <Grid Grid.Column="3" ColumnSpacing="4" VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0"
+                                        Command="{x:Bind ViewModel.ToggleMusicMuteCommand}"
+                                        Style="{StaticResource SubtleButtonStyle}"
+                                        Padding="4,2"
+                                        ToolTipService.ToolTip="{x:Bind ViewModel.MusicMuteButtonTooltip, Mode=OneWay}">
+                                    <FontIcon Glyph="{x:Bind ViewModel.MusicMuteButtonGlyph, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" />
+                                </Button>
+                                <Slider Grid.Column="1"
+                                        Value="{x:Bind ViewModel.MusicVolume, Mode=TwoWay}"
+                                        Minimum="0"
+                                        Maximum="100"
+                                        StepFrequency="1"
+                                        Padding="0"
+                                        Margin="0"
+                                        VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2"
+                                           Text="{x:Bind ViewModel.MusicVolumePercentText, Mode=OneWay}"
+                                           FontSize="10"
+                                           FontFamily="Consolas"
+                                           Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                           VerticalAlignment="Center"
+                                           MinWidth="32" />
+                            </Grid>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Border>
 
             </StackPanel>
         </Grid>

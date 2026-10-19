@@ -32,4 +32,28 @@ public sealed partial class DashboardPage : Page
     {
         ViewModel.DismissPreviousCrashBanner();
     }
+
+    private void OnMoveTrackUpClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (sender is Button b && b.Tag is Models.Music.MusicTrack track)
+        {
+            ViewModel.MoveMusicTrackUp(track);
+        }
+    }
+
+    private void OnMoveTrackDownClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (sender is Button b && b.Tag is Models.Music.MusicTrack track)
+        {
+            ViewModel.MoveMusicTrackDown(track);
+        }
+    }
+
+    private void OnRemoveTrackClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (sender is Button b && b.Tag is Models.Music.MusicTrack track)
+        {
+            ViewModel.RemoveMusicTrack(track);
+        }
+    }
 }

@@ -29,6 +29,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     private readonly ICameraCaptureService? _cameraCaptureService;
     private readonly IPresenterDockService? _presenterDockService;
     private readonly IApplicationSettingsService? _settingsService;
+    private readonly Services.Music.IBackgroundMusicService? _backgroundMusicService;
     private readonly SemaphoreSlim _transitionSemaphore = new(1, 1);
 
     private CaptureSource? _targetRequestedPresentationSource;
@@ -59,7 +60,8 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         IPowerPointLiveService? powerPointLiveService = null,
         ICameraCaptureService? cameraCaptureService = null,
         IPresenterDockService? presenterDockService = null,
-        IApplicationSettingsService? settingsService = null)
+        IApplicationSettingsService? settingsService = null,
+        Services.Music.IBackgroundMusicService? backgroundMusicService = null)
     {
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
         _presentationWindowService = presentationWindowService ?? throw new ArgumentNullException(nameof(presentationWindowService));
@@ -74,6 +76,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         _cameraCaptureService = cameraCaptureService;
         _presenterDockService = presenterDockService;
         _settingsService = settingsService;
+        _backgroundMusicService = backgroundMusicService;
 
         _presentationStateService.PropertyChanged += (s, e) =>
         {
@@ -210,6 +213,8 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             : _mediaPresentationService.DirectImageSource;
 
     public Windows.Media.Playback.MediaPlayer? MediaPlayer => _mediaPresentationService.Player;
+
+    public Services.Music.IBackgroundMusicService? BackgroundMusicService => _backgroundMusicService;
 
     public async Task OpenOutputWindowAsync()
     {
@@ -519,7 +524,10 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             _mediaPresentationService.ClearImage();
             await _mediaPresentationService.StopVideoAsync().ConfigureAwait(false);
 
-            // 5. Invalidate render generations & clear output renderer
+            // 5. Stop background music by default on presentation stop
+            _backgroundMusicService?.Stop();
+
+            // 6. Invalidate render generations & clear output renderer
             _outputRenderer.Clear();
 
             // 6. Update presentation state to Idle

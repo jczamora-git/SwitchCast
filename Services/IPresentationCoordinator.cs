@@ -75,6 +75,11 @@ public interface IPresentationCoordinator : INotifyPropertyChanged, IDisposable
     Media.IMediaPresentationService MediaPresentationService { get; }
 
     /// <summary>
+    /// Independent background music service instance, or null if unconfigured.
+    /// </summary>
+    Music.IBackgroundMusicService? BackgroundMusicService { get; }
+
+    /// <summary>
     /// Whether the active on-air source is a direct media file (Image or Video).
     /// </summary>
     bool IsActiveSourceMedia { get; }

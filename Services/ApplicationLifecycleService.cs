@@ -14,6 +14,7 @@ public sealed class ApplicationLifecycleService : IApplicationLifecycleService
     private readonly IPresenterDockService _presenterDockService;
     private readonly IHotkeyService _hotkeyService;
     private readonly IApplicationSettingsService _settingsService;
+    private readonly Music.IBackgroundMusicService? _backgroundMusicService;
 
     private int _isShuttingDown;
     private int _isShutdownApproved;
@@ -25,7 +26,8 @@ public sealed class ApplicationLifecycleService : IApplicationLifecycleService
         IPresentationWindowService presentationWindowService,
         IPresenterDockService presenterDockService,
         IHotkeyService hotkeyService,
-        IApplicationSettingsService settingsService)
+        IApplicationSettingsService settingsService,
+        Music.IBackgroundMusicService? backgroundMusicService = null)
     {
         _presentationCoordinator = presentationCoordinator ?? throw new ArgumentNullException(nameof(presentationCoordinator));
         _captureCoordinator = captureCoordinator ?? throw new ArgumentNullException(nameof(captureCoordinator));
@@ -33,6 +35,7 @@ public sealed class ApplicationLifecycleService : IApplicationLifecycleService
         _presenterDockService = presenterDockService ?? throw new ArgumentNullException(nameof(presenterDockService));
         _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        _backgroundMusicService = backgroundMusicService;
     }
 
     public bool IsShutdownApproved => Volatile.Read(ref _isShutdownApproved) == 1;
@@ -116,7 +119,22 @@ public sealed class ApplicationLifecycleService : IApplicationLifecycleService
             Debug.WriteLine($"[ApplicationLifecycleService] Error disposing hotkeys during shutdown: {ex.Message}");
         }
 
-        // 6. Save user settings
+        // 6. Stop and dispose background music
+        try
+        {
+            if (_backgroundMusicService is not null)
+            {
+                _backgroundMusicService.Stop();
+                _backgroundMusicService.Dispose();
+                Debug.WriteLine("[ApplicationLifecycleService] Background music stopped and disposed.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ApplicationLifecycleService] Error disposing background music during shutdown: {ex.Message}");
+        }
+
+        // 7. Save user settings
         try
         {
             await _settingsService.SaveSettingsAsync().ConfigureAwait(false);

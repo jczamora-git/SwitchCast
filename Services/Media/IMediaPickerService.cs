@@ -16,4 +16,10 @@ public interface IMediaPickerService
     /// Returns a list of absolute file paths.
     /// </summary>
     Task<IReadOnlyList<string>> PickPowerPointFilesAsync();
+
+    /// <summary>
+    /// Launches a native Windows file picker allowing the user to select one or multiple local audio files (.mp3, .wav, .wma, .m4a, .aac, .flac).
+    /// Returns a list of absolute file paths.
+    /// </summary>
+    Task<IReadOnlyList<string>> PickAudioFilesAsync();
 }

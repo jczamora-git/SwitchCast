@@ -108,6 +108,49 @@ public class Win32MediaPickerService : IMediaPickerService
         return [];
     }
 
+    public async Task<IReadOnlyList<string>> PickAudioFilesAsync()
+    {
+        try
+        {
+            var picker = new FileOpenPicker
+            {
+                ViewMode = PickerViewMode.List,
+                SuggestedStartLocation = PickerLocationId.MusicLibrary
+            };
+
+            IntPtr hwnd = _windowHandleProvider?.Invoke() ?? IntPtr.Zero;
+            if (hwnd == IntPtr.Zero)
+            {
+                hwnd = GetActiveWindow();
+            }
+
+            if (hwnd != IntPtr.Zero)
+            {
+                InitializeWithWindow.Initialize(picker, hwnd);
+            }
+
+            picker.FileTypeFilter.Add(".mp3");
+            picker.FileTypeFilter.Add(".wav");
+            picker.FileTypeFilter.Add(".wma");
+            picker.FileTypeFilter.Add(".m4a");
+            picker.FileTypeFilter.Add(".aac");
+            picker.FileTypeFilter.Add(".flac");
+            picker.FileTypeFilter.Add(".ogg");
+
+            var files = await picker.PickMultipleFilesAsync();
+            if (files is not null && files.Count > 0)
+            {
+                return files.Select(f => f.Path).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[Win32MediaPickerService] PickAudioFilesAsync failed: {ex.Message}");
+        }
+
+        return [];
+    }
+
     [DllImport("user32.dll")]
     private static extern IntPtr GetActiveWindow();
 }

@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -5,8 +6,11 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using SwitchCast.Models;
+using SwitchCast.Models.Music;
 using SwitchCast.Services;
 using SwitchCast.Services.Capture;
+using SwitchCast.Services.Media;
+using SwitchCast.Services.Music;
 
 namespace SwitchCast.ViewModels;
 
@@ -21,6 +25,8 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
     private readonly IPresentationCoordinator _presentationCoordinator;
     private readonly IPresenterDockService? _dockService;
     private readonly IApplicationSettingsService? _settingsService;
+    private readonly IBackgroundMusicService? _backgroundMusicService;
+    private readonly IMediaPickerService? _mediaPickerService;
     private IUIThreadDispatcher? _dispatcher;
     private bool _disposed;
 
@@ -47,7 +53,9 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
         IPresenterDockService? dockService = null,
         IApplicationSettingsService? settingsService = null,
         Services.Diagnostics.IErrorReportingService? reportingService = null,
-        IUIThreadDispatcher? uiDispatcher = null)
+        IUIThreadDispatcher? uiDispatcher = null,
+        IBackgroundMusicService? backgroundMusicService = null,
+        IMediaPickerService? mediaPickerService = null)
     {
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
         _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
@@ -56,6 +64,8 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
         _dockService = dockService;
         _settingsService = settingsService;
         _reportingService = reportingService;
+        _backgroundMusicService = backgroundMusicService ?? _presentationCoordinator.BackgroundMusicService;
+        _mediaPickerService = mediaPickerService;
 
         _dispatcher = UIThreadDispatcherProvider.Resolve(uiDispatcher);
 
@@ -71,6 +81,14 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
         {
             _dockService.DockOpened += (s, e) => RunOnUIThread(() => OnPropertyChanged(nameof(IsPresenterDockOpen)));
             _dockService.DockClosed += (s, e) => RunOnUIThread(() => OnPropertyChanged(nameof(IsPresenterDockOpen)));
+        }
+
+        if (_backgroundMusicService is not null)
+        {
+            _backgroundMusicService.PlaybackStateChanged += OnBackgroundMusicStateChanged;
+            _backgroundMusicService.TrackChanged += OnBackgroundMusicTrackChanged;
+            _backgroundMusicService.PlaylistChanged += OnBackgroundMusicPlaylistChanged;
+            _backgroundMusicService.PositionChanged += OnBackgroundMusicPositionChanged;
         }
 
         // Default selected sources if sources are already queued
@@ -841,6 +859,336 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
         });
     }
 
+    #region Background Music Properties & Commands
+
+    public IBackgroundMusicService? BackgroundMusicService => _backgroundMusicService;
+
+    public IReadOnlyList<MusicPlaylist> Playlists => _backgroundMusicService?.Playlists ?? [];
+
+    public MusicPlaylist? ActivePlaylist
+    {
+        get => _backgroundMusicService?.CurrentPlaylist;
+        set
+        {
+            if (value is not null && _backgroundMusicService is not null && _backgroundMusicService.CurrentPlaylist?.Id != value.Id)
+            {
+                _backgroundMusicService.SetActivePlaylist(value.Id);
+                OnPropertyChanged(nameof(ActivePlaylist));
+                OnPropertyChanged(nameof(PlaylistTracks));
+                OnPropertyChanged(nameof(HasCurrentPlaylistTracks));
+                OnPropertyChanged(nameof(CurrentMusicTrack));
+                OnPropertyChanged(nameof(MusicTrackTitle));
+            }
+        }
+    }
+
+    public ObservableCollection<MusicTrack>? PlaylistTracks => ActivePlaylist?.Tracks;
+
+    public bool HasPlaylists => Playlists.Count > 0;
+
+    public bool HasCurrentPlaylistTracks => (PlaylistTracks?.Count ?? 0) > 0;
+
+    [ObservableProperty]
+    private MusicTrack? _selectedMusicTrack;
+
+    [ObservableProperty]
+    private string _newPlaylistName = string.Empty;
+
+    public MusicTrack? CurrentMusicTrack => _backgroundMusicService?.CurrentTrack;
+
+    public string MusicTrackTitle => CurrentMusicTrack is not null
+        ? CurrentMusicTrack.DisplayText
+        : (ActivePlaylist is not null ? $"Playlist: {ActivePlaylist.Name}" : "No track playing");
+
+    public bool IsMusicPlaying => _backgroundMusicService?.IsPlaying ?? false;
+
+    public bool IsMusicPaused => _backgroundMusicService?.IsPaused ?? false;
+
+    public string MusicPlayPauseGlyph => IsMusicPlaying ? "\uE769" : "\uE768";
+
+    public string MusicPlayPauseTooltip => IsMusicPlaying ? "Pause Background Music" : "Play Background Music";
+
+    public double MusicVolume
+    {
+        get => (_backgroundMusicService?.Volume ?? 0.5) * 100.0;
+        set
+        {
+            if (_backgroundMusicService is not null)
+            {
+                _backgroundMusicService.Volume = Math.Clamp(value / 100.0, 0.0, 1.0);
+                OnPropertyChanged(nameof(MusicVolume));
+                OnPropertyChanged(nameof(MusicVolumePercentText));
+                OnPropertyChanged(nameof(MusicMuteButtonGlyph));
+            }
+        }
+    }
+
+    public bool IsMusicMuted => _backgroundMusicService?.IsMuted ?? false;
+
+    public string MusicVolumePercentText => $"{Math.Round(MusicVolume)}%";
+
+    public string MusicMuteButtonGlyph => (IsMusicMuted || MusicVolume == 0) ? "\uE74F" : "\uE767";
+
+    public string MusicMuteButtonTooltip => IsMusicMuted ? "Unmute Background Music" : "Mute Background Music";
+
+    public MusicRepeatMode MusicRepeatMode => _backgroundMusicService?.RepeatMode ?? MusicRepeatMode.RepeatAll;
+
+    public string MusicRepeatGlyph => MusicRepeatMode switch
+    {
+        MusicRepeatMode.RepeatOne => "\uE8ED",
+        MusicRepeatMode.RepeatAll => "\uE8EE",
+        _ => "\uF5E7"
+    };
+
+    public string MusicRepeatTooltip => MusicRepeatMode switch
+    {
+        MusicRepeatMode.RepeatOne => "Repeat: One Track",
+        MusicRepeatMode.RepeatAll => "Repeat: All Tracks",
+        _ => "Repeat: Off"
+    };
+
+    public bool IsMusicShuffleEnabled => _backgroundMusicService?.IsShuffleEnabled ?? false;
+
+    public string MusicShuffleTooltip => IsMusicShuffleEnabled ? "Shuffle: On" : "Shuffle: Off";
+
+    public double MusicPositionSeconds
+    {
+        get => _backgroundMusicService?.Position.TotalSeconds ?? 0;
+        set
+        {
+            _backgroundMusicService?.Seek(TimeSpan.FromSeconds(value));
+            OnPropertyChanged(nameof(MusicPositionSeconds));
+            OnPropertyChanged(nameof(MusicPositionText));
+        }
+    }
+
+    public double MusicDurationSeconds => _backgroundMusicService?.Duration.TotalSeconds ?? 0;
+
+    public string MusicPositionText
+    {
+        get
+        {
+            var pos = _backgroundMusicService?.Position ?? TimeSpan.Zero;
+            var dur = _backgroundMusicService?.Duration ?? TimeSpan.Zero;
+            return $"{pos:mm\\:ss} / {dur:mm\\:ss}";
+        }
+    }
+
+    private void OnBackgroundMusicStateChanged(object? sender, EventArgs e)
+    {
+        RunOnUIThread(() =>
+        {
+            OnPropertyChanged(nameof(IsMusicPlaying));
+            OnPropertyChanged(nameof(IsMusicPaused));
+            OnPropertyChanged(nameof(MusicPlayPauseGlyph));
+            OnPropertyChanged(nameof(MusicPlayPauseTooltip));
+            OnPropertyChanged(nameof(MusicPositionText));
+            OnPropertyChanged(nameof(MusicPositionSeconds));
+            OnPropertyChanged(nameof(MusicDurationSeconds));
+        });
+    }
+
+    private void OnBackgroundMusicTrackChanged(object? sender, EventArgs e)
+    {
+        RunOnUIThread(() =>
+        {
+            OnPropertyChanged(nameof(CurrentMusicTrack));
+            OnPropertyChanged(nameof(MusicTrackTitle));
+            OnPropertyChanged(nameof(MusicDurationSeconds));
+            OnPropertyChanged(nameof(MusicPositionSeconds));
+            OnPropertyChanged(nameof(MusicPositionText));
+        });
+    }
+
+    private void OnBackgroundMusicPlaylistChanged(object? sender, EventArgs e)
+    {
+        RunOnUIThread(() =>
+        {
+            OnPropertyChanged(nameof(Playlists));
+            OnPropertyChanged(nameof(ActivePlaylist));
+            OnPropertyChanged(nameof(PlaylistTracks));
+            OnPropertyChanged(nameof(HasPlaylists));
+            OnPropertyChanged(nameof(HasCurrentPlaylistTracks));
+            OnPropertyChanged(nameof(CurrentMusicTrack));
+            OnPropertyChanged(nameof(MusicTrackTitle));
+        });
+    }
+
+    private void OnBackgroundMusicPositionChanged(object? sender, TimeSpan pos)
+    {
+        RunOnUIThread(() =>
+        {
+            OnPropertyChanged(nameof(MusicPositionSeconds));
+            OnPropertyChanged(nameof(MusicPositionText));
+        });
+    }
+
+    [RelayCommand]
+    public void ToggleMusicPlayPause()
+    {
+        _backgroundMusicService?.TogglePlayPause();
+    }
+
+    [RelayCommand]
+    public async Task PlayMusicTrack(MusicTrack? track)
+    {
+        if (track is not null && _backgroundMusicService is not null)
+        {
+            await _backgroundMusicService.PlayTrackAsync(track);
+        }
+    }
+
+    [RelayCommand]
+    public async Task NextMusicTrack()
+    {
+        if (_backgroundMusicService is not null)
+        {
+            await _backgroundMusicService.NextTrackAsync();
+        }
+    }
+
+    [RelayCommand]
+    public async Task PreviousMusicTrack()
+    {
+        if (_backgroundMusicService is not null)
+        {
+            await _backgroundMusicService.PreviousTrackAsync();
+        }
+    }
+
+    [RelayCommand]
+    public void StopMusic()
+    {
+        _backgroundMusicService?.Stop();
+    }
+
+    [RelayCommand]
+    public void ToggleMusicMute()
+    {
+        if (_backgroundMusicService is not null)
+        {
+            _backgroundMusicService.IsMuted = !_backgroundMusicService.IsMuted;
+            OnPropertyChanged(nameof(IsMusicMuted));
+            OnPropertyChanged(nameof(MusicMuteButtonGlyph));
+            OnPropertyChanged(nameof(MusicMuteButtonTooltip));
+        }
+    }
+
+    [RelayCommand]
+    public void CycleMusicRepeatMode()
+    {
+        if (_backgroundMusicService is not null)
+        {
+            _backgroundMusicService.RepeatMode = _backgroundMusicService.RepeatMode switch
+            {
+                MusicRepeatMode.RepeatOff => MusicRepeatMode.RepeatOne,
+                MusicRepeatMode.RepeatOne => MusicRepeatMode.RepeatAll,
+                _ => MusicRepeatMode.RepeatOff
+            };
+            OnPropertyChanged(nameof(MusicRepeatMode));
+            OnPropertyChanged(nameof(MusicRepeatGlyph));
+            OnPropertyChanged(nameof(MusicRepeatTooltip));
+        }
+    }
+
+    [RelayCommand]
+    public void ToggleMusicShuffle()
+    {
+        if (_backgroundMusicService is not null)
+        {
+            _backgroundMusicService.IsShuffleEnabled = !_backgroundMusicService.IsShuffleEnabled;
+            OnPropertyChanged(nameof(IsMusicShuffleEnabled));
+            OnPropertyChanged(nameof(MusicShuffleTooltip));
+        }
+    }
+
+    [RelayCommand]
+    public void CreateNewPlaylist()
+    {
+        if (_backgroundMusicService is null)
+        {
+            return;
+        }
+
+        string name = string.IsNullOrWhiteSpace(NewPlaylistName)
+            ? $"Playlist {_backgroundMusicService.Playlists.Count + 1}"
+            : NewPlaylistName.Trim();
+
+        var created = _backgroundMusicService.CreatePlaylist(name);
+        NewPlaylistName = string.Empty;
+        ActivePlaylist = created;
+    }
+
+    [RelayCommand]
+    public void DeleteCurrentPlaylist()
+    {
+        if (_backgroundMusicService is null || ActivePlaylist is null)
+        {
+            return;
+        }
+
+        _backgroundMusicService.DeletePlaylist(ActivePlaylist.Id);
+        ActivePlaylist = _backgroundMusicService.CurrentPlaylist;
+    }
+
+    [RelayCommand]
+    public async Task ImportAudioFiles()
+    {
+        if (_backgroundMusicService is null || ActivePlaylist is null || _mediaPickerService is null)
+        {
+            return;
+        }
+
+        var files = await _mediaPickerService.PickAudioFilesAsync();
+        if (files.Count > 0)
+        {
+            await _backgroundMusicService.AddTracksAsync(ActivePlaylist.Id, files);
+        }
+    }
+
+    [RelayCommand]
+    public void RemoveMusicTrack(MusicTrack? track)
+    {
+        if (_backgroundMusicService is null || ActivePlaylist is null || track is null)
+        {
+            return;
+        }
+
+        _backgroundMusicService.RemoveTrack(ActivePlaylist.Id, track.Id);
+    }
+
+    [RelayCommand]
+    public void MoveMusicTrackUp(MusicTrack? track)
+    {
+        if (_backgroundMusicService is null || ActivePlaylist is null || track is null)
+        {
+            return;
+        }
+
+        int index = ActivePlaylist.Tracks.IndexOf(track);
+        if (index > 0)
+        {
+            _backgroundMusicService.MoveTrack(ActivePlaylist.Id, index, index - 1);
+        }
+    }
+
+    [RelayCommand]
+    public void MoveMusicTrackDown(MusicTrack? track)
+    {
+        if (_backgroundMusicService is null || ActivePlaylist is null || track is null)
+        {
+            return;
+        }
+
+        int index = ActivePlaylist.Tracks.IndexOf(track);
+        if (index >= 0 && index < ActivePlaylist.Tracks.Count - 1)
+        {
+            _backgroundMusicService.MoveTrack(ActivePlaylist.Id, index, index + 1);
+        }
+    }
+
+    #endregion
+
     public void Dispose()
     {
         if (_disposed)
@@ -852,5 +1200,13 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
         _presentationStateService.PropertyChanged -= OnPresentationStatePropertyChanged;
         _captureCoordinator.PropertyChanged -= OnCaptureCoordinatorPropertyChanged;
         _presentationCoordinator.PropertyChanged -= OnPresentationCoordinatorPropertyChanged;
+
+        if (_backgroundMusicService is not null)
+        {
+            _backgroundMusicService.PlaybackStateChanged -= OnBackgroundMusicStateChanged;
+            _backgroundMusicService.TrackChanged -= OnBackgroundMusicTrackChanged;
+            _backgroundMusicService.PlaylistChanged -= OnBackgroundMusicPlaylistChanged;
+            _backgroundMusicService.PositionChanged -= OnBackgroundMusicPositionChanged;
+        }
     }
 }

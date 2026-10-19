@@ -149,6 +149,9 @@ public partial class App : Application
         services.AddSingleton<Services.Media.IMediaPickerService, Services.Media.Win32MediaPickerService>();
         services.AddSingleton<Services.Media.IMediaPresentationService, Services.Media.MediaPresentationService>();
 
+        // Background Music Services
+        services.AddSingleton<Services.Music.IBackgroundMusicService, Services.Music.BackgroundMusicService>();
+
         // PowerPoint Services
         services.AddSingleton<Services.PowerPoint.IPresentationSlideRenderer, Services.PowerPoint.PowerPointComSlideRenderer>();
         services.AddSingleton<Services.PowerPoint.IPowerPointPresentationService, Services.PowerPoint.PowerPointPresentationService>();
@@ -191,6 +194,10 @@ public partial class App : Application
         // Preload persistent user settings before initializing UI
         var settingsService = Services.GetRequiredService<IApplicationSettingsService>();
         await settingsService.LoadSettingsAsync();
+
+        // Preload background music playlists
+        var backgroundMusicService = Services.GetRequiredService<Services.Music.IBackgroundMusicService>();
+        await backgroundMusicService.LoadPlaylistsAsync();
 
         var presentationStateService = Services.GetRequiredService<IPresentationStateService>();
         presentationStateService.SetSwitchMode(settingsService.CurrentSettings.SwitchMode);
