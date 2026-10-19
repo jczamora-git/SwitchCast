@@ -28,7 +28,13 @@ public partial class MusicTrack : ObservableObject
     [NotifyPropertyChangedFor(nameof(MissingBadgeVisibility))]
     private bool _isAvailable = true;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PlayingIndicatorVisibility))]
+    private bool _isCurrentlyPlaying;
+
     public Microsoft.UI.Xaml.Visibility MissingBadgeVisibility => IsAvailable ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
+
+    public Microsoft.UI.Xaml.Visibility PlayingIndicatorVisibility => IsCurrentlyPlaying ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
 
     public string DurationText => Duration.TotalHours >= 1
         ? Duration.ToString(@"h\:mm\:ss")

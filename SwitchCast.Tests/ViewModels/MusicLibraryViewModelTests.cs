@@ -272,7 +272,7 @@ public class MusicLibraryViewModelTests
         vm.PositionSeconds = 45.0;
         vm.CompleteScrubbing(45.0);
 
-        _mockMusicService.Verify(m => m.Seek(TimeSpan.FromSeconds(45)), Times.Once);
+        _mockMusicService.Verify(m => m.Seek(TimeSpan.FromSeconds(45), It.IsAny<string?>()), Times.Once);
     }
 
     [Fact]

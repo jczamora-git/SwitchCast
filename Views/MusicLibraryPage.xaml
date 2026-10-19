@@ -236,20 +236,33 @@
                                           ScrollViewer.VerticalScrollBarVisibility="Auto">
                                     <ListView.ItemTemplate>
                                         <DataTemplate x:DataType="music:MusicTrack">
-                                            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto"
-                                                  ColumnSpacing="10"
+                                            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto"
+                                                  ColumnSpacing="8"
                                                   Padding="4,6">
                                                 <!-- Play Button -->
                                                 <Button Grid.Column="0"
                                                         Click="OnPlayTrackClick"
+                                                        Tag="{x:Bind}"
                                                         Style="{StaticResource SubtleButtonStyle}"
                                                         Padding="4,2"
                                                         ToolTipService.ToolTip="Play this track">
                                                     <FontIcon Glyph="&#xE768;" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" />
                                                 </Button>
 
-                                                <!-- Title and Artist -->
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                                                <!-- Playing Indicator -->
+                                                <FontIcon Grid.Column="1"
+                                                          Glyph="&#xE767;"
+                                                          FontSize="12"
+                                                          Foreground="#34D399"
+                                                          VerticalAlignment="Center"
+                                                          Visibility="{x:Bind PlayingIndicatorVisibility, Mode=OneWay}"
+                                                          ToolTipService.ToolTip="Currently Playing" />
+
+                                                <!-- Title and Artist with Full Path ToolTip -->
+                                                <StackPanel Grid.Column="2"
+                                                            VerticalAlignment="Center"
+                                                            Spacing="1"
+                                                            ToolTipService.ToolTip="{x:Bind FilePath, Mode=OneWay}">
                                                     <TextBlock Text="{x:Bind Title, Mode=OneWay}"
                                                                FontSize="12"
                                                                FontWeight="SemiBold"
@@ -264,7 +277,7 @@
                                                 </StackPanel>
 
                                                 <!-- Missing Indicator -->
-                                                <Border Grid.Column="2"
+                                                <Border Grid.Column="3"
                                                         Visibility="{x:Bind MissingBadgeVisibility, Mode=OneWay}"
                                                         Background="#33FF0000"
                                                         Padding="4,1"
@@ -274,7 +287,7 @@
                                                 </Border>
 
                                                 <!-- Duration -->
-                                                <TextBlock Grid.Column="3"
+                                                <TextBlock Grid.Column="4"
                                                             Text="{x:Bind FormattedDuration, Mode=OneWay}"
                                                             FontSize="11"
                                                             FontFamily="Consolas"
@@ -282,20 +295,23 @@
                                                             VerticalAlignment="Center" />
 
                                                 <!-- Reorder & Remove Actions -->
-                                                <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                                <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
                                                     <Button Click="OnMoveTrackUpClick"
+                                                            Tag="{x:Bind}"
                                                             Style="{StaticResource SubtleButtonStyle}"
                                                             Padding="4,3"
                                                             ToolTipService.ToolTip="Move track up">
                                                         <FontIcon Glyph="&#xE74A;" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
                                                     </Button>
                                                     <Button Click="OnMoveTrackDownClick"
+                                                            Tag="{x:Bind}"
                                                             Style="{StaticResource SubtleButtonStyle}"
                                                             Padding="4,3"
                                                             ToolTipService.ToolTip="Move track down">
                                                         <FontIcon Glyph="&#xE74B;" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
                                                     </Button>
                                                     <Button Click="OnRemoveTrackClick"
+                                                            Tag="{x:Bind}"
                                                             Style="{StaticResource SubtleButtonStyle}"
                                                             Padding="4,3"
                                                             ToolTipService.ToolTip="Remove track from playlist">
@@ -349,6 +365,7 @@
                                         StepFrequency="1"
                                         Padding="0"
                                         Margin="0"
+                                        PointerPressed="OnSeekSliderPointerPressed"
                                         PointerCaptureLost="OnSeekSliderPointerCaptureLost" />
                                 <TextBlock Grid.Row="1"
                                            Text="{x:Bind ViewModel.PositionText, Mode=OneWay}"

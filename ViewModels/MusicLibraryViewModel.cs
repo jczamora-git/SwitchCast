@@ -70,11 +70,13 @@ public partial class MusicLibraryViewModel : ObservableObject, IDisposable
 
     #region Properties
 
+    private static readonly System.Collections.ObjectModel.ObservableCollection<MusicTrack> s_emptyTracks = [];
+
     public IReadOnlyList<MusicPlaylist> Playlists => _musicService.Playlists;
 
     public string PlaylistsCountText => Playlists.Count.ToString();
 
-    public IReadOnlyList<MusicTrack> SelectedPlaylistTracks => (IReadOnlyList<MusicTrack>?)SelectedPlaylist?.Tracks ?? Array.Empty<MusicTrack>();
+    public System.Collections.ObjectModel.ObservableCollection<MusicTrack> SelectedPlaylistTracks => SelectedPlaylist?.Tracks ?? s_emptyTracks;
 
     public string SelectedPlaylistTracksCountText => $"{SelectedPlaylistTracks.Count} tracks";
 
@@ -515,7 +517,7 @@ public partial class MusicLibraryViewModel : ObservableObject, IDisposable
     public void CompleteScrubbing(double targetSeconds)
     {
         _isScrubbing = false;
-        _musicService.Seek(TimeSpan.FromSeconds(targetSeconds));
+        _musicService.Seek(TimeSpan.FromSeconds(targetSeconds), "MusicLibraryUserScrubbing");
         NotifyPositionProperties();
     }
 
@@ -530,24 +532,30 @@ public partial class MusicLibraryViewModel : ObservableObject, IDisposable
 
     private void NotifyPlaylistsChanged()
     {
-        OnPropertyChanged(nameof(Playlists));
-        OnPropertyChanged(nameof(PlaylistsCountText));
-        OnPropertyChanged(nameof(IsSelectedPlaylistActive));
-        OnPropertyChanged(nameof(ActivePlaylistBadgeText));
-        OnPropertyChanged(nameof(ActivePlaylistBadgeVisibility));
+        RunOnUIThread(() =>
+        {
+            OnPropertyChanged(nameof(Playlists));
+            OnPropertyChanged(nameof(PlaylistsCountText));
+            OnPropertyChanged(nameof(IsSelectedPlaylistActive));
+            OnPropertyChanged(nameof(ActivePlaylistBadgeText));
+            OnPropertyChanged(nameof(ActivePlaylistBadgeVisibility));
+        });
     }
 
     public void NotifySelectedPlaylistChanged()
     {
-        OnPropertyChanged(nameof(SelectedPlaylistTracks));
-        OnPropertyChanged(nameof(SelectedPlaylistTracksCountText));
-        OnPropertyChanged(nameof(HasSelectedPlaylist));
-        OnPropertyChanged(nameof(HasTracks));
-        OnPropertyChanged(nameof(EmptyPlaylistVisibility));
-        OnPropertyChanged(nameof(PlaylistTracksVisibility));
-        OnPropertyChanged(nameof(IsSelectedPlaylistActive));
-        OnPropertyChanged(nameof(ActivePlaylistBadgeText));
-        OnPropertyChanged(nameof(ActivePlaylistBadgeVisibility));
+        RunOnUIThread(() =>
+        {
+            OnPropertyChanged(nameof(SelectedPlaylistTracks));
+            OnPropertyChanged(nameof(SelectedPlaylistTracksCountText));
+            OnPropertyChanged(nameof(HasSelectedPlaylist));
+            OnPropertyChanged(nameof(HasTracks));
+            OnPropertyChanged(nameof(EmptyPlaylistVisibility));
+            OnPropertyChanged(nameof(PlaylistTracksVisibility));
+            OnPropertyChanged(nameof(IsSelectedPlaylistActive));
+            OnPropertyChanged(nameof(ActivePlaylistBadgeText));
+            OnPropertyChanged(nameof(ActivePlaylistBadgeVisibility));
+        });
     }
 
     public void NotifyPlaybackProperties()

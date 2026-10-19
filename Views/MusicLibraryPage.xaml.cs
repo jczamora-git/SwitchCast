@@ -85,6 +85,11 @@ public sealed partial class MusicLibraryPage : Page
         }
     }
 
+    private void OnSeekSliderPointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        ViewModel.StartScrubbing();
+    }
+
     private void OnSeekSliderPointerCaptureLost(object sender, PointerRoutedEventArgs e)
     {
         if (sender is Slider slider)
