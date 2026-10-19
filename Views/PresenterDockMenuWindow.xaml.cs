@@ -93,6 +93,7 @@ public sealed partial class PresenterDockMenuWindow : Window
         SourcesMenuPanel.Visibility = Visibility.Collapsed;
         ModeMenuPanel.Visibility = Visibility.Collapsed;
         MoreMenuPanel.Visibility = Visibility.Collapsed;
+        MusicMenuPanel.Visibility = Visibility.Collapsed;
 
         double desiredWidthDip;
         double desiredHeightDip;
@@ -129,6 +130,12 @@ public sealed partial class PresenterDockMenuWindow : Window
                 CheckLiveOnly.Visibility = _viewModel.IsModeLiveOnly ? Visibility.Visible : Visibility.Collapsed;
                 desiredWidthDip = 235.0;
                 desiredHeightDip = 155.0;
+                break;
+
+            case PresenterDockMenuType.Music:
+                MusicMenuPanel.Visibility = Visibility.Visible;
+                desiredWidthDip = 260.0;
+                desiredHeightDip = 245.0;
                 break;
 
             case PresenterDockMenuType.MoreOptions:
@@ -321,6 +328,14 @@ public sealed partial class PresenterDockMenuWindow : Window
     {
         CloseMenu();
         _viewModel.ToggleFullscreenCommand.Execute(null);
+    }
+
+    private void OnMusicSeekSliderPointerCaptureLost(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is Slider slider)
+        {
+            _viewModel.CompleteMusicScrubbing(slider.Value);
+        }
     }
 
     private void OnWindowActivated(object sender, WindowActivatedEventArgs args)

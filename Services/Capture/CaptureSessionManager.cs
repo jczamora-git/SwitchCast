@@ -21,10 +21,42 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
     private bool _isDisposed;
     private int _isProcessingFrame;
     private long _sessionGeneration;
+    private bool _isCursorCaptureEnabled = true;
 
     public event EventHandler<FrameArrivedEventArgs>? FrameArrived;
     public event EventHandler? SourceClosed;
     public event EventHandler<Exception>? CaptureError;
+
+    public bool IsCursorCaptureEnabled
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _isCursorCaptureEnabled;
+            }
+        }
+        set => SetCursorCaptureEnabled(value);
+    }
+
+    public void SetCursorCaptureEnabled(bool enabled)
+    {
+        lock (_syncLock)
+        {
+            _isCursorCaptureEnabled = enabled;
+            if (_session is not null && OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041))
+            {
+                try
+                {
+                    _session.IsCursorCaptureEnabled = enabled;
+                }
+                catch
+                {
+                    // Ignored on platforms without cursor toggle support
+                }
+            }
+        }
+    }
 
     public bool IsCapturing
     {
@@ -86,7 +118,7 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
                 {
                     try
                     {
-                        _session.IsCursorCaptureEnabled = true;
+                        _session.IsCursorCaptureEnabled = _isCursorCaptureEnabled;
                     }
                     catch
                     {

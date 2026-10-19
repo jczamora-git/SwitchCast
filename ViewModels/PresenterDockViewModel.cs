@@ -21,11 +21,14 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
     private readonly IPresenterDockService _dockService;
     private readonly IApplicationSettingsService _settingsService;
     private readonly IApplicationLifecycleService? _lifecycleService;
+    private readonly Services.Music.IBackgroundMusicService? _backgroundMusicService;
     private DispatcherQueue? _dispatcherQueue;
     private IUIThreadDispatcher? _dispatcher;
     private DispatcherQueueTimer? _playbackTimer;
     private bool _isScrubbing;
     private double _scrubbingPositionSeconds;
+    private bool _isMusicScrubbing;
+    private double _musicScrubbingPositionSeconds;
     private bool _disposed;
 
     public PresenterDockViewModel(
@@ -35,7 +38,8 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         IPresenterDockService dockService,
         IApplicationSettingsService settingsService,
         IApplicationLifecycleService? lifecycleService = null,
-        IUIThreadDispatcher? uiDispatcher = null)
+        IUIThreadDispatcher? uiDispatcher = null,
+        Services.Music.IBackgroundMusicService? backgroundMusicService = null)
     {
         _presentationCoordinator = presentationCoordinator ?? throw new ArgumentNullException(nameof(presentationCoordinator));
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
@@ -43,6 +47,7 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         _dockService = dockService ?? throw new ArgumentNullException(nameof(dockService));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _lifecycleService = lifecycleService;
+        _backgroundMusicService = backgroundMusicService ?? _presentationCoordinator.BackgroundMusicService;
 
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _dispatcher = UIThreadDispatcherProvider.Resolve(uiDispatcher);
@@ -56,6 +61,13 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         if (_presentationCoordinator.MediaPresentationService is not null)
         {
             _presentationCoordinator.MediaPresentationService.MediaStateChanged += OnMediaStateChanged;
+        }
+
+        if (_backgroundMusicService is not null)
+        {
+            _backgroundMusicService.PlaybackStateChanged += OnBackgroundMusicPlaybackStateChanged;
+            _backgroundMusicService.TrackChanged += OnBackgroundMusicTrackChanged;
+            _backgroundMusicService.PositionChanged += OnBackgroundMusicPositionChanged;
         }
 
         InitializePlaybackTimer();
@@ -189,6 +201,13 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         if (_presentationCoordinator.MediaPresentationService is not null)
         {
             _presentationCoordinator.MediaPresentationService.MediaStateChanged -= OnMediaStateChanged;
+        }
+
+        if (_backgroundMusicService is not null)
+        {
+            _backgroundMusicService.PlaybackStateChanged -= OnBackgroundMusicPlaybackStateChanged;
+            _backgroundMusicService.TrackChanged -= OnBackgroundMusicTrackChanged;
+            _backgroundMusicService.PositionChanged -= OnBackgroundMusicPositionChanged;
         }
     }
 
@@ -639,6 +658,26 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         _presentationWindowService.IsWindowOpen ||
         _presentationCoordinator.CurrentPresentationSource is not null;
 
+    public bool ShowPresentationCursor => _presentationCoordinator.ShowPresentationCursor;
+
+    public string PresentationCursorGlyph => ShowPresentationCursor ? "\uE890" : "\uED1A";
+
+    public string PresentationCursorTooltip => ShowPresentationCursor
+        ? "Hide Presentation Cursor"
+        : "Show Presentation Cursor";
+
+    public double PresentationCursorOpacity => ShowPresentationCursor ? 1.0 : 0.4;
+
+    [RelayCommand]
+    public async Task TogglePresentationCursorAsync()
+    {
+        await _presentationCoordinator.SetShowPresentationCursorAsync(!ShowPresentationCursor);
+        OnPropertyChanged(nameof(ShowPresentationCursor));
+        OnPropertyChanged(nameof(PresentationCursorGlyph));
+        OnPropertyChanged(nameof(PresentationCursorTooltip));
+        OnPropertyChanged(nameof(PresentationCursorOpacity));
+    }
+
     /// <summary>
     /// Optional confirmation handler for closing dock while a presentation is live.
     /// Returns true if the user confirmed "Stop & Close", or false if canceled.
@@ -800,5 +839,238 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         NotifyMediaProperties();
         NotifyFullscreenProperties();
         NotifyModeProperties();
+        NotifyBackgroundMusicProperties();
+        OnPropertyChanged(nameof(ShowPresentationCursor));
+        OnPropertyChanged(nameof(PresentationCursorGlyph));
+        OnPropertyChanged(nameof(PresentationCursorTooltip));
+        OnPropertyChanged(nameof(PresentationCursorOpacity));
     }
+
+    #region Background Music SwitchDeck Controls
+
+    public bool HasBackgroundMusic => _backgroundMusicService is not null;
+
+    public bool IsBackgroundMusicPlaying => _backgroundMusicService?.IsPlaying ?? false;
+
+    public string BackgroundMusicTrackTitle => _backgroundMusicService?.CurrentTrack?.Title ?? "No Track Playing";
+
+    public string BackgroundMusicPlaylistName => _backgroundMusicService?.CurrentPlaylist?.Name ?? "No Playlist";
+
+    public double BackgroundMusicVolume
+    {
+        get => (_backgroundMusicService?.Volume ?? 0.5) * 100.0;
+        set
+        {
+            if (_backgroundMusicService is not null)
+            {
+                double normalized = Math.Clamp(value / 100.0, 0.0, 1.0);
+                if (Math.Abs(_backgroundMusicService.Volume - normalized) > 0.001)
+                {
+                    _backgroundMusicService.Volume = normalized;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(BackgroundMusicVolumePercentText));
+                }
+            }
+        }
+    }
+
+    public string BackgroundMusicVolumePercentText => $"{(int)Math.Round(BackgroundMusicVolume)}%";
+
+    public bool IsBackgroundMusicMuted => _backgroundMusicService?.IsMuted ?? false;
+
+    public double BackgroundMusicPositionSeconds
+    {
+        get => _isMusicScrubbing ? _musicScrubbingPositionSeconds : (_backgroundMusicService?.Position.TotalSeconds ?? 0.0);
+        set
+        {
+            if (_isMusicScrubbing)
+            {
+                _musicScrubbingPositionSeconds = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(BackgroundMusicPositionText));
+            }
+        }
+    }
+
+    public double BackgroundMusicDurationSeconds => _backgroundMusicService?.Duration.TotalSeconds ?? 0.0;
+
+    public string BackgroundMusicPositionText
+    {
+        get
+        {
+            var pos = _isMusicScrubbing ? TimeSpan.FromSeconds(_musicScrubbingPositionSeconds) : (_backgroundMusicService?.Position ?? TimeSpan.Zero);
+            var dur = _backgroundMusicService?.Duration ?? TimeSpan.Zero;
+            return $"{pos:mm\\:ss} / {dur:mm\\:ss}";
+        }
+    }
+
+    public string BackgroundMusicPlayPauseGlyph => IsBackgroundMusicPlaying ? "\uE769" : "\uE768";
+
+    public string BackgroundMusicPlayPauseTooltip => IsBackgroundMusicPlaying ? "Pause (SwitchDeck Music)" : "Play (SwitchDeck Music)";
+
+    public string BackgroundMusicMuteGlyph => IsBackgroundMusicMuted ? "\uE74F" : "\uE767";
+
+    public string BackgroundMusicMuteTooltip => IsBackgroundMusicMuted ? "Unmute Background Music" : "Mute Background Music";
+
+    public Models.Music.MusicRepeatMode BackgroundMusicRepeatMode => _backgroundMusicService?.RepeatMode ?? Models.Music.MusicRepeatMode.RepeatOff;
+
+    public string BackgroundMusicRepeatGlyph => BackgroundMusicRepeatMode switch
+    {
+        Models.Music.MusicRepeatMode.RepeatOne => "\uE8ED",
+        Models.Music.MusicRepeatMode.RepeatAll => "\uE8EE",
+        _ => "\uF5E7"
+    };
+
+    public string BackgroundMusicRepeatTooltip => BackgroundMusicRepeatMode switch
+    {
+        Models.Music.MusicRepeatMode.RepeatOne => "Repeat: One Track",
+        Models.Music.MusicRepeatMode.RepeatAll => "Repeat: All Tracks",
+        _ => "Repeat: Off"
+    };
+
+    public bool IsBackgroundMusicShuffleEnabled => _backgroundMusicService?.IsShuffleEnabled ?? false;
+
+    public string BackgroundMusicShuffleTooltip => IsBackgroundMusicShuffleEnabled ? "Shuffle: On" : "Shuffle: Off";
+
+    public double BackgroundMusicShuffleOpacity => IsBackgroundMusicShuffleEnabled ? 1.0 : 0.45;
+
+    public IReadOnlyList<Models.Music.MusicPlaylist> Playlists => _backgroundMusicService?.Playlists ?? Array.Empty<Models.Music.MusicPlaylist>();
+
+    public Models.Music.MusicPlaylist? ActivePlaylist
+    {
+        get => _backgroundMusicService?.CurrentPlaylist;
+        set
+        {
+            if (_backgroundMusicService is not null && value is not null && _backgroundMusicService.CurrentPlaylist?.Id != value.Id)
+            {
+                _backgroundMusicService.SetActivePlaylist(value.Id);
+                NotifyBackgroundMusicProperties();
+            }
+        }
+    }
+
+    public string MusicButtonTooltip => IsBackgroundMusicPlaying
+        ? $"Background Music: {BackgroundMusicTrackTitle} (Playing)"
+        : "Background Music (SwitchDeck)";
+
+    public string MusicButtonGlyph => "\uE8D6";
+
+    public double BackgroundMusicButtonOpacity => IsBackgroundMusicPlaying ? 1.0 : 0.65;
+
+    [RelayCommand]
+    public async Task ToggleBackgroundMusicPlayPauseAsync()
+    {
+        if (_backgroundMusicService is null) return;
+        if (_backgroundMusicService.IsPlaying)
+        {
+            _backgroundMusicService.Pause();
+        }
+        else
+        {
+            await _backgroundMusicService.PlayAsync();
+        }
+        NotifyBackgroundMusicProperties();
+    }
+
+    [RelayCommand]
+    public async Task NextBackgroundMusicTrackAsync()
+    {
+        if (_backgroundMusicService is null) return;
+        await _backgroundMusicService.NextTrackAsync();
+        NotifyBackgroundMusicProperties();
+    }
+
+    [RelayCommand]
+    public async Task PreviousBackgroundMusicTrackAsync()
+    {
+        if (_backgroundMusicService is null) return;
+        await _backgroundMusicService.PreviousTrackAsync();
+        NotifyBackgroundMusicProperties();
+    }
+
+    [RelayCommand]
+    public void ToggleBackgroundMusicShuffle()
+    {
+        if (_backgroundMusicService is null) return;
+        _backgroundMusicService.IsShuffleEnabled = !_backgroundMusicService.IsShuffleEnabled;
+        NotifyBackgroundMusicProperties();
+    }
+
+    [RelayCommand]
+    public void CycleBackgroundMusicRepeatMode()
+    {
+        if (_backgroundMusicService is null) return;
+        _backgroundMusicService.RepeatMode = _backgroundMusicService.RepeatMode switch
+        {
+            Models.Music.MusicRepeatMode.RepeatOff => Models.Music.MusicRepeatMode.RepeatAll,
+            Models.Music.MusicRepeatMode.RepeatAll => Models.Music.MusicRepeatMode.RepeatOne,
+            _ => Models.Music.MusicRepeatMode.RepeatOff
+        };
+        NotifyBackgroundMusicProperties();
+    }
+
+    [RelayCommand]
+    public void ToggleBackgroundMusicMute()
+    {
+        if (_backgroundMusicService is null) return;
+        _backgroundMusicService.IsMuted = !_backgroundMusicService.IsMuted;
+        NotifyBackgroundMusicProperties();
+    }
+
+    public void StartMusicScrubbing()
+    {
+        _isMusicScrubbing = true;
+        _musicScrubbingPositionSeconds = _backgroundMusicService?.Position.TotalSeconds ?? 0.0;
+    }
+
+    public void CompleteMusicScrubbing(double targetSeconds)
+    {
+        _isMusicScrubbing = false;
+        _backgroundMusicService?.Seek(TimeSpan.FromSeconds(targetSeconds));
+        NotifyBackgroundMusicProperties();
+    }
+
+    private void OnBackgroundMusicPlaybackStateChanged(object? sender, EventArgs e) => RunOnUIThread(NotifyBackgroundMusicProperties);
+
+    private void OnBackgroundMusicTrackChanged(object? sender, EventArgs e) => RunOnUIThread(NotifyBackgroundMusicProperties);
+
+    private void OnBackgroundMusicPositionChanged(object? sender, TimeSpan position) => RunOnUIThread(() =>
+    {
+        if (!_isMusicScrubbing)
+        {
+            OnPropertyChanged(nameof(BackgroundMusicPositionSeconds));
+            OnPropertyChanged(nameof(BackgroundMusicPositionText));
+        }
+    });
+
+    public void NotifyBackgroundMusicProperties()
+    {
+        OnPropertyChanged(nameof(HasBackgroundMusic));
+        OnPropertyChanged(nameof(IsBackgroundMusicPlaying));
+        OnPropertyChanged(nameof(BackgroundMusicTrackTitle));
+        OnPropertyChanged(nameof(BackgroundMusicPlaylistName));
+        OnPropertyChanged(nameof(BackgroundMusicVolume));
+        OnPropertyChanged(nameof(BackgroundMusicVolumePercentText));
+        OnPropertyChanged(nameof(IsBackgroundMusicMuted));
+        OnPropertyChanged(nameof(BackgroundMusicDurationSeconds));
+        OnPropertyChanged(nameof(BackgroundMusicPositionSeconds));
+        OnPropertyChanged(nameof(BackgroundMusicPositionText));
+        OnPropertyChanged(nameof(BackgroundMusicPlayPauseGlyph));
+        OnPropertyChanged(nameof(BackgroundMusicPlayPauseTooltip));
+        OnPropertyChanged(nameof(BackgroundMusicMuteGlyph));
+        OnPropertyChanged(nameof(BackgroundMusicMuteTooltip));
+        OnPropertyChanged(nameof(BackgroundMusicRepeatMode));
+        OnPropertyChanged(nameof(BackgroundMusicRepeatGlyph));
+        OnPropertyChanged(nameof(BackgroundMusicRepeatTooltip));
+        OnPropertyChanged(nameof(IsBackgroundMusicShuffleEnabled));
+        OnPropertyChanged(nameof(BackgroundMusicShuffleTooltip));
+        OnPropertyChanged(nameof(BackgroundMusicShuffleOpacity));
+        OnPropertyChanged(nameof(Playlists));
+        OnPropertyChanged(nameof(ActivePlaylist));
+        OnPropertyChanged(nameof(MusicButtonTooltip));
+        OnPropertyChanged(nameof(MusicButtonGlyph));
+        OnPropertyChanged(nameof(BackgroundMusicButtonOpacity));
+    }
+
+    #endregion
 }

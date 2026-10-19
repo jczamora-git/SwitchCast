@@ -48,4 +48,14 @@ public interface ICaptureCoordinator : INotifyPropertyChanged, IDisposable
     /// Safely switches live capture preview to another presentation source.
     /// </summary>
     Task SwitchPreviewSourceAsync(CaptureSource newSource);
+
+    /// <summary>
+    /// Gets or sets whether cursor capture is enabled for presentation capture sessions.
+    /// </summary>
+    bool IsCursorCaptureEnabled { get; set; }
+
+    /// <summary>
+    /// Dynamically sets cursor capture enabled state in capture sessions.
+    /// </summary>
+    void SetCursorCaptureEnabled(bool enabled);
 }

@@ -91,6 +91,11 @@ public class UserSettings
     public bool IsMediaMuted { get; set; } = false;
 
     /// <summary>
+    /// Whether the presentation cursor is visible in audience-facing Presentation Output.
+    /// </summary>
+    public bool ShowPresentationCursor { get; set; } = true;
+
+    /// <summary>
     /// Configured global hotkey bindings.
     /// </summary>
     public List<HotkeyBinding> HotkeyBindings { get; set; } = GetDefaultHotkeys();

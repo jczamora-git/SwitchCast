@@ -50,6 +50,18 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
 
     public ImageSource? PreviewImageSource => _previewRenderer.PreviewImageSource;
 
+    public bool IsCursorCaptureEnabled
+    {
+        get => _sessionManager.IsCursorCaptureEnabled;
+        set => SetCursorCaptureEnabled(value);
+    }
+
+    public void SetCursorCaptureEnabled(bool enabled)
+    {
+        _sessionManager.SetCursorCaptureEnabled(enabled);
+        OnPropertyChanged(nameof(IsCursorCaptureEnabled));
+    }
+
     public event EventHandler<FrameArrivedEventArgs>? FrameArrived;
 
     public async Task StartPreviewAsync(CaptureSource source)

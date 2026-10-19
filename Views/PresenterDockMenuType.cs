@@ -18,5 +18,10 @@ public enum PresenterDockMenuType
     /// <summary>
     /// Menu providing secondary actions (Stop Presenting, Dashboard, Output Window).
     /// </summary>
-    MoreOptions
+    MoreOptions,
+
+    /// <summary>
+    /// Menu providing background music playback and playlist controls.
+    /// </summary>
+    Music
 }

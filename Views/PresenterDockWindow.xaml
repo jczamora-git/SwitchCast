@@ -184,6 +184,27 @@
                                 ToolTipService.ToolTip="{x:Bind ViewModel.FullscreenButtonTooltip, Mode=OneWay}">
                             <FontIcon Glyph="{x:Bind ViewModel.FullscreenButtonGlyph, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                         </Button>
+
+                        <!-- Background Music (SwitchDeck) -->
+                        <Button x:Name="ExpandedMusicButton"
+                                Click="OnMusicClicked"
+                                Style="{StaticResource DockIconButtonStyle}"
+                                ToolTipService.ToolTip="{x:Bind ViewModel.MusicButtonTooltip, Mode=OneWay}">
+                            <FontIcon Glyph="{x:Bind ViewModel.MusicButtonGlyph, Mode=OneWay}"
+                                      FontSize="11"
+                                      Opacity="{x:Bind ViewModel.BackgroundMusicButtonOpacity, Mode=OneWay}"
+                                      Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                        </Button>
+
+                        <!-- Presentation Cursor Visibility Toggle -->
+                        <Button Command="{x:Bind ViewModel.TogglePresentationCursorCommand}"
+                                Style="{StaticResource DockIconButtonStyle}"
+                                ToolTipService.ToolTip="{x:Bind ViewModel.PresentationCursorTooltip, Mode=OneWay}">
+                            <FontIcon Glyph="{x:Bind ViewModel.PresentationCursorGlyph, Mode=OneWay}"
+                                      FontSize="11"
+                                      Opacity="{x:Bind ViewModel.PresentationCursorOpacity, Mode=OneWay}"
+                                      Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                        </Button>
                     </StackPanel>
 
                     <!-- More Actions (Opens External Dropdown Menu) -->

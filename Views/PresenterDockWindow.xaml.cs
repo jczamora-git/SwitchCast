@@ -239,9 +239,9 @@ public sealed partial class PresenterDockWindow : Window
 
         double scale = dpi / 96.0;
 
-        // Baseline width: 680 DIPs (comfortable single row).
+        // Baseline width: 730 DIPs (comfortable single row with music & cursor controls).
         // Height: 52 DIPs for standard sources, 86 DIPs when secondary controls row (PowerPoint / Video) is active.
-        double widthDip = 680.0;
+        double widthDip = 730.0;
         double heightDip = isVideoActive ? 86.0 : 52.0;
 
         int pixelWidth = (int)Math.Round(widthDip * scale);
@@ -305,6 +305,11 @@ public sealed partial class PresenterDockWindow : Window
     private void OnMoreOptionsClicked(object sender, RoutedEventArgs e)
     {
         ToggleMenu(PresenterDockMenuType.MoreOptions, sender as FrameworkElement);
+    }
+
+    private void OnMusicClicked(object sender, RoutedEventArgs e)
+    {
+        ToggleMenu(PresenterDockMenuType.Music, sender as FrameworkElement);
     }
 
     private void ToggleMenu(PresenterDockMenuType type, FrameworkElement? anchor)

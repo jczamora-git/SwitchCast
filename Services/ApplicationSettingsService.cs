@@ -137,4 +137,10 @@ public class ApplicationSettingsService : IApplicationSettingsService
 
         await SaveSettingsAsync().ConfigureAwait(false);
     }
+
+    public async Task SetShowPresentationCursorAsync(bool show)
+    {
+        CurrentSettings.ShowPresentationCursor = show;
+        await SaveSettingsAsync().ConfigureAwait(false);
+    }
 }

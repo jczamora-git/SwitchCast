@@ -43,6 +43,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     private bool _isRenderingCameraFrame;
     private Task? _activeStopTask;
     private readonly object _stopLock = new();
+    private bool _showPresentationCursor = true;
 
     [ObservableProperty]
     private string? _lastErrorMessage;
@@ -77,6 +78,12 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         _presenterDockService = presenterDockService;
         _settingsService = settingsService;
         _backgroundMusicService = backgroundMusicService;
+
+        if (_settingsService is not null)
+        {
+            _showPresentationCursor = _settingsService.CurrentSettings.ShowPresentationCursor;
+        }
+        _captureCoordinator.SetCursorCaptureEnabled(_showPresentationCursor);
 
         _presentationStateService.PropertyChanged += (s, e) =>
         {
@@ -215,6 +222,25 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     public Windows.Media.Playback.MediaPlayer? MediaPlayer => _mediaPresentationService.Player;
 
     public Services.Music.IBackgroundMusicService? BackgroundMusicService => _backgroundMusicService;
+
+    public bool ShowPresentationCursor => _showPresentationCursor;
+
+    public async Task SetShowPresentationCursorAsync(bool show)
+    {
+        if (_showPresentationCursor == show)
+        {
+            return;
+        }
+
+        _showPresentationCursor = show;
+        if (_settingsService is not null)
+        {
+            await _settingsService.SetShowPresentationCursorAsync(show).ConfigureAwait(false);
+        }
+
+        _captureCoordinator.SetCursorCaptureEnabled(show);
+        OnPropertyChanged(nameof(ShowPresentationCursor));
+    }
 
     public async Task OpenOutputWindowAsync()
     {

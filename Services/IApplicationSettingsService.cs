@@ -46,4 +46,9 @@ public interface IApplicationSettingsService
     /// Updates both window dimensions and position and persists if enabled.
     /// </summary>
     Task SetWindowPlacementAsync(double width, double height, int? x, int? y);
+
+    /// <summary>
+    /// Updates whether the presentation cursor is visible in presentation output.
+    /// </summary>
+    Task SetShowPresentationCursorAsync(bool show);
 }

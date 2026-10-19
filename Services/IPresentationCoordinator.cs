@@ -199,4 +199,14 @@ public interface IPresentationCoordinator : INotifyPropertyChanged, IDisposable
     /// Switches to the source at the specified zero-based index in the queued sources list following active switch mode rules.
     /// </summary>
     Task SwitchToSourceIndexAsync(int index);
+
+    /// <summary>
+    /// Gets whether the presentation cursor is visible in audience-facing Presentation Output.
+    /// </summary>
+    bool ShowPresentationCursor { get; }
+
+    /// <summary>
+    /// Updates whether the presentation cursor is visible in presentation output and syncs with capture sessions and settings.
+    /// </summary>
+    Task SetShowPresentationCursorAsync(bool show);
 }

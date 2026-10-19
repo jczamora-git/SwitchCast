@@ -1,7 +1,9 @@
 using Moq;
 using SwitchCast.Models;
+using SwitchCast.Models.Music;
 using SwitchCast.Services;
 using SwitchCast.Services.Media;
+using SwitchCast.Services.Music;
 using SwitchCast.ViewModels;
 using Xunit;
 
@@ -572,6 +574,94 @@ public class PresenterDockViewModelTests
         vm.UnqueueSourceCommand.Execute(source);
 
         _mockStateService.Verify(s => s.RemoveSelectedSource("win-test"), Times.Once);
+    }
+
+    [Fact]
+    public async Task BackgroundMusicControls_WhenServiceProvided_ReflectsStateAndExecutesCommands()
+    {
+        var mockMusicService = new Mock<IBackgroundMusicService>();
+        var testTrack = new MusicTrack { Id = "t1", Title = "Ambient Beats", Duration = TimeSpan.FromMinutes(3) };
+        var testPlaylist = new MusicPlaylist { Id = "p1", Name = "Chill Flow" };
+        testPlaylist.Tracks.Add(testTrack);
+
+        mockMusicService.SetupGet(m => m.CurrentTrack).Returns(testTrack);
+        mockMusicService.SetupGet(m => m.CurrentPlaylist).Returns(testPlaylist);
+        mockMusicService.SetupGet(m => m.IsPlaying).Returns(false);
+        mockMusicService.SetupGet(m => m.Volume).Returns(0.4);
+        mockMusicService.SetupGet(m => m.IsMuted).Returns(false);
+        mockMusicService.SetupGet(m => m.RepeatMode).Returns(MusicRepeatMode.RepeatOff);
+        mockMusicService.SetupGet(m => m.IsShuffleEnabled).Returns(false);
+        mockMusicService.SetupGet(m => m.Duration).Returns(TimeSpan.FromMinutes(3));
+        mockMusicService.SetupGet(m => m.Position).Returns(TimeSpan.FromSeconds(30));
+
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object,
+            backgroundMusicService: mockMusicService.Object);
+
+        Assert.True(vm.HasBackgroundMusic);
+        Assert.False(vm.IsBackgroundMusicPlaying);
+        Assert.Equal("Ambient Beats", vm.BackgroundMusicTrackTitle);
+        Assert.Equal("Chill Flow", vm.BackgroundMusicPlaylistName);
+        Assert.Equal(40.0, vm.BackgroundMusicVolume);
+        Assert.Equal("40%", vm.BackgroundMusicVolumePercentText);
+        Assert.False(vm.IsBackgroundMusicMuted);
+        Assert.Equal("\uE768", vm.BackgroundMusicPlayPauseGlyph);
+
+        // Play
+        await vm.ToggleBackgroundMusicPlayPauseCommand.ExecuteAsync(null);
+        mockMusicService.Verify(m => m.PlayAsync(), Times.Once);
+
+        // Next
+        await vm.NextBackgroundMusicTrackCommand.ExecuteAsync(null);
+        mockMusicService.Verify(m => m.NextTrackAsync(), Times.Once);
+
+        // Previous
+        await vm.PreviousBackgroundMusicTrackCommand.ExecuteAsync(null);
+        mockMusicService.Verify(m => m.PreviousTrackAsync(), Times.Once);
+
+        // Shuffle
+        vm.ToggleBackgroundMusicShuffleCommand.Execute(null);
+        mockMusicService.VerifySet(m => m.IsShuffleEnabled = true, Times.Once);
+
+        // Repeat
+        vm.CycleBackgroundMusicRepeatModeCommand.Execute(null);
+        mockMusicService.VerifySet(m => m.RepeatMode = MusicRepeatMode.RepeatAll, Times.Once);
+
+        // Mute
+        vm.ToggleBackgroundMusicMuteCommand.Execute(null);
+        mockMusicService.VerifySet(m => m.IsMuted = true, Times.Once);
+
+        // Scrubbing
+        vm.StartMusicScrubbing();
+        vm.BackgroundMusicPositionSeconds = 90.0;
+        vm.CompleteMusicScrubbing(90.0);
+        mockMusicService.Verify(m => m.Seek(TimeSpan.FromSeconds(90.0)), Times.Once);
+    }
+
+    [Fact]
+    public async Task TogglePresentationCursorCommand_TogglesCursorVisibilityViaCoordinator()
+    {
+        _mockCoordinator.SetupGet(c => c.ShowPresentationCursor).Returns(true);
+
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object);
+
+        Assert.True(vm.ShowPresentationCursor);
+        Assert.Equal("\uE890", vm.PresentationCursorGlyph);
+        Assert.Equal("Hide Presentation Cursor", vm.PresentationCursorTooltip);
+        Assert.Equal(1.0, vm.PresentationCursorOpacity);
+
+        await vm.TogglePresentationCursorCommand.ExecuteAsync(null);
+
+        _mockCoordinator.Verify(c => c.SetShowPresentationCursorAsync(false), Times.Once);
     }
 }
 

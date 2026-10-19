@@ -19,6 +19,7 @@ namespace SwitchCast.Views;
 public sealed partial class PresentationWindow : Window
 {
     private readonly IApplicationSettingsService _settingsService;
+    private readonly SubclassProc _subclassProc;
     private AppWindow? _appWindow;
     private PropertyChangedEventHandler? _viewModelPropertyChangedHandler;
     private int _isCleanedUp;
@@ -26,6 +27,7 @@ public sealed partial class PresentationWindow : Window
     public PresentationWindow()
     {
         InitializeComponent();
+        _subclassProc = OnSubclassProc;
 
         ViewModel = App.Current.Services.GetRequiredService<PresentationViewModel>();
         ViewModel.SetDispatcherQueue(DispatcherQueue);
@@ -83,6 +85,8 @@ public sealed partial class PresentationWindow : Window
             CenterPresentationWindow();
 
             UpdateTitleBarColors(_settingsService.CurrentSettings.Theme);
+
+            SetWindowSubclass(WindowHandle, _subclassProc, new UIntPtr(1003), IntPtr.Zero);
         }
     }
 
@@ -368,6 +372,11 @@ public sealed partial class PresentationWindow : Window
         _settingsService.ThemeChanged -= OnThemeChanged;
         ViewModel.SetDispatcherQueue(null);
         ViewModel.Dispose();
+
+        if (WindowHandle != IntPtr.Zero)
+        {
+            RemoveWindowSubclass(WindowHandle, _subclassProc, new UIntPtr(1003));
+        }
     }
 
     private void OnWindowClosed(object sender, WindowEventArgs args)
@@ -409,6 +418,37 @@ public sealed partial class PresentationWindow : Window
 
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    private const uint WM_SETCURSOR = 0x0020;
+    private const int HTCLIENT = 1;
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetCursor(IntPtr hCursor);
+
+    [DllImport("comctl32.dll", SetLastError = true)]
+    private static extern bool SetWindowSubclass(IntPtr hWnd, SubclassProc pfnSubclass, UIntPtr uIdSubclass, IntPtr dwRefData);
+
+    [DllImport("comctl32.dll", SetLastError = true)]
+    private static extern bool RemoveWindowSubclass(IntPtr hWnd, SubclassProc pfnSubclass, UIntPtr uIdSubclass);
+
+    [DllImport("comctl32.dll", SetLastError = true)]
+    private static extern IntPtr DefSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
+
+    private delegate IntPtr SubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, IntPtr dwRefData);
+
+    private IntPtr OnSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, IntPtr dwRefData)
+    {
+        if (uMsg == WM_SETCURSOR)
+        {
+            short hitTest = (short)(lParam.ToInt64() & 0xFFFF);
+            if (hitTest == HTCLIENT && !_settingsService.CurrentSettings.ShowPresentationCursor)
+            {
+                SetCursor(IntPtr.Zero);
+                return (IntPtr)1;
+            }
+        }
+        return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+    }
 
     #endregion
 }

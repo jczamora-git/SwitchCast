@@ -36,4 +36,14 @@ public interface ICaptureSessionManager : IDisposable
     /// Stops the active capture session and disposes frame pools deterministically.
     /// </summary>
     void StopCapture();
+
+    /// <summary>
+    /// Gets or sets whether cursor capture is enabled for screen and window capture sessions.
+    /// </summary>
+    bool IsCursorCaptureEnabled { get; set; }
+
+    /// <summary>
+    /// Dynamically sets cursor capture enabled state in the active capture session and future sessions.
+    /// </summary>
+    void SetCursorCaptureEnabled(bool enabled);
 }
