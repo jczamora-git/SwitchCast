@@ -228,4 +228,26 @@ public class ErrorReportingServiceTests : IDisposable
         Assert.NotEmpty(crashReports);
         Assert.Contains(crashReports, r => r.Id == incident.Id);
     }
+
+    [Fact]
+    public void RecordException_SanitizesErroneousCurrentSourceType_ToNone()
+    {
+        var ex = new System.Runtime.InteropServices.COMException("Unspecified error", unchecked((int)0x80004005));
+        var incident = _reportingService.RecordException(
+            component: "DashboardPage",
+            operation: "LookupConverter",
+            ex: ex,
+            severity: DiagnosticSeverity.Critical,
+            category: "UI",
+            currentSourceType: "HResult=0x80004005, Message=Unspecified error");
+
+        Assert.Equal("None", incident.CurrentSourceType);
+        Assert.Equal(unchecked((int)0x80004005), incident.HResult);
+        Assert.Equal("0x80004005", incident.HResultHex);
+        Assert.Equal("Unspecified error", incident.SafeMessage);
+
+        string formatted = _reportBuilder.BuildPlainTextReport(incident);
+        Assert.Contains("Active Source:     None", formatted);
+        Assert.Contains("0x80004005", formatted);
+    }
 }

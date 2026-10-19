@@ -22,6 +22,8 @@ public sealed class ErrorReportingService : IErrorReportingService
     private readonly IDiagnosticRedactionService _redactionService;
 
     private readonly object _stateLock = new();
+    private readonly object _persistLock = new();
+    private Task _lastPersistTask = Task.CompletedTask;
     private readonly List<DiagnosticEvent> _timelineEvents = [];
     private readonly List<DiagnosticIncident> _recentIncidents = [];
     private readonly ConcurrentDictionary<string, (DiagnosticIncident Incident, DateTimeOffset LastSeen)> _dedupCache = new();
@@ -146,6 +148,10 @@ public sealed class ErrorReportingService : IErrorReportingService
 
         string incidentId = $"SC-{now:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
 
+        string cleanSourceType = !string.IsNullOrWhiteSpace(currentSourceType) && !currentSourceType.Contains('=') && !currentSourceType.Contains("HResult", StringComparison.OrdinalIgnoreCase)
+            ? currentSourceType
+            : "None";
+
         var incident = new DiagnosticIncident
         {
             Id = incidentId,
@@ -162,7 +168,7 @@ public sealed class ErrorReportingService : IErrorReportingService
             SafeMessage = string.IsNullOrWhiteSpace(ex.Message) ? "An unexpected exception occurred." : ex.Message,
             StackTrace = ex.StackTrace,
             InnerException = ex.InnerException?.ToString(),
-            CurrentSourceType = currentSourceType,
+            CurrentSourceType = cleanSourceType,
             PreviousSourceType = previousSourceType,
             PresentationState = presentationState,
             Recoverability = severity == DiagnosticSeverity.Critical ? "Unrecoverable" : "Recovered",
@@ -219,6 +225,18 @@ public sealed class ErrorReportingService : IErrorReportingService
 
     public async Task ClearIncidentHistoryAsync()
     {
+        Task pending;
+        lock (_persistLock)
+        {
+            pending = _lastPersistTask;
+        }
+
+        try
+        {
+            await pending;
+        }
+        catch { }
+
         lock (_stateLock)
         {
             _recentIncidents.Clear();
@@ -232,11 +250,22 @@ public sealed class ErrorReportingService : IErrorReportingService
                 var files = Directory.GetFiles(_logsDirectory, "incident-*.*");
                 foreach (var file in files)
                 {
-                    try
+                    for (int attempt = 0; attempt < 5; attempt++)
                     {
-                        File.Delete(file);
+                        try
+                        {
+                            File.Delete(file);
+                            break;
+                        }
+                        catch (IOException)
+                        {
+                            await Task.Delay(50);
+                        }
+                        catch
+                        {
+                            break;
+                        }
                     }
-                    catch { }
                 }
             }
         }
@@ -244,8 +273,6 @@ public sealed class ErrorReportingService : IErrorReportingService
         {
             Debug.WriteLine($"[ErrorReportingService] Failed to clear incident files: {ex.Message}");
         }
-
-        await Task.CompletedTask;
     }
 
     public async Task<string> ExportIncidentReportAsync(string incidentId, string destinationFilePath)
@@ -415,7 +442,10 @@ public sealed class ErrorReportingService : IErrorReportingService
         }
         else
         {
-            _ = Task.Run(WriteFiles);
+            lock (_persistLock)
+            {
+                _lastPersistTask = Task.Run(WriteFiles);
+            }
         }
     }
 

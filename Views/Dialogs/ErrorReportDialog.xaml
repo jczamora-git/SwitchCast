@@ -11,79 +11,90 @@
     CornerRadius="8"
     MaxWidth="640">
 
-    <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="14" Padding="0,8,0,0">
-        <!-- Friendly Header & Incident Summary -->
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="12" Padding="0,4,0,0">
+        <!-- 1. Header & Incident Summary -->
         <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="12">
             <Border Width="40" Height="40" CornerRadius="20" Background="#33FF4D4D" HorizontalAlignment="Center" VerticalAlignment="Top">
                 <FontIcon Glyph="&#xE783;" FontSize="18" Foreground="#FFFF4D4D" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <StackPanel Grid.Column="1" Spacing="4">
-                <TextBlock x:Name="FriendlyTitleTextBlock" Text="Source Switching Interrupted" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
-                <TextBlock x:Name="FriendlyDescriptionTextBlock" Text="An unexpected error interrupted the operation. A diagnostic report is available for review." FontSize="13" Foreground="{ThemeResource AppTextSecondaryBrush}" TextWrapping="Wrap" />
+                <TextBlock x:Name="FriendlyTitleTextBlock" Text="An unexpected incident occurred" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock x:Name="FriendlyDescriptionTextBlock" Text="A sanitized diagnostic report is ready for your review." FontSize="12" Foreground="{ThemeResource AppTextSecondaryBrush}" TextWrapping="Wrap" />
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
                     <Border Background="{ThemeResource AppBadgeBackgroundBrush}" BorderBrush="{ThemeResource AppBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="6,2">
                         <TextBlock x:Name="IncidentIdBadge" Text="INC-000000" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" FontFamily="Consolas, monospace" />
                     </Border>
                     <Border Background="{ThemeResource AppBadgeBackgroundBrush}" BorderBrush="{ThemeResource AppBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="6,2">
-                        <TextBlock x:Name="ErrorCodeBadge" Text="0x8001010E" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" FontFamily="Consolas, monospace" />
+                        <TextBlock x:Name="ErrorCodeBadge" Text="0x80004005" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" FontFamily="Consolas, monospace" />
+                    </Border>
+                    <Border Background="{ThemeResource AppBadgeBackgroundBrush}" BorderBrush="{ThemeResource AppBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="6,2">
+                        <TextBlock x:Name="ActiveSourceBadge" Text="Source: None" FontSize="11" Foreground="{ThemeResource AppTextTertiaryBrush}" />
                     </Border>
                 </StackPanel>
             </StackPanel>
         </Grid>
 
-        <!-- Notification / Status Banner -->
-        <InfoBar Grid.Row="1" x:Name="FeedbackInfoBar" IsOpen="False" Severity="Informational" IsClosable="True" Margin="0,2,0,0" />
-
-        <!-- Collapsible Technical Details -->
-        <Expander Grid.Row="2" Header="Technical Details" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
-            <ScrollViewer MaxHeight="220" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                <StackPanel Spacing="8" Margin="4">
+        <!-- 2. Collapsible Technical Details (Collapsed by default) -->
+        <Expander Grid.Row="1" Header="Technical Details" IsExpanded="False" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+            <ScrollViewer MaxHeight="180" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="6" Margin="4">
                     <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4">
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Component:" FontSize="12" Foreground="{ThemeResource AppTextSecondaryBrush}" />
-                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="ComponentTextBlock" FontSize="12" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Component:" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="ComponentTextBlock" FontSize="11" TextWrapping="Wrap" />
 
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Operation:" FontSize="12" Foreground="{ThemeResource AppTextSecondaryBrush}" />
-                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="OperationTextBlock" FontSize="12" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Operation:" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="OperationTextBlock" FontSize="11" TextWrapping="Wrap" />
 
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Timestamp (UTC):" FontSize="12" Foreground="{ThemeResource AppTextSecondaryBrush}" />
-                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="TimestampTextBlock" FontSize="12" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Timestamp (UTC):" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="TimestampTextBlock" FontSize="11" />
 
-                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Environment:" FontSize="12" Foreground="{ThemeResource AppTextSecondaryBrush}" />
-                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="EnvironmentTextBlock" FontSize="12" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Environment:" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="EnvironmentTextBlock" FontSize="11" TextWrapping="Wrap" />
                     </Grid>
 
-                    <TextBlock Text="Sanitized Stack / Details:" FontSize="12" FontWeight="SemiBold" Margin="0,6,0,2" />
-                    <TextBox x:Name="DetailsTextBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" FontFamily="Consolas, monospace" FontSize="11" Height="100" />
+                    <TextBlock Text="Sanitized Stack / Details:" FontSize="11" FontWeight="SemiBold" Margin="0,4,0,2" />
+                    <TextBox x:Name="DetailsTextBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" FontFamily="Consolas, monospace" FontSize="11" Height="90" />
                 </StackPanel>
             </ScrollViewer>
         </Expander>
 
-        <!-- Action Buttons -->
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
-            <Button x:Name="CopyReportButton" Click="OnCopyReportClick" ToolTipService.ToolTip="Copy sanitized diagnostic report to clipboard">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <FontIcon Glyph="&#xE8C8;" FontSize="14" />
-                    <TextBlock Text="Copy Report" />
-                </StackPanel>
-            </Button>
-            <Button x:Name="SaveReportButton" Click="OnSaveReportClick" ToolTipService.ToolTip="Export sanitized report to disk">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <FontIcon Glyph="&#xE74E;" FontSize="14" />
-                    <TextBlock Text="Save Report" />
-                </StackPanel>
-            </Button>
-            <Button x:Name="GitHubButton" Click="OnReportGitHubClick" ToolTipService.ToolTip="Create a reviewable issue on GitHub">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <FontIcon Glyph="&#xE8A7;" FontSize="14" />
-                    <TextBlock Text="Report on GitHub" />
-                </StackPanel>
-            </Button>
-            <Button x:Name="DeveloperButton" Click="OnReportDeveloperClick" ToolTipService.ToolTip="Submit to direct support endpoint">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <FontIcon Glyph="&#xE715;" FontSize="14" />
-                    <TextBlock Text="Report to Developer" />
-                </StackPanel>
-            </Button>
-        </StackPanel>
+        <!-- 3. Grouped Responsive Actions -->
+        <Grid Grid.Row="2" RowDefinitions="Auto,Auto" RowSpacing="8">
+            <!-- Primary Actions (Copy, Save) -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="CopyReportButton" Click="OnCopyReportClick" Style="{StaticResource PrimaryAccentButtonStyle}" Padding="14,6" ToolTipService.ToolTip="Copy sanitized diagnostic report to clipboard">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE8C8;" FontSize="13" />
+                        <TextBlock Text="Copy Report" FontSize="12" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="SaveReportButton" Click="OnSaveReportClick" Padding="14,6" ToolTipService.ToolTip="Export sanitized report to disk">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE74E;" FontSize="13" />
+                        <TextBlock Text="Save Report" FontSize="12" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <!-- Secondary Actions (GitHub, Developer) -->
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+                <HyperlinkButton x:Name="GitHubButton" Click="OnReportGitHubClick" ToolTipService.ToolTip="Create a reviewable issue on GitHub" Padding="0,2">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE8A7;" FontSize="12" Foreground="{ThemeResource AppAccentBrush}" />
+                        <TextBlock Text="Report on GitHub" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" />
+                    </StackPanel>
+                </HyperlinkButton>
+                <TextBlock Text="•" Foreground="{ThemeResource AppTextTertiaryBrush}" VerticalAlignment="Center" Margin="2,0" />
+                <HyperlinkButton x:Name="DeveloperButton" Click="OnReportDeveloperClick" ToolTipService.ToolTip="Submit to direct support endpoint" Padding="0,2">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE715;" FontSize="12" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                        <TextBlock Text="Report to Developer" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                    </StackPanel>
+                </HyperlinkButton>
+            </StackPanel>
+        </Grid>
+
+        <!-- 4. Notification / Feedback Banner -->
+        <InfoBar Grid.Row="3" x:Name="FeedbackInfoBar" IsOpen="False" Severity="Informational" IsClosable="True" Margin="0,4,0,0" />
     </Grid>
 </ContentDialog>

@@ -90,6 +90,7 @@ public sealed partial class ErrorReportDialog : ContentDialog
     {
         IncidentIdBadge.Text = _incident.Id;
         ErrorCodeBadge.Text = _incident.HResultHex;
+        ActiveSourceBadge.Text = $"Source: {_incident.CurrentSourceType ?? "None"}";
 
         if (!string.IsNullOrWhiteSpace(_incident.SafeMessage))
         {
