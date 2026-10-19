@@ -7,6 +7,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Dual-Player Isolation Guards & Mandatory Regression Matrix] - 2026-10-19
+
+### Added (feat / audio / media / music / isolation / test)
+- **Strict Dual-Player Service Isolation**:
+  - `MediaPresentationService` and `BackgroundMusicService` operate as independent playback systems, each owning a distinct native `MediaPlayer` instance.
+  - Zero shared `MediaPlayer` instances, `MediaSource` objects, mutable state, or disposal ownership.
+- **Strict Command Ownership**:
+  - Video controls exclusively command `MediaPresentationService` (`ToggleVideoPlaybackCommand`, `RestartVideoCommand`, `SeekBackward10Command`, `SeekForward10Command`, `ToggleMediaMuteCommand`, `StartScrubbing`, `CompleteScrubbing`).
+  - Music controls exclusively command `BackgroundMusicService` (`ToggleBackgroundMusicPlayPauseCommand`, `NextBackgroundMusicTrackCommand`, `PreviousBackgroundMusicTrackCommand`, `ToggleBackgroundMusicShuffleCommand`, `CycleBackgroundMusicRepeatModeCommand`, `ToggleBackgroundMusicMuteCommand`, `StartMusicScrubbing`, `CompleteMusicScrubbing`).
+  - Source switching (`NextSourceCommand`, `PreviousSourceCommand`, `SwitchSourceCommand`) and PowerPoint slide commands remain strictly decoupled from background music track transport.
+- **Independent State and Settings Persistence**:
+  - Video properties (`IsVideoPlaying`, `IsVideoPaused`, `IsVideoEnded`, `Position`, `Duration`, `Volume`, `IsMuted`) and Music properties (`IsPlaying`, `IsPaused`, `CurrentTrack`, `CurrentPlaylist`, `RepeatMode`, `IsShuffleEnabled`, `Position`, `Duration`, `Volume`, `IsMuted`) maintain independent state pipelines and notifications.
+  - Video volume and mute persist via `settings.json`; music volume, mute, and playlists persist via `playlists.json`.
+  - Added `BackgroundMusicVolume` and `IsBackgroundMusicMuted` to `UserSettings` and added explicit isolated persistence methods `SetMediaVolumeAsync`, `SetMediaMutedAsync`, `SetBackgroundMusicVolumeAsync`, and `SetBackgroundMusicMutedAsync` to `IApplicationSettingsService`.
+- **Independent Playback Lifecycle**:
+  - Source switching (`Window -> Video -> PowerPoint -> Camera -> Video`) never stops, resets, or recreates background music.
+  - Music track changes never reset the On Air presentation source.
+  - Video pause != music pause; music pause != video pause.
+  - Video ended != advance music; music ended != advance presentation sources.
+  - Coordinated strictly through the explicit `StopPresentationAsync` session-stop policy in `PresentationCoordinator`.
+- **Mandatory 16-Test Regression Matrix**:
+  - Added `SwitchCast.Tests/Services/DualPlayerIsolationTests.cs` covering all 16 specified tests (TEST 1 through TEST 16).
+  - Test suite expanded from 395 to 411 passing tests (100% pass rate).
+  - Debug x64 and Release x64 compilation verified with 0 warnings and 0 errors.
+
+---
+
 ## [Startup Termination Hotfix — COMException 0x80004005 Fixed] - 2026-10-19
 
 ### Fixed (fix / winui / xaml / startup / bindings / diagnostics)

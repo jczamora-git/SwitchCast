@@ -51,4 +51,24 @@ public interface IApplicationSettingsService
     /// Updates whether the presentation cursor is visible in presentation output.
     /// </summary>
     Task SetShowPresentationCursorAsync(bool show);
+
+    /// <summary>
+    /// Updates media video audio playback volume and persists to storage.
+    /// </summary>
+    Task SetMediaVolumeAsync(double volume);
+
+    /// <summary>
+    /// Updates media video audio mute state and persists to storage.
+    /// </summary>
+    Task SetMediaMutedAsync(bool isMuted);
+
+    /// <summary>
+    /// Updates background music audio playback volume and persists to storage.
+    /// </summary>
+    Task SetBackgroundMusicVolumeAsync(double volume);
+
+    /// <summary>
+    /// Updates background music audio mute state and persists to storage.
+    /// </summary>
+    Task SetBackgroundMusicMutedAsync(bool isMuted);
 }

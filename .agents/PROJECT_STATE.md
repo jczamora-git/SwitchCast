@@ -7,15 +7,23 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: Startup Termination Investigation & Hotfix (WinRT COMException 0x80004005 Resolved, Synchronous Critical Flush Added, SwitchDeck Music & Cursor Controls Verified)
-- **Overall Status**: **Implemented & Validated (395 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors], Native Windows Startup 3-Cycle Verified)**
-- **Last Updated**: 2026-10-19T20:45:00+08:00 (UTC+8)
+- **Current Phase**: Dual-Player Isolation Guards & Mandatory Regression Matrix (Strict Service Isolation, Command Ownership, Independent State & Settings, 16 Regression Tests Passed)
+- **Overall Status**: **Implemented & Validated (411 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors], Dual-Player Isolation Verified)**
+- **Last Updated**: 2026-10-19T21:05:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Mandatory Dual-Player Isolation Guards (Video MediaPlayer vs Background Music MediaPlayer)**:
+  - **Strict Service Isolation**: `MediaPresentationService` exclusively owns its dedicated `MediaPlayer` for presentation output video; `BackgroundMusicService` exclusively owns its dedicated `MediaPlayer` for background music. Neither service shares instances, mutable state, or disposal.
+  - **Command Ownership**: SwitchDeck and Dashboard video commands (`ToggleVideoPlaybackCommand`, `RestartVideoCommand`, `SeekBackward10Command`, `SeekForward10Command`, `ToggleMediaMuteCommand`) exclusively control `MediaPresentationService`. SwitchDeck music commands (`ToggleBackgroundMusicPlayPauseCommand`, `NextBackgroundMusicTrackCommand`, `PreviousBackgroundMusicTrackCommand`, `ToggleBackgroundMusicShuffleCommand`, `CycleBackgroundMusicRepeatModeCommand`, `ToggleBackgroundMusicMuteCommand`) exclusively control `BackgroundMusicService`. PowerPoint and source switching commands remain strictly separate.
+  - **Independent State and Settings**: Video properties (`IsVideoPlaying`, `IsVideoPaused`, `IsVideoEnded`, `Position`, `Duration`, `Volume`, `IsMuted`) and Music properties (`IsPlaying`, `IsPaused`, `CurrentTrack`, `CurrentPlaylist`, `RepeatMode`, `IsShuffleEnabled`, `Position`, `Duration`, `Volume`, `IsMuted`) use independent events and notifications. Video volume/mute persists via `settings.json`; music volume/mute/playlist persists via `playlists.json`. Added explicit isolated helper methods to `IApplicationSettingsService`.
+  - **Independent Playback Lifecycle**: Source switching (`Window -> Video -> PowerPoint -> Camera -> Video`) never stops, resets, or recreates the music player; music track changes never reset On Air presentation. Video ended never advances music; music ended never advances presentation sources. The only intentional coordination is the explicit `StopPresentationAsync` session-stop policy.
+  - **Player Lifetime Safety**: Video player and Music player dispose independently with zero shared `MediaSource`, no stale callbacks, no cross-thread XAML notifications, and no double disposal.
+  - **SwitchDeck UI Isolation**: Background Music controls open in their own contextual popup available across all sources, preserving the compact main Dock and source-specific secondary control rows (Video playback row, PowerPoint slide row).
+  - **Mandatory 16-Test Regression Matrix**: Implemented and verified in `SwitchCast.Tests/Services/DualPlayerIsolationTests.cs` (TEST 1 through TEST 16 all passing). Total test count increased from 395 to 411.
 - [x] **P0 Startup Termination Resolution — COMException (0x80004005) in WinRT.Runtime.dll Fixed**:
   - **Runtime Evidence & Forensic Investigation**:
     - `MainWindow` successfully initialized (`HWND=0x70DDC | PID=12136 | Thread=1`).

@@ -91,6 +91,16 @@ public class UserSettings
     public bool IsMediaMuted { get; set; } = false;
 
     /// <summary>
+    /// Default normalized background music audio playback volume (0.0 to 1.0).
+    /// </summary>
+    public double BackgroundMusicVolume { get; set; } = 0.5;
+
+    /// <summary>
+    /// Whether background music playback is muted by default.
+    /// </summary>
+    public bool IsBackgroundMusicMuted { get; set; } = false;
+
+    /// <summary>
     /// Whether the presentation cursor is visible in audience-facing Presentation Output.
     /// </summary>
     public bool ShowPresentationCursor { get; set; } = true;

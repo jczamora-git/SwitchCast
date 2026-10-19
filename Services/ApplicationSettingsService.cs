@@ -143,4 +143,28 @@ public class ApplicationSettingsService : IApplicationSettingsService
         CurrentSettings.ShowPresentationCursor = show;
         await SaveSettingsAsync().ConfigureAwait(false);
     }
+
+    public async Task SetMediaVolumeAsync(double volume)
+    {
+        CurrentSettings.MediaVolume = Math.Clamp(volume, 0.0, 1.0);
+        await SaveSettingsAsync().ConfigureAwait(false);
+    }
+
+    public async Task SetMediaMutedAsync(bool isMuted)
+    {
+        CurrentSettings.IsMediaMuted = isMuted;
+        await SaveSettingsAsync().ConfigureAwait(false);
+    }
+
+    public async Task SetBackgroundMusicVolumeAsync(double volume)
+    {
+        CurrentSettings.BackgroundMusicVolume = Math.Clamp(volume, 0.0, 1.0);
+        await SaveSettingsAsync().ConfigureAwait(false);
+    }
+
+    public async Task SetBackgroundMusicMutedAsync(bool isMuted)
+    {
+        CurrentSettings.IsBackgroundMusicMuted = isMuted;
+        await SaveSettingsAsync().ConfigureAwait(false);
+    }
 }

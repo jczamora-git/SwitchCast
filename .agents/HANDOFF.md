@@ -3,92 +3,94 @@
 ---
 
 ## Task Details
-- **Task**: Startup Termination Investigation & Hotfix (WinRT COMException 0x80004005 Resolved, Synchronous Critical Flush Added, SwitchDeck Music & Cursor Controls Verified)
-- **Date**: 2026-10-19T20:47:00+08:00 (UTC+8)
-- **Status**: Completed, Validated & Ready for Local Commit (395 Tests Passing, 0 Build Warnings/Errors, Native Windows Startup Verified)
+- **Task**: Mandatory Dual-Player Isolation Guards (Video MediaPlayer vs Background Music MediaPlayer) & Regression Test Matrix
+- **Date**: 2026-10-19T21:07:00+08:00 (UTC+8)
+- **Status**: Completed, Validated & Ready for Local Commit (411 Tests Passing, 0 Build Warnings/Errors, Strict Dual-Player Coexistence Verified)
 
 ---
 
-## 1. Objectives & Confirmed Root Causes Resolved
+## 1. Objectives & Implementation Details
 
-1. **Startup Termination (COMException in WinRT.Runtime.dll / 0xFFFFFFFF Exit)**:
-   - **Captured Forensic Diagnostics**:
-     - Exception: `System.Runtime.InteropServices.COMException`
-     - HRESULT: `0x80004005 (E_FAIL / Unspecified error)`
-     - Managed Thread ID: `1` (Main UI / ASTA thread)
-     - Originating Call Stack:
-       ```
-       at ABI.System.Collections.Generic.IDictionaryMethods`2.Indexer_Get(IObjectReference obj, Dictionary`2 __lookupCache, K key)
-       at Microsoft.UI.Xaml.ResourceDictionary.get_Item(Object key)
-       at SwitchCast.Views.DashboardPage.DashboardPage_obj1_Bindings.LookupConverter(String key)
-       at SwitchCast.Views.DashboardPage.DashboardPage_obj1_Bindings.Update_ViewModel_IsMusicShuffleEnabled(Boolean obj, Int32 phase)
-       at SwitchCast.Views.DashboardPage.DashboardPage_obj1_Bindings.Initialize()
-       at SwitchCast.Views.DashboardPage.DashboardPage_obj1_Bindings.Loading(FrameworkElement src, Object data)
-       ```
-   - **Confirmed Root Cause**:
-     - `Views/DashboardPage.xaml` referenced `{StaticResource BoolToAccentBrushConverter}` and `{StaticResource InvertedBoolToVisibilityConverter}` without registering them in `App.xaml` or `Page.Resources`.
-     - When `MainWindow` activated and navigated to `DashboardPage`, WinUI 3 XAML compiled bindings executed `LookupConverter` during `Loading`, invoking native COM `ResourceDictionary::Lookup` for `"BoolToAccentBrushConverter"`. Missing resource lookups throw native COM `E_FAIL (0x80004005)`.
-     - Because this occurred during page loading on the ASTA UI message loop, it escaped as an unhandled terminating exception, causing process exit `-1` (`0xFFFFFFFF`).
-     - Process exit was so fast that asynchronous background file writes in `ErrorReportingService` were terminated before they could flush the stack trace to disk.
-   - **Remediation**:
-     - Replaced dynamic string-based converter lookups in `DashboardPage.xaml` with direct ViewModel properties:
-       - `EmptyPlaylistVisibility` and `PlaylistTracksVisibility` in `DashboardViewModel`.
-       - `MusicShuffleOpacity` and `MusicRepeatOpacity` in `DashboardViewModel` with `ThemeResource AppAccentBrush`.
-       - Replaced `InvertedBoolToVisibilityConverter` in `DataTemplate` with statically-qualified compile-time method binding `{x:Bind views:DashboardPage.InvertBoolToVisibility(IsAvailable), Mode=OneWay}`.
-     - Hardened `App.OnUnhandledException` to call `SwitchCastDiagnostics.LogCritical(...)` instead of `LogException`.
-     - Hardened `ErrorReportingService.FlushCriticalIncident(...)` to synchronously append exception type, hex HRESULT, message, thread ID, and stack trace to the daily log file before returning.
+1. **Strict Service Isolation**:
+   - `MediaPresentationService` exclusively owns its dedicated `MediaPlayer` for presentation output video.
+   - `BackgroundMusicService` exclusively owns its dedicated `MediaPlayer` for background music.
+   - Neither service shares `MediaPlayer` instances, `MediaSource` instances, mutable state, or disposal logic.
+   - `BackgroundMusicService` never calls `MediaPresentationService.StopVideoAsync`, `ClearVideoInternal`, or `PlayVideoAsync`.
+
+2. **Command Ownership**:
+   - Video transport commands exclusively control `MediaPresentationService`:
+     - `ToggleVideoPlaybackCommand`, `RestartVideoCommand`, `SeekBackward10Command`, `SeekForward10Command`, `ToggleMediaMuteCommand`, `StartScrubbing`, `CompleteScrubbing`.
+   - Music transport commands exclusively control `BackgroundMusicService`:
+     - `ToggleBackgroundMusicPlayPauseCommand`, `NextBackgroundMusicTrackCommand`, `PreviousBackgroundMusicTrackCommand`, `ToggleBackgroundMusicShuffleCommand`, `CycleBackgroundMusicRepeatModeCommand`, `ToggleBackgroundMusicMuteCommand`, `StartMusicScrubbing`, `CompleteMusicScrubbing`.
+   - Source switching commands (`NextSourceCommand`, `PreviousSourceCommand`, `SwitchSourceCommand`) and PowerPoint slide commands (`PowerPointNextSlideCommand`, `PowerPointPreviousSlideCommand`) remain strictly isolated from music track transport.
+
+3. **Independent State and Settings**:
+   - Video state: `VideoPositionSeconds`, `VideoDurationSeconds`, `VideoPositionText`, `MediaVolume`, `IsMediaMuted`, `IsVideoPlaying`, `IsVideoPaused`, `IsVideoEnded`.
+   - Music state: `BackgroundMusicPositionSeconds`, `BackgroundMusicDurationSeconds`, `BackgroundMusicPositionText`, `BackgroundMusicVolume`, `IsBackgroundMusicMuted`, `IsBackgroundMusicPlaying`, `BackgroundMusicTrackTitle`, `BackgroundMusicPlaylistName`, `BackgroundMusicRepeatMode`, `IsBackgroundMusicShuffleEnabled`.
+   - Settings isolation: Added `BackgroundMusicVolume` and `IsBackgroundMusicMuted` to `UserSettings.cs`. Added explicit helper methods `SetMediaVolumeAsync`, `SetMediaMutedAsync`, `SetBackgroundMusicVolumeAsync`, and `SetBackgroundMusicMutedAsync` to `IApplicationSettingsService` and `ApplicationSettingsService`.
+
+4. **Independent Playback Lifecycle**:
+   - Source transitions (`Window -> Video -> PowerPoint -> Camera -> Video`) do not stop, recreate, or reset background music.
+   - Music track changes do not alter On Air presentation source.
+   - Pausing video does not pause music; pausing music does not pause video.
+   - Video ended does not advance music playlist; music ended does not advance presentation sources.
+   - The only intentional coordination is the explicit `StopPresentationAsync` session-stop policy in `PresentationCoordinator.ExecuteStopPresentationAsync`, which stops both video and background music when a presentation session concludes.
+
+5. **Player Lifetime Safety**:
+   - `MediaPresentationService.Dispose()` and `BackgroundMusicService.Dispose()` are completely independent.
+   - No shared `MediaSource`, no stale callbacks, no unobserved playback tasks, and no double disposal.
+
+6. **Audio Safeguards**:
+   - Both players play through the default Windows audio output simultaneously without master system volume mutation.
+   - Per-instance volume and mute controls; no automatic ducking or mutual muting.
+
+7. **SwitchDeck UI Isolation**:
+   - Music controls live in a dedicated contextual popup available across all sources.
+   - Source-specific secondary rows (Video playback controls, PowerPoint slide controls) remain completely intact and functional.
+
+8. **Mandatory 16-Test Regression Matrix**:
+   - Implemented in `SwitchCast.Tests/Services/DualPlayerIsolationTests.cs`:
+     - `Test01`: Play Video & Music simultaneously -> Pause Video -> Music continues.
+     - `Test02`: Play Video & Music simultaneously -> Pause Music -> Video continues.
+     - `Test03`: Change Music volume -> Video volume remains unchanged.
+     - `Test04`: Mute Video -> Music remains audible / unmuted.
+     - `Test05`: Mute Music -> Video remains audible / unmuted.
+     - `Test06`: Seek Video -> Music position remains unchanged.
+     - `Test07`: Seek Music -> Video position remains unchanged.
+     - `Test08`: Video reaches end -> Music playlist and track remain unaffected.
+     - `Test09`: Music reaches end -> Music advances according to repeat mode -> Video unaffected.
+     - `Test10`: Switch Video -> PowerPoint -> Camera -> Video -> Music continues without restarting.
+     - `Test11`: Change music playlist while Video is live -> On Air source remains unchanged.
+     - `Test12`: Click SwitchDeck Next Source -> Music track does not change.
+     - `Test13`: Click SwitchDeck Next Music Track -> Presentation source does not change.
+     - `Test14`: Stop Presenting -> Both player sessions stop per explicit session-stop policy -> MainWindow remains alive.
+     - `Test15`: Close/hide SwitchDeck non-destructively -> Music and presentation continue uninterrupted.
+     - `Test16`: Rapidly switch sources while changing tracks -> No deadlock, player disposal race, or unhandled exceptions.
 
 ---
 
 ## 2. Verification Performed
 
-- **Automated Tests**: 395 passing tests (0 failures, 0 skipped) across all test fixtures.
+- **Automated Tests**: **411 passing tests (0 failures, 0 skipped)** across all test fixtures.
 - **Compiler Gates**:
-  - `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> 0 Errors, 0 Warnings.
-  - `dotnet build SwitchCast.csproj -c Release -p:Platform=x64` -> 0 Errors, 0 Warnings.
-  - `dotnet test SwitchCast.Tests/SwitchCast.Tests.csproj -c Debug` -> 395 Passed, 0 Failed.
-- **Native Windows Startup Verification**:
-  - 3-cycle automated native launch, verification, and clean close loop passed without errors.
-  - Native Release x64 binary execution verified: `PID=24940, HWND=462294, Responding=True`.
-  - Continuous 10s run verification confirmed process remains alive and responsive.
+  - `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64 --no-incremental` -> 0 Errors, 0 Warnings.
+  - `dotnet build SwitchCast.csproj -c Release -p:Platform=x64 --no-incremental` -> 0 Errors, 0 Warnings.
+  - `dotnet test SwitchCast.Tests/SwitchCast.Tests.csproj -c Debug` -> 411 Passed, 0 Failed, 0 Skipped.
 
 ---
 
 ## 3. Important Files Modified
 
-- `SwitchCast/Views/DashboardPage.xaml`: Replaced missing dynamic static resource converters with ViewModel opacity and visibility properties and static method binding.
-- `SwitchCast/Views/DashboardPage.xaml.cs`: Added `InvertBoolToVisibility` static method for compile-time verified XAML binding.
-- `SwitchCast/ViewModels/DashboardViewModel.cs`: Added `EmptyPlaylistVisibility`, `PlaylistTracksVisibility`, `MusicShuffleOpacity`, and `MusicRepeatOpacity`.
-- `SwitchCast/App.xaml.cs`: Routed `OnUnhandledException` through `LogCritical` for synchronous crash flushes.
-- `SwitchCast/Services/Diagnostics/ErrorReportingService.cs`: Added synchronous daily log file flush in `FlushCriticalIncident` to prevent log drop on immediate process termination.
-
----
-
-## 2. Verification Performed
-
-- **Unit & Contract Tests**: 372 passing tests (0 failures, 0 skipped) across all test fixtures.
-- **Compiler Gates**:
-  - `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> 0 Errors, 0 Warnings.
-  - `dotnet build SwitchCast.csproj -c Release -p:Platform=x64` -> 0 Errors, 0 Warnings.
-  - `dotnet test SwitchCast.Tests/SwitchCast.Tests.csproj -c Debug` -> 372 Passed, 0 Failed.
-- **Runtime Verification Note**: Unit and integration test harnesses verified all lifecycle state transitions, event unsubscriptions, and concurrency deduplications. Interactive Windows desktop session was not independently exercised in this headless CLI environment.
-
----
-
-## 3. Important Files Modified
-
-- `SwitchCast/Views/PresentationWindow.xaml`: Added `x:Name="PresentationOutputImage"` and `x:Name="PresentationDirectImage"` for explicit detachment.
-- `SwitchCast/Views/PresentationWindow.xaml.cs`: Added idempotent `Cleanup()` method detaching Image sources, MediaPlayer, compiled bindings, event handlers, and disposing ViewModel.
-- `SwitchCast/Services/PresentationWindowService.cs`: Invokes `target.Cleanup()` on `ClosePresentationWindow()` and in `OnWindowClosed()`.
-- `SwitchCast/Services/Capture/Direct3D11PresentationRenderer.cs`: Updated `Clear()` to atomically increment generation without racing `SetBitmapAsync`, and handled `OperationCanceledException`.
-- `SwitchCast/Services/Capture/Direct3D11PreviewRenderer.cs`: Added `OperationCanceledException` handling across render methods.
-- `SwitchCast/Services/PresentationCoordinator.cs`: Reordered stop lifecycle sequence and implemented `_activeStopTask` idempotency deduplication.
-- `SwitchCast.Tests/Services/StopLifecycleNativeCrashRecoveryTests.cs` *(New)*: Comprehensive regression test suite covering Stop sequence, source drain order, and concurrency deduplication.
+- `SwitchCast/Models/UserSettings.cs`: Added `BackgroundMusicVolume` and `IsBackgroundMusicMuted`.
+- `SwitchCast/Services/IApplicationSettingsService.cs`: Added `SetMediaVolumeAsync`, `SetMediaMutedAsync`, `SetBackgroundMusicVolumeAsync`, and `SetBackgroundMusicMutedAsync`.
+- `SwitchCast/Services/ApplicationSettingsService.cs`: Implemented isolated media and background music volume/mute persistence methods.
+- `SwitchCast/Services/Media/MediaPresentationService.cs`: Cleanly wired settings updates.
+- `SwitchCast.Tests/Services/DualPlayerIsolationTests.cs` *(New)*: Complete 16-test mandatory regression matrix verifying player independence, command separation, settings isolation, and concurrency safety.
 
 ---
 
 ## 4. Next Steps for Next Agent
 
-1. Run native stress test scenarios across mixed sources on actual Windows hardware session.
-2. Confirm WER / LocalDumps remain clean with 0 AccessViolations during rapid presentation stop cycles.
-3. Keep the 0-error and 0-warning compiler gate intact.
+1. Maintain dual-player isolation in any future audio ducking or master transport feature requests.
+2. Ensure new presentation source types (e.g. browser, PDF) respect the non-interference rule for `BackgroundMusicService`.
+3. Keep the 0-error and 0-warning compiler gate intact across Debug and Release x64 builds.
