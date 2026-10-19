@@ -12,8 +12,8 @@ public sealed partial class SourcesPage : Page
 {
     public SourcesPage()
     {
-        InitializeComponent();
         ViewModel = App.Current.Services.GetRequiredService<SourcesViewModel>();
+        InitializeComponent();
         ViewModel.SetDispatcherQueue(DispatcherQueue);
     }
 

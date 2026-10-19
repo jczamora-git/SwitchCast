@@ -38,6 +38,11 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
     private int _selectedCategoryIndex = 1; // 0 = All Sources, 1 = Application Windows, 2 = Displays, 3 = Media Files, 4 = PowerPoint, 5 = Cameras
 
     [ObservableProperty]
+    private SourceCategoryOption? _selectedCategoryOption;
+
+    public ObservableCollection<SourceCategoryOption> CategoryOptions { get; }
+
+    [ObservableProperty]
     private bool _showQueuedOnly;
 
     [ObservableProperty]
@@ -97,6 +102,17 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
         _settingsService = settingsService;
         _dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
         _dispatcher = UIThreadDispatcherProvider.Resolve(null);
+
+        CategoryOptions =
+        [
+            new SourceCategoryOption(0, "All Sources", 0),
+            new SourceCategoryOption(1, "Application Windows", 0),
+            new SourceCategoryOption(2, "Displays & Monitors", 0),
+            new SourceCategoryOption(3, "Media Files", 0),
+            new SourceCategoryOption(4, "PowerPoint", 0),
+            new SourceCategoryOption(5, "Cameras", 0)
+        ];
+        _selectedCategoryOption = CategoryOptions[1];
 
         DisplayedSources = [];
         _presentationStateService.PropertyChanged += OnPresentationStatePropertyChanged;
@@ -178,14 +194,7 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
     public int TotalSourcesCount => _allWindows.Count + _allDisplays.Count + _allMedia.Count + _allPowerPoint.Count + _allCameras.Count;
 
     public IReadOnlyList<string> CategoryDisplayOptions =>
-    [
-        $"All Sources ({TotalSourcesCount})",
-        WindowCategoryHeader,
-        DisplayCategoryHeader,
-        MediaCategoryHeader,
-        PowerPointCategoryHeader,
-        CameraCategoryHeader
-    ];
+        CategoryOptions.Select(c => c.DisplayText).ToList();
 
     public string EmptyStateTitle
     {
@@ -657,11 +666,19 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
 
     private void UpdateCategoryHeaders()
     {
-        WindowCategoryHeader = $"Application Windows ({_allWindows.Count})";
-        DisplayCategoryHeader = $"Displays & Monitors ({_allDisplays.Count})";
-        MediaCategoryHeader = $"Media Files ({_allMedia.Count})";
-        PowerPointCategoryHeader = $"PowerPoint ({_allPowerPoint.Count})";
-        CameraCategoryHeader = $"Cameras ({_allCameras.Count})";
+        CategoryOptions[0].UpdateCount(TotalSourcesCount);
+        CategoryOptions[1].UpdateCount(_allWindows.Count);
+        CategoryOptions[2].UpdateCount(_allDisplays.Count);
+        CategoryOptions[3].UpdateCount(_allMedia.Count);
+        CategoryOptions[4].UpdateCount(_allPowerPoint.Count);
+        CategoryOptions[5].UpdateCount(_allCameras.Count);
+
+        WindowCategoryHeader = CategoryOptions[1].DisplayText;
+        DisplayCategoryHeader = CategoryOptions[2].DisplayText;
+        MediaCategoryHeader = CategoryOptions[3].DisplayText;
+        PowerPointCategoryHeader = CategoryOptions[4].DisplayText;
+        CameraCategoryHeader = CategoryOptions[5].DisplayText;
+
         OnPropertyChanged(nameof(TotalSourcesCount));
         OnPropertyChanged(nameof(CategoryDisplayOptions));
     }
@@ -727,6 +744,18 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
 
     partial void OnSelectedCategoryIndexChanged(int value)
     {
+        if (value < 0 || value >= CategoryOptions.Count)
+        {
+            value = 1;
+            SelectedCategoryIndex = 1;
+            return;
+        }
+
+        if (SelectedCategoryOption != CategoryOptions[value])
+        {
+            SelectedCategoryOption = CategoryOptions[value];
+        }
+
         OnPropertyChanged(nameof(IsAllSourcesCategorySelected));
         OnPropertyChanged(nameof(IsWindowsCategorySelected));
         OnPropertyChanged(nameof(IsDisplaysCategorySelected));
@@ -734,6 +763,14 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsPowerPointCategorySelected));
         OnPropertyChanged(nameof(IsCameraCategorySelected));
         ApplyFilter();
+    }
+
+    partial void OnSelectedCategoryOptionChanged(SourceCategoryOption? value)
+    {
+        if (value is not null && SelectedCategoryIndex != value.CategoryIndex)
+        {
+            SelectedCategoryIndex = value.CategoryIndex;
+        }
     }
 
     partial void OnShowQueuedOnlyChanged(bool value)
@@ -817,7 +854,8 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
                 2 => _allDisplays,
                 3 => _allMedia,
                 4 => _allPowerPoint,
-                _ => _allCameras
+                5 => _allCameras,
+                _ => _allWindows
             };
 
             if (ShowQueuedOnly)
