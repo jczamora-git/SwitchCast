@@ -12,6 +12,7 @@ namespace SwitchCast.Services.Capture;
 public sealed class CaptureSessionManager : ICaptureSessionManager
 {
     private readonly object _syncLock = new();
+    private readonly Performance.IPerformanceMetricsService? _metricsService;
     private GraphicsCaptureItem? _item;
     private Direct3D11CaptureFramePool? _framePool;
     private GraphicsCaptureSession? _session;
@@ -22,6 +23,11 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
     private int _isProcessingFrame;
     private long _sessionGeneration;
     private bool _isCursorCaptureEnabled = true;
+
+    public CaptureSessionManager(Performance.IPerformanceMetricsService? metricsService = null)
+    {
+        _metricsService = metricsService;
+    }
 
     public event EventHandler<FrameArrivedEventArgs>? FrameArrived;
     public event EventHandler? SourceClosed;
@@ -188,11 +194,13 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
 
     private void OnFrameArrived(Direct3D11CaptureFramePool sender, object args)
     {
+        _metricsService?.RecordFrameCaptured();
         long currentGen = Volatile.Read(ref _sessionGeneration);
 
         // Pacing & Backpressure: If previous frame conversion is still running, drain and drop this frame
         if (Interlocked.CompareExchange(ref _isProcessingFrame, 1, 0) != 0)
         {
+            _metricsService?.RecordFrameDropped();
             try
             {
                 using var skipped = sender.TryGetNextFrame();

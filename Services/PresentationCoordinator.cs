@@ -30,6 +30,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
     private readonly IPresenterDockService? _presenterDockService;
     private readonly IApplicationSettingsService? _settingsService;
     private readonly Services.Music.IBackgroundMusicService? _backgroundMusicService;
+    private readonly Services.Performance.IPerformanceMetricsService? _performanceMetricsService;
     private readonly SemaphoreSlim _transitionSemaphore = new(1, 1);
 
     private CaptureSource? _targetRequestedPresentationSource;
@@ -62,7 +63,8 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         ICameraCaptureService? cameraCaptureService = null,
         IPresenterDockService? presenterDockService = null,
         IApplicationSettingsService? settingsService = null,
-        Services.Music.IBackgroundMusicService? backgroundMusicService = null)
+        Services.Music.IBackgroundMusicService? backgroundMusicService = null,
+        Services.Performance.IPerformanceMetricsService? performanceMetricsService = null)
     {
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
         _presentationWindowService = presentationWindowService ?? throw new ArgumentNullException(nameof(presentationWindowService));
@@ -78,6 +80,7 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         _presenterDockService = presenterDockService;
         _settingsService = settingsService;
         _backgroundMusicService = backgroundMusicService;
+        _performanceMetricsService = performanceMetricsService;
 
         if (_settingsService is not null)
         {
@@ -300,6 +303,8 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
 
         Debug.WriteLine($"[PresentationCoordinator] StartPresentation requested seq={sequence} source={targetSource.Id} type={targetSource.Type}");
 
+        var startupSw = Stopwatch.StartNew();
+
         await _transitionSemaphore.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -469,6 +474,8 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
                 _presenterDockService?.ShowDock();
             }
 
+            _performanceMetricsService?.RecordPresentationStartup(startupSw.Elapsed.TotalMilliseconds);
+
             Debug.WriteLine($"[PresentationCoordinator] StartPresentation completed seq={sequence} source={targetSource.Id}");
         }
         catch (Exception ex)
@@ -601,6 +608,8 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
         Volatile.Write(ref _targetRequestedPresentationSource, newSource);
 
         Debug.WriteLine($"[PresentationCoordinator] SwitchPresentation requested seq={sequence} target={newSource.Id} type={newSource.Type}");
+
+        var switchSw = Stopwatch.StartNew();
 
         await _transitionSemaphore.WaitAsync().ConfigureAwait(false);
         try
@@ -796,6 +805,8 @@ public sealed partial class PresentationCoordinator : ObservableObject, IPresent
             {
                 ActivatePresentationOutput();
             }
+
+            _performanceMetricsService?.RecordSourceSwitch(switchSw.Elapsed.TotalMilliseconds);
 
             Debug.WriteLine($"[PresentationCoordinator] SwitchPresentation completed seq={sequence} target={newSource.Id}");
         }

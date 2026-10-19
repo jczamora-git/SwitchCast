@@ -1,3 +1,5 @@
+using SwitchCast.Models.Performance;
+
 namespace SwitchCast.Models;
 
 /// <summary>
@@ -9,6 +11,16 @@ public class UserSettings
     /// Preferred application UI theme.
     /// </summary>
     public ApplicationThemeOption Theme { get; set; } = ApplicationThemeOption.System;
+
+    /// <summary>
+    /// Configured adaptive rendering mode (Auto, PreferHardware, CompatibilityMode).
+    /// </summary>
+    public RenderingMode RenderingMode { get; set; } = RenderingMode.Auto;
+
+    /// <summary>
+    /// Whether lightweight performance diagnostics and metrics logging are enabled.
+    /// </summary>
+    public bool EnablePerformanceDiagnostics { get; set; } = false;
 
     /// <summary>
     /// Last saved window width in DIPs.

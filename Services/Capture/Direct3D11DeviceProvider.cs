@@ -11,10 +11,16 @@ namespace SwitchCast.Services.Capture;
 public sealed class Direct3D11DeviceProvider : IDirect3D11DeviceProvider
 {
     private readonly object _lock = new();
+    private readonly Performance.IPerformanceMetricsService? _metricsService;
     private IntPtr _d3d11DevicePtr = IntPtr.Zero;
     private IntPtr _immediateContextPtr = IntPtr.Zero;
     private IDirect3DDevice? _winrtDevice;
     private bool _isDisposed;
+
+    public Direct3D11DeviceProvider(Performance.IPerformanceMetricsService? metricsService = null)
+    {
+        _metricsService = metricsService;
+    }
 
     public IDirect3DDevice Device
     {
@@ -119,6 +125,7 @@ public sealed class Direct3D11DeviceProvider : IDirect3D11DeviceProvider
                 return;
             }
 
+            _metricsService?.RecordDeviceReset();
             ReleaseDeviceUnsafe();
             EnsureDevice();
         }

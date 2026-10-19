@@ -17,14 +17,16 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
 
     private readonly DispatcherQueue _dispatcherQueue;
     private readonly SoftwareBitmapSource _softwareBitmapSource;
+    private readonly Performance.IPerformanceMetricsService? _metricsService;
     private long _lastRenderTimestamp;
     private long _currentGeneration;
     private int _isProcessingFrame;
     private bool _isEnabled = true;
     private bool _isDisposed;
 
-    public Direct3D11PreviewRenderer()
+    public Direct3D11PreviewRenderer(Performance.IPerformanceMetricsService? metricsService = null)
     {
+        _metricsService = metricsService;
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread() ??
                            throw new InvalidOperationException("Direct3D11PreviewRenderer must be created on a thread with an active DispatcherQueue.");
         _softwareBitmapSource = new SoftwareBitmapSource();
@@ -87,6 +89,7 @@ public sealed class Direct3D11PreviewRenderer : ICapturePreviewRenderer
                 if (!_isDisposed && _isEnabled && (targetGen == 0 || targetGen >= Volatile.Read(ref _currentGeneration)))
                 {
                     await _softwareBitmapSource.SetBitmapAsync(sharedBitmap.Bitmap);
+                    _metricsService?.RecordPreviewFramePresented();
                 }
             }
             catch (OperationCanceledException)

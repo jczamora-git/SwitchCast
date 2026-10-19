@@ -191,6 +191,10 @@ public partial class App : Application
         services.AddSingleton<SwitchCast.Services.Diagnostics.IDiagnosticReportBuilder, SwitchCast.Services.Diagnostics.DiagnosticReportBuilder>();
         services.AddSingleton<SwitchCast.Services.Diagnostics.IErrorReportingService, SwitchCast.Services.Diagnostics.ErrorReportingService>();
 
+        // Performance & Capability Services
+        services.AddSingleton<SwitchCast.Services.Performance.IGraphicsCapabilityService, SwitchCast.Services.Performance.GraphicsCapabilityService>();
+        services.AddSingleton<SwitchCast.Services.Performance.IPerformanceMetricsService, SwitchCast.Services.Performance.PerformanceMetricsService>();
+
         // ViewModels
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<SourcesViewModel>();
@@ -206,6 +210,7 @@ public partial class App : Application
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
+        var startupStopwatch = System.Diagnostics.Stopwatch.StartNew();
         base.OnLaunched(args);
 
         // Preload persistent user settings before initializing UI
@@ -320,6 +325,9 @@ public partial class App : Application
         }
 
         _mainWindow.Activate();
+
+        var metricsService = Services.GetService<SwitchCast.Services.Performance.IPerformanceMetricsService>();
+        metricsService?.RecordStartupDuration(startupStopwatch.Elapsed.TotalMilliseconds);
     }
 
     private SwitchCast.Services.Diagnostics.UIHangWatchdog? _uiHangWatchdog;

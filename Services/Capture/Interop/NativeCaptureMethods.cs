@@ -15,6 +15,67 @@ public static class NativeCaptureMethods
     public static readonly Guid IID_IGraphicsCaptureItemInterop = new("3628E81B-3CAC-4C60-B7F4-23CE0E0C3356");
     public static readonly Guid IID_IInspectable = new("AF86E2E0-B12D-4C6A-9C5A-D7AA65101E90");
     public static readonly Guid IID_IDXGIDevice = new("54EC77FA-1377-44E6-8C32-88FD5F44C84C");
+    public static readonly Guid IID_IDXGIFactory1 = new("770aae78-f26f-4dba-a829-253c83d1b387");
+    public static readonly Guid IID_IDXGIAdapter1 = new("29038f61-3839-4626-91fd-086879011a05");
+
+    public const int DXGI_ERROR_NOT_FOUND = unchecked((int)0x887A0002);
+    public const uint DXGI_ADAPTER_FLAG_SOFTWARE = 2;
+
+    [DllImport("dxgi.dll", ExactSpelling = true)]
+    public static extern int CreateDXGIFactory1(
+        [In] ref Guid riid,
+        [MarshalAs(UnmanagedType.Interface)] out IDXGIFactory1 ppFactory);
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct DXGI_ADAPTER_DESC1
+    {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string Description;
+        public uint VendorId;
+        public uint DeviceId;
+        public uint SubSysId;
+        public uint Revision;
+        public UIntPtr DedicatedVideoMemory;
+        public UIntPtr DedicatedSystemMemory;
+        public UIntPtr SharedSystemMemory;
+        public long AdapterLuid;
+        public uint Flags;
+    }
+
+    [ComImport]
+    [Guid("770aae78-f26f-4dba-a829-253c83d1b387")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IDXGIFactory1
+    {
+        int SetPrivateData(ref Guid Name, uint DataSize, IntPtr pData);
+        int SetPrivateDataInterface(ref Guid Name, [MarshalAs(UnmanagedType.IUnknown)] object pUnknown);
+        int GetPrivateData(ref Guid Name, ref uint pDataSize, IntPtr pData);
+        int GetParent(ref Guid riid, out IntPtr ppParent);
+        int EnumAdapters(uint Adapter, out IntPtr ppAdapter);
+        int MakeWindowAssociation(IntPtr WindowHandle, uint Flags);
+        int GetWindowAssociation(out IntPtr pWindowHandle);
+        int CreateSwapChain(IntPtr pDevice, IntPtr pDesc, out IntPtr ppSwapChain);
+        int CreateSoftwareAdapter(IntPtr Module, out IntPtr ppAdapter);
+        [PreserveSig]
+        int EnumAdapters1(uint Adapter, [MarshalAs(UnmanagedType.Interface)] out IDXGIAdapter1 ppAdapter);
+        [PreserveSig]
+        int IsCurrent();
+    }
+
+    [ComImport]
+    [Guid("29038f61-3839-4626-91fd-086879011a05")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IDXGIAdapter1
+    {
+        int SetPrivateData(ref Guid Name, uint DataSize, IntPtr pData);
+        int SetPrivateDataInterface(ref Guid Name, [MarshalAs(UnmanagedType.IUnknown)] object pUnknown);
+        int GetPrivateData(ref Guid Name, ref uint pDataSize, IntPtr pData);
+        int GetParent(ref Guid riid, out IntPtr ppParent);
+        int GetDesc(IntPtr pDesc);
+        int CheckInterfaceSupport(ref Guid InterfaceName, out long pUMDVersion);
+        [PreserveSig]
+        int GetDesc1(out DXGI_ADAPTER_DESC1 pDesc);
+    }
 
     [DllImport("d3d11.dll", ExactSpelling = true)]
     public static extern int D3D11CreateDevice(
