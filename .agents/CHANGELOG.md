@@ -7,6 +7,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.5.0 — Lightweight Performance & Adaptive Rendering] - 2026-10-20
+
+### Added (feat / perf / graphics / directx / adaptive)
+- **Hardware Capability Detection Service (`IGraphicsCapabilityService`, `GraphicsCapabilityService`)**:
+  - Implemented zero-allocation native DXGI 1.1 COM adapter enumeration (`CreateDXGIFactory1`, `EnumAdapters1`, `DXGI_ADAPTER_DESC1`).
+  - Probes physical/virtual graphics adapters, dedicated VRAM, shared system memory, vendor ID (Intel, NVIDIA, AMD, Microsoft), and hardware/software flags.
+  - Probes Direct3D 11 hardware acceleration and exact feature levels (11.1, 11.0, 10.1, 10.0, 9.3).
+  - Probes WARP software rasterizer device creation.
+  - Automatically identifies integrated GPUs (iGPUs) based on shared memory architecture to adapt resource profiles without forcing CPU software rendering.
+  - Caches capability queries and refreshes when device loss or display topology changes occur.
+- **In-Memory Performance Telemetry Service (`IPerformanceMetricsService`, `PerformanceMetricsService`)**:
+  - Implemented thread-safe, non-blocking atomic performance counter tracking (`Interlocked.Increment`, `Interlocked.Exchange`, `Stopwatch.GetTimestamp()`).
+  - Measures application cold startup duration, presentation startup latency, source switch latency, preview FPS, output FPS, frame drops, queue depth, GPU device reset counts, and process memory.
+  - Zero disk logging in hot frame acquisition path.
+- **Adaptive Rendering Backend Selection (`RenderingMode`)**:
+  - Added user-selectable modes: `Auto (Recommended)`, `Prefer Hardware`, and `Compatibility Mode`.
+  - Upgraded `IDirect3D11DeviceProvider` and `Direct3D11DeviceProvider` to initialize Direct3D 11 devices based on selected mode:
+    - `Auto`: Prefers hardware acceleration; automatically falls back to WARP software rasterizer if hardware initialization fails.
+    - `Prefer Hardware`: Enforces hardware D3D11 device creation; reports exact HRESULT without silent software fallback.
+    - `Compatibility Mode`: Directly initializes WARP software rasterizer (`D3D_DRIVER_TYPE_WARP`) for troubleshooting problematic or crashing GPU drivers.
+  - Corrected `D3D_DRIVER_TYPE_WARP = 5` in `NativeCaptureMethods.cs` (previously misdeclared as 2).
+  - Added `SetRenderingMode(mode)` supporting live backend switching with safe device recreation.
+- **Performance Settings Page (`Views/SettingsPage.xaml`, `ViewModels/SettingsViewModel.cs`)**:
+  - Added dedicated **Performance & Adaptive Rendering** category (Sidebar index 6, glyph `\uE9E9`).
+  - Rendering mode selection `ComboBox` (`Auto (Recommended)`, `Prefer Hardware`, `Compatibility Mode`).
+  - 3-card summary strip displaying Active Backend (`ActiveBackendText` & `HardwareAccelerationStatus`), Primary Graphics Adapter (Name & VRAM), and Direct3D Feature Level & Vendor.
+  - Adaptive Resource Profile notification banner informing presenter of current GPU profile.
+  - In-memory performance diagnostics toggle switch (`EnablePerformanceDiagnostics`).
+  - "Refresh Hardware Info" button bound to `RefreshPerformanceDataCommand`.
+  - Persisted `RenderingMode` and `EnablePerformanceDiagnostics` in `settings.json`.
+
+### Optimized (perf / capture / pipeline / memory)
+- **Direct Native Surface Copying**:
+  - Updated `CaptureSessionManager.cs` to copy surfaces directly with `BitmapAlphaMode.Premultiplied` in a single native pass via `SoftwareBitmap.CreateCopyFromSurfaceAsync(surface, BitmapAlphaMode.Premultiplied)`.
+  - Completely bypassed the secondary `SoftwareBitmap.Convert(...)` allocation and copy loop, saving ~8.3 MB per frame at 1080p and preventing unified memory bus thrashing on integrated GPUs.
+- **Self-Healing Device Loss Recovery**:
+  - Added automatic device-loss recovery in `CaptureSessionManager.cs` handling `DXGI_ERROR_DEVICE_REMOVED` (`0x887A0005`), `DXGI_ERROR_DEVICE_RESET` (`0x887A0007`), and `DXGI_ERROR_DEVICE_HUNG` (`0x887A0006`).
+  - Automatically resets `_deviceProvider`, increments metrics, and recreates `Direct3D11CaptureFramePool` without closing or recreating `MainWindow` or `SwitchDeck`.
+  - In `CaptureCoordinator.cs`, wired device reset and single recovery retry if capture start fails in `Auto` mode.
+
+### Tests & Verification (test / build / quality-gates)
+- **463 Passing Tests**: Expanded automated test suite from 443 to 463 tests (+20 new tests across `GraphicsCapabilityServiceTests`, `PerformanceMetricsServiceTests`, `Direct3D11DeviceProviderTests`, and `SettingsViewModelTests`).
+- **Clean Compiler Validation**: Debug x64 and Release x64 builds verified with 0 warnings and 0 errors.
+
+---
+
 ## [v1.4.0 — Fix Playlist Refresh After Import] - 2026-10-20
 
 ### Fixed (fix / ui / music / playlists / threading)

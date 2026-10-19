@@ -7,15 +7,45 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Version**: v1.4.0 — Fix Playlist Refresh After Import (Immediate Import Refresh, Mini Refresh Button, In-Place Reconciliation, Thread-Safe Collection Synchronization)
-- **Overall Status**: **Implemented & Validated (443 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
-- **Last Updated**: 2026-10-20T01:10:00+08:00 (UTC+8)
+- **Project**: SwitchCast
+- **Current Version**: v1.5.0 — Lightweight Performance & Adaptive Rendering (Phased Implementation: Capability Probing, Adaptive Backend Selection, GPU-Backed Frame Pipeline, Device Loss Recovery, Performance Settings UI)
+- **Overall Status**: **Implemented & Validated (463 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
+- **Last Updated**: 2026-10-20T02:05:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **v1.5.0 Lightweight Performance & Adaptive Rendering**:
+  - **Phase A — Hardware Capability Detection & In-Memory Performance Telemetry**:
+    - `IGraphicsCapabilityService` & `GraphicsCapabilityService`: Zero-allocation native DXGI 1.1 adapter enumeration (`CreateDXGIFactory1`, `EnumAdapters1`, `DXGI_ADAPTER_DESC1`) extracting adapter name, dedicated VRAM, shared system memory, vendor ID, and software flags.
+    - Probes Direct3D 11 hardware capability and exact feature levels (11.1, 11.0, 10.1, 10.0, 9.3) as well as WARP software rasterizer device creation.
+    - Accurately detects integrated GPUs (Intel UHD/Iris Xe, AMD Vega) to adapt queue pacing and memory footprint without forcing software rendering. Caches results and auto-refreshes on device change.
+    - `IPerformanceMetricsService` & `PerformanceMetricsService`: Real-time thread-safe performance counter aggregation (`Interlocked.Increment`, `Interlocked.Exchange`, `Stopwatch.GetTimestamp()`) for cold startup duration, presentation startup latency, source switch latency, preview FPS, output FPS, frame drops, queue depth, device reset count, and process memory with zero per-frame disk writes.
+  - **Phase B — Adaptive Rendering Backend Selection**:
+    - Implemented user-selectable `RenderingMode`: `Auto (Recommended)`, `Prefer Hardware`, and `Compatibility Mode`.
+    - Enhanced `IDirect3D11DeviceProvider` and `Direct3D11DeviceProvider` to initialize Direct3D 11 devices based on selected mode:
+      - `Auto`: Attempts hardware acceleration; seamlessly falls back to WARP software rasterizer if hardware creation fails.
+      - `Prefer Hardware`: Enforces hardware D3D11 device creation; reports exact HRESULT without silent software fallback.
+      - `Compatibility Mode`: Directly requests WARP software rasterizer (`D3D_DRIVER_TYPE_WARP`) for troubleshooting problematic or crashing GPU drivers.
+    - Corrected `D3D_DRIVER_TYPE_WARP = 5` in `NativeCaptureMethods.cs` (previously misdeclared as 2).
+    - Added `SetRenderingMode(mode)` supporting live backend switching with safe device recreation.
+  - **Phase C — GPU-Backed Frame Processing Improvements**:
+    - Optimized `CaptureSessionManager.cs` to copy surfaces directly with `BitmapAlphaMode.Premultiplied` in a single native pass via `SoftwareBitmap.CreateCopyFromSurfaceAsync(surface, BitmapAlphaMode.Premultiplied)`.
+    - Completely bypassed the secondary `SoftwareBitmap.Convert(...)` allocation and copy loop, saving ~8.3 MB per frame at 1080p and preventing unified memory bus thrashing on integrated GPUs.
+    - Enforced strict rate-limiting on dashboard preview (~15 FPS) in `Direct3D11PreviewRenderer.cs`, protecting audience-facing output priority.
+  - **Phase D & E — Software Fallback & Self-Healing Device Recovery**:
+    - Added automatic device-loss recovery in `CaptureSessionManager.cs` handling `DXGI_ERROR_DEVICE_REMOVED` (`0x887A0005`), `DXGI_ERROR_DEVICE_RESET` (`0x887A0007`), and `DXGI_ERROR_DEVICE_HUNG` (`0x887A0006`). Automatically resets `_deviceProvider`, increments metrics, and recreates `Direct3D11CaptureFramePool` without closing or recreating `MainWindow` or `SwitchDeck`.
+    - In `CaptureCoordinator.cs`, wired device reset and single recovery retry if capture start fails in `Auto` mode.
+  - **Phase F — Performance Settings UI & Documentation**:
+    - Added dedicated **Performance & Adaptive Rendering** category to `Views/SettingsPage.xaml` and `ViewModels/SettingsViewModel.cs` (Sidebar index 6, glyph `\uE9E9`).
+    - Rendering mode selection `ComboBox` (`Auto (Recommended)`, `Prefer Hardware`, `Compatibility Mode`).
+    - 3-card summary strip displaying Active Backend (`ActiveBackendText` & `HardwareAccelerationStatus`), Primary Graphics Adapter (Name & VRAM), and Direct3D Feature Level & Vendor.
+    - Adaptive Resource Profile notification banner informing presenter of current GPU profile.
+    - In-memory performance diagnostics toggle switch (`EnablePerformanceDiagnostics`).
+    - "Refresh Hardware Info" button bound to `RefreshPerformanceDataCommand`.
+  - **Automated Test Matrix**: 463 unit & regression tests passing (100% pass rate).
 - [x] **v1.4.0 Fix Playlist Refresh After Import**:
   - **Automatic Refresh After Audio Import**:
     - Dispatched `playlist.Tracks.Add(t)`, `playlist.NotifyTracksChanged()`, and `PlaylistChanged` to UI thread via `RunOnUIThreadAsync` and `IUIThreadDispatcher` in `BackgroundMusicService.AddTracksAsync`. WinUI 3 `ObservableVector` adapter receives collection notifications synchronously on the UI thread without dropping changes.
