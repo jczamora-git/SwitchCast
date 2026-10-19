@@ -16,6 +16,7 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
     private readonly ICaptureSessionManager _sessionManager;
     private readonly ICapturePreviewRenderer _previewRenderer;
     private readonly IPresentationStateService _presentationStateService;
+    private readonly IWin32DiagnosticCaptureService? _diagnosticCaptureService;
     private readonly SemaphoreSlim _transitionSemaphore = new(1, 1);
 
     private CaptureSource? _targetRequestedSource;
@@ -35,13 +36,15 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
         IDirect3D11DeviceProvider deviceProvider,
         ICaptureSessionManager sessionManager,
         ICapturePreviewRenderer previewRenderer,
-        IPresentationStateService presentationStateService)
+        IPresentationStateService presentationStateService,
+        IWin32DiagnosticCaptureService? diagnosticCaptureService = null)
     {
         _itemFactory = itemFactory ?? throw new ArgumentNullException(nameof(itemFactory));
         _deviceProvider = deviceProvider ?? throw new ArgumentNullException(nameof(deviceProvider));
         _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
         _previewRenderer = previewRenderer ?? throw new ArgumentNullException(nameof(previewRenderer));
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
+        _diagnosticCaptureService = diagnosticCaptureService;
 
         _sessionManager.FrameArrived += OnFrameArrived;
         _sessionManager.SourceClosed += OnSourceClosed;
@@ -103,7 +106,19 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
             LastErrorMessage = null;
 
             var captureItem = _itemFactory.CreateItemForSource(source);
-            _sessionManager.StartCapture(captureItem, _deviceProvider);
+            try
+            {
+                _sessionManager.StartCapture(captureItem, _deviceProvider);
+            }
+            catch (Exception ex) when (_deviceProvider.ActiveMode == Models.Performance.RenderingMode.Auto)
+            {
+                // Auto mode: if capture start failed, reset device and attempt one recovery retry
+                SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.LogWarning(
+                    nameof(CaptureCoordinator),
+                    $"Capture start failed ({ex.Message}). Retrying with device reset.");
+                _deviceProvider.ResetDevice();
+                _sessionManager.StartCapture(captureItem, _deviceProvider);
+            }
 
             State = CaptureState.Capturing;
             _presentationStateService.SetActiveSource(source);
@@ -188,7 +203,19 @@ public sealed partial class CaptureCoordinator : ObservableObject, ICaptureCoord
             LastErrorMessage = null;
 
             var captureItem = _itemFactory.CreateItemForSource(targetSource);
-            _sessionManager.StartCapture(captureItem, _deviceProvider);
+            try
+            {
+                _sessionManager.StartCapture(captureItem, _deviceProvider);
+            }
+            catch (Exception ex) when (_deviceProvider.ActiveMode == Models.Performance.RenderingMode.Auto)
+            {
+                // Auto mode: if capture switch failed, reset device and attempt one recovery retry
+                SwitchCast.Services.Diagnostics.SwitchCastDiagnostics.LogWarning(
+                    nameof(CaptureCoordinator),
+                    $"Capture switch failed ({ex.Message}). Retrying with device reset.");
+                _deviceProvider.ResetDevice();
+                _sessionManager.StartCapture(captureItem, _deviceProvider);
+            }
 
             State = CaptureState.Capturing;
             _presentationStateService.SetActiveSource(targetSource);

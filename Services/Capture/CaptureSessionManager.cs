@@ -2,6 +2,7 @@ using Windows.Graphics;
 using Windows.Graphics.Capture;
 using Windows.Graphics.DirectX;
 using Windows.Graphics.Imaging;
+using SwitchCast.Services.Diagnostics;
 
 namespace SwitchCast.Services.Capture;
 
@@ -255,7 +256,8 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
                     var surface = frame.Surface;
                     if (surface is not null && Volatile.Read(ref _sessionGeneration) == currentGen)
                     {
-                        softwareBitmap = await SoftwareBitmap.CreateCopyFromSurfaceAsync(surface);
+                        // Copy directly with Premultiplied alpha in single native pass, avoiding redundant secondary SoftwareBitmap.Convert allocation
+                        softwareBitmap = await SoftwareBitmap.CreateCopyFromSurfaceAsync(surface, BitmapAlphaMode.Premultiplied);
                     }
                 }
                 finally
@@ -270,10 +272,10 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
                     return;
                 }
 
-                // Ensure pixel format is BGRA8 with Premultiplied alpha for WinUI rendering
+                // Defensive fallback: ensure BGRA8 / Premultiplied format for WinUI rendering pipeline
                 SoftwareBitmap displayBitmap;
                 if (softwareBitmap.BitmapPixelFormat != BitmapPixelFormat.Bgra8 ||
-                    softwareBitmap.BitmapAlphaMode == BitmapAlphaMode.Straight)
+                    softwareBitmap.BitmapAlphaMode != BitmapAlphaMode.Premultiplied)
                 {
                     displayBitmap = SoftwareBitmap.Convert(
                         softwareBitmap,
@@ -298,6 +300,34 @@ public sealed class CaptureSessionManager : ICaptureSessionManager
                 // If no renderer took a ref, displayBitmap is disposed immediately.
                 using var sharedBitmap = new RefCountedSoftwareBitmap(displayBitmap, initialRefCount: 1);
                 FrameArrived?.Invoke(this, new FrameArrivedEventArgs(sharedBitmap, currentGen));
+            }
+            catch (System.Runtime.InteropServices.COMException comEx) when (
+                comEx.HResult == unchecked((int)0x887A0005) /* DXGI_ERROR_DEVICE_REMOVED */ ||
+                comEx.HResult == unchecked((int)0x887A0007) /* DXGI_ERROR_DEVICE_RESET */ ||
+                comEx.HResult == unchecked((int)0x887A0006) /* DXGI_ERROR_DEVICE_HUNG */)
+            {
+                SwitchCastDiagnostics.LogWarning(nameof(CaptureSessionManager), $"DirectX device removed/reset detected (0x{comEx.HResult:X8}). Triggering device recovery.");
+                _metricsService?.RecordDeviceReset();
+                try
+                {
+                    _deviceProvider?.ResetDevice();
+                    lock (_syncLock)
+                    {
+                        if (_isCapturing && _framePool is not null && _deviceProvider is not null)
+                        {
+                            _framePool.Recreate(
+                                _deviceProvider.Device,
+                                DirectXPixelFormat.B8G8R8A8UIntNormalized,
+                                2,
+                                _lastSize);
+                        }
+                    }
+                }
+                catch (Exception recoveryEx)
+                {
+                    SwitchCastDiagnostics.LogException(nameof(CaptureSessionManager), "DeviceRecovery", recoveryEx);
+                    CaptureError?.Invoke(this, comEx);
+                }
             }
             catch (Exception ex) when (ex is ObjectDisposedException or OperationCanceledException or System.Runtime.InteropServices.COMException)
             {
