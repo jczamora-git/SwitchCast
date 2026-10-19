@@ -10,57 +10,74 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <Grid HorizontalAlignment="Stretch">
-            <StackPanel Spacing="16" Padding="28,20,28,28" MaxWidth="1160" HorizontalAlignment="Stretch">
+            <StackPanel x:Name="RootContentStackPanel"
+                        Spacing="16"
+                        Padding="24,18,24,24"
+                        MaxWidth="1120"
+                        HorizontalAlignment="Stretch"
+                        SizeChanged="OnRootContentSizeChanged">
             
             <!-- Header & Actions -->
-            <Grid>
+            <Grid x:Name="HeaderGrid" RowSpacing="8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-                <StackPanel Grid.Column="0" Spacing="3">
+                <StackPanel Grid.Row="0" Grid.Column="0" Spacing="3" VerticalAlignment="Center">
                     <TextBlock Text="Sources"
                                FontSize="22"
                                FontWeight="SemiBold"
                                Foreground="{ThemeResource AppTextPrimaryBrush}" />
-                    <TextBlock Text="Select application windows, displays, and media files to include in your presentation."
+                    <TextBlock Text="Select windows, displays, and media to include in your presentation."
                                FontSize="12"
                                Foreground="{ThemeResource AppTextSecondaryBrush}" />
                 </StackPanel>
 
                 <!-- Actions Header Strip -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <StackPanel x:Name="HeaderActionsPanel"
+                            Grid.Row="0"
+                            Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            VerticalAlignment="Center">
                     <!-- Add Media Button (visible when All Sources or Media Files selected) -->
                     <Button Command="{x:Bind ViewModel.AddMediaCommand}"
                             Visibility="{x:Bind ViewModel.IsMediaCategorySelected, Mode=OneWay}"
                             Style="{StaticResource SubtleButtonStyle}"
                             VerticalAlignment="Center"
                             Padding="12,6"
-                            ToolTipService.ToolTip="Import local images (PNG, JPG, BMP) and videos (MP4, WMV)">
+                            ToolTipService.ToolTip="Import local images (PNG, JPG, BMP) and videos (MP4, WMV)"
+                            AutomationProperties.Name="Add Media">
                         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                             <FontIcon Glyph="&#xE710;" FontSize="13" />
                             <TextBlock Text="Add Media" FontSize="12" />
                         </StackPanel>
                     </Button>
 
-                    <!-- Import PowerPoint Button -->
+                    <!-- Import PowerPoint Button (Primary Action) -->
                     <Button Command="{x:Bind ViewModel.AddPowerPointCommand}"
                             Style="{StaticResource PrimaryAccentButtonStyle}"
                             VerticalAlignment="Center"
                             Padding="14,6"
-                            ToolTipService.ToolTip="Import PowerPoint presentation (.pptx)">
+                            ToolTipService.ToolTip="Import PowerPoint presentation (.pptx)"
+                            AutomationProperties.Name="Import PowerPoint">
                         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                             <FontIcon Glyph="&#xE8A1;" FontSize="13" />
                             <TextBlock Text="Import PowerPoint" FontSize="12" />
                         </StackPanel>
                     </Button>
 
-                    <!-- Refresh Button -->
+                    <!-- Refresh Button (Secondary Action) -->
                     <Button Command="{x:Bind ViewModel.RefreshSourcesCommand}"
                             VerticalAlignment="Center"
                             Padding="14,6"
-                            ToolTipService.ToolTip="Rescan running windows and connected monitors">
+                            ToolTipService.ToolTip="Rescan running windows and connected monitors"
+                            AutomationProperties.Name="Refresh sources">
                         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                             <FontIcon Glyph="&#xE72C;" FontSize="13" />
                             <TextBlock Text="Refresh" FontSize="12" />
@@ -76,34 +93,62 @@
                      Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
                      IsClosable="True" />
 
+            <!-- Import Success Notice with View Action -->
+            <InfoBar IsOpen="{x:Bind ViewModel.HasImportNotice, Mode=OneWay}"
+                     Severity="Success"
+                     Title="{x:Bind ViewModel.ImportNoticeMessage, Mode=OneWay}"
+                     IsClosable="True"
+                     Closed="OnImportNoticeClosed">
+                <InfoBar.ActionButton>
+                    <Button Content="View"
+                            Command="{x:Bind ViewModel.ViewImportedSourceCommand}"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            FontSize="12"
+                            Padding="8,4"
+                            AutomationProperties.Name="View imported source" />
+                </InfoBar.ActionButton>
+            </InfoBar>
+
             <!-- Dedicated Search & Category Selector Toolbar -->
             <Border Background="{ThemeResource AppSurfaceBrush}"
                     BorderBrush="{ThemeResource AppBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="8"
                     Padding="12,10">
-                <Grid ColumnSpacing="12" RowSpacing="8">
+                <Grid x:Name="ToolbarGrid" ColumnSpacing="10" RowSpacing="8">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="220" />
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                    <!-- Compact Category Selection Dropdown -->
-                    <ComboBox Grid.Column="0"
-                              ItemsSource="{x:Bind ViewModel.CategoryDisplayOptions, Mode=OneWay}"
-                              SelectedIndex="{x:Bind ViewModel.SelectedCategoryIndex, Mode=TwoWay}"
-                              HorizontalAlignment="Stretch"
-                              FontSize="12"
-                              Padding="10,6"
-                              ToolTipService.ToolTip="Select source category" />
-
-                    <!-- Dedicated Search Input with Clear Action -->
-                    <Grid Grid.Column="1" HorizontalAlignment="Stretch">
-                        <TextBox Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                 PlaceholderText="Search title, process, app, or file name..."
+                    <!-- Dedicated Search Input with Left Search Icon & Clear Action -->
+                    <Grid x:Name="SearchBoxContainer"
+                          Grid.Row="0"
+                          Grid.Column="0"
+                          MinWidth="240"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Center">
+                        <TextBox x:Name="SearchBox"
+                                 Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 PlaceholderText="Search windows, displays, media, or PowerPoint..."
                                  FontSize="12"
+                                 Padding="32,6,30,6"
                                  HorizontalAlignment="Stretch"
-                                 VerticalAlignment="Center" />
+                                 VerticalAlignment="Center"
+                                 AutomationProperties.Name="Search windows, displays, media, or PowerPoint" />
+                        <FontIcon Glyph="&#xE721;"
+                                  FontSize="12"
+                                  Foreground="{ThemeResource AppTextTertiaryBrush}"
+                                  HorizontalAlignment="Left"
+                                  VerticalAlignment="Center"
+                                  Margin="10,0,0,0"
+                                  IsHitTestVisible="False" />
                         <Button Command="{x:Bind ViewModel.ClearSearchCommand}"
                                 Visibility="{x:Bind ViewModel.IsSearchQueryNotEmpty, Mode=OneWay}"
                                 HorizontalAlignment="Right"
@@ -111,12 +156,45 @@
                                 Margin="0,0,4,0"
                                 Padding="6,4"
                                 Style="{StaticResource SubtleButtonStyle}"
-                                ToolTipService.ToolTip="Clear search">
+                                ToolTipService.ToolTip="Clear search"
+                                AutomationProperties.Name="Clear search query">
                             <FontIcon Glyph="&#xE711;" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
                         </Button>
                     </Grid>
+
+                    <!-- Compact Category Selection Dropdown -->
+                    <ComboBox x:Name="CategoryComboBox"
+                              Grid.Row="0"
+                              Grid.Column="1"
+                              Width="210"
+                              ItemsSource="{x:Bind ViewModel.CategoryDisplayOptions, Mode=OneWay}"
+                              SelectedIndex="{x:Bind ViewModel.SelectedCategoryIndex, Mode=TwoWay}"
+                              HorizontalAlignment="Left"
+                              FontSize="12"
+                              Padding="10,6"
+                              ToolTipService.ToolTip="Select source category"
+                              AutomationProperties.Name="Select source category" />
+
+                    <!-- Compact Queued Only Filter -->
+                    <CheckBox x:Name="QueuedOnlyCheckBox"
+                              Grid.Row="0"
+                              Grid.Column="2"
+                              IsChecked="{x:Bind ViewModel.ShowQueuedOnly, Mode=TwoWay}"
+                              Content="Queued Only"
+                              FontSize="12"
+                              VerticalAlignment="Center"
+                              Margin="4,0,0,0"
+                              ToolTipService.ToolTip="Filter visible results to only queued sources without modifying presentation queue"
+                              AutomationProperties.Name="Filter by queued only" />
                 </Grid>
             </Border>
+
+            <!-- Search / Filter Results Feedback -->
+            <Grid Visibility="{x:Bind ViewModel.HasSearchFeedback, Mode=OneWay}" Margin="2,-4,2,0">
+                <TextBlock Text="{x:Bind ViewModel.SearchFeedbackText, Mode=OneWay}"
+                           FontSize="12"
+                           Foreground="{ThemeResource AppTextSecondaryBrush}" />
+            </Grid>
 
             <!-- Loading Indicator -->
             <StackPanel Visibility="{x:Bind ViewModel.IsRefreshing, Mode=OneWay}"
@@ -156,6 +234,10 @@
                                HorizontalAlignment="Center"
                                TextAlignment="Center" />
                     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0,6,0,0">
+                        <Button Content="Clear Search"
+                                Command="{x:Bind ViewModel.ClearSearchCommand}"
+                                Visibility="{x:Bind ViewModel.IsSearchQueryNotEmpty, Mode=OneWay}"
+                                Style="{StaticResource SubtleButtonStyle}" />
                         <Button Content="Add Media"
                                 Command="{x:Bind ViewModel.AddMediaCommand}"
                                 Visibility="{x:Bind ViewModel.IsMediaCategorySelected, Mode=OneWay}"
@@ -164,7 +246,7 @@
                                 Command="{x:Bind ViewModel.AddPowerPointCommand}"
                                 Visibility="{x:Bind ViewModel.IsPowerPointCategorySelected, Mode=OneWay}"
                                 Style="{StaticResource PrimaryAccentButtonStyle}" />
-                        <Button Content="Scan Again"
+                        <Button Content="Refresh"
                                 Command="{x:Bind ViewModel.RefreshSourcesCommand}" />
                     </StackPanel>
                 </StackPanel>
@@ -218,7 +300,7 @@
                             <!-- Title & Metadata -->
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1" Margin="0,0,12,0">
                                 <TextBlock Text="{x:Bind Title}"
-                                           FontSize="12"
+                                           FontSize="13"
                                            FontWeight="SemiBold"
                                            Foreground="{ThemeResource AppTextPrimaryBrush}"
                                            TextTrimming="CharacterEllipsis"
@@ -247,15 +329,16 @@
                                 <TextBlock Text="Unavailable" FontSize="10" Foreground="{ThemeResource SystemFillColorCautionBrush}" FontWeight="SemiBold" />
                             </Border>
 
-                            <!-- Remove Button (Media files only) -->
+                            <!-- Remove Button (Media and PowerPoint files only) -->
                             <Button Grid.Column="3"
                                     Click="OnRemoveMediaClicked"
                                     Visibility="{x:Bind RemoveButtonVisibility, Mode=OneWay}"
                                     Style="{ThemeResource SubtleButtonStyle}"
                                     Padding="6,4"
                                     Margin="0,0,8,0"
-                                    ToolTipService.ToolTip="Remove from media library"
-                                    VerticalAlignment="Center">
+                                    ToolTipService.ToolTip="Remove from library"
+                                    VerticalAlignment="Center"
+                                    AutomationProperties.Name="Remove from library">
                                 <FontIcon Glyph="&#xE74D;" FontSize="12" Foreground="{ThemeResource AppTextTertiaryBrush}" />
                             </Button>
 
@@ -265,14 +348,16 @@
                                       Content="Queue"
                                       FontSize="12"
                                       IsEnabled="{x:Bind IsAvailable, Mode=OneWay}"
-                                      VerticalAlignment="Center" />
+                                      VerticalAlignment="Center"
+                                      AutomationProperties.Name="{x:Bind Title, Mode=OneWay}" />
                         </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
             <!-- Selection Queue Summary Footer -->
-            <Grid Padding="14,10"
+            <Grid x:Name="QueueSummaryFooter"
+                  Padding="14,10"
                   Background="{ThemeResource AppSurfaceBrush}"
                   BorderBrush="{ThemeResource AppBorderBrush}"
                   BorderThickness="1"
@@ -282,19 +367,17 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <FontIcon Glyph="&#xE8B7;" FontSize="13" Foreground="{ThemeResource AppAccentBrush}" VerticalAlignment="Center" />
-                    <TextBlock Text="{x:Bind ViewModel.SelectedSourceCount, Mode=OneWay}"
+                    <TextBlock Text="{x:Bind ViewModel.QueueSummaryText, Mode=OneWay}"
                                FontSize="12"
-                               FontWeight="Bold"
-                               Foreground="{ThemeResource AppTextPrimaryBrush}" />
-                    <TextBlock Text="sources in presentation queue"
-                               FontSize="12"
-                               Foreground="{ThemeResource AppTextSecondaryBrush}"
+                               FontWeight="SemiBold"
+                               Foreground="{ThemeResource AppTextPrimaryBrush}"
                                VerticalAlignment="Center" />
                 </StackPanel>
 
-                <TextBlock Grid.Column="1"
+                <TextBlock x:Name="QueueSummaryHotkeyHint"
+                           Grid.Column="1"
                            Text="Switch sources via hotkeys (Ctrl+Shift+Right/Left) or Presenter Dock."
                            FontSize="11"
                            Foreground="{ThemeResource AppTextSecondaryBrush}"
@@ -305,3 +388,4 @@
         </Grid>
     </ScrollViewer>
 </Page>
+

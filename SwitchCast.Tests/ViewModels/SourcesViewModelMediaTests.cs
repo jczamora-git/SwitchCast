@@ -129,4 +129,53 @@ public class SourcesViewModelMediaTests
         _mockStateService.Verify(s => s.RemoveSelectedSource(item.Id), Times.Once);
         _mockSettingsService.Verify(s => s.SaveSettingsAsync(), Times.Exactly(2));
     }
+
+    [Fact]
+    public async Task AddMediaAsync_WhenFilteredOutByCategory_ShowsImportNoticeWithViewAction()
+    {
+        var filePath = @"C:\Images\Photo.png";
+        var imageSource = new ImageMediaSource
+        {
+            Id = $"media:{filePath.ToLowerInvariant()}",
+            Title = "Photo.png",
+            FilePath = filePath,
+            IsAvailable = true
+        };
+
+        _mockMediaPickerService.Setup(p => p.PickMediaFilesAsync())
+            .ReturnsAsync(new List<string> { filePath });
+        _mockMediaDiscoveryService.Setup(d => d.CreateMediaSourceFromFileAsync(filePath))
+            .ReturnsAsync(imageSource);
+
+        var vm = new SourcesViewModel(
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockMonitorService.Object,
+            _mockIconService.Object,
+            _mockMediaDiscoveryService.Object,
+            _mockMediaPickerService.Object,
+            _mockSettingsService.Object)
+        {
+            SelectedCategoryIndex = 1 // Application Windows category
+        };
+
+        await vm.AddMediaAsync();
+
+        // The imported media was not added to DisplayedSources because Windows category is selected
+        Assert.Empty(vm.DisplayedSources);
+
+        // An import notice with View action was raised
+        Assert.True(vm.HasImportNotice);
+        Assert.Equal("Photo.png imported successfully", vm.ImportNoticeMessage);
+
+        // Clicking View executes ViewImportedSourceCommand
+        vm.ViewImportedSourceCommand.Execute(null);
+
+        // View action switched category to Media (3) and dismissed notice
+        Assert.False(vm.HasImportNotice);
+        Assert.Equal(3, vm.SelectedCategoryIndex);
+        Assert.Single(vm.DisplayedSources);
+        Assert.Equal("Photo.png", vm.DisplayedSources[0].Title);
+    }
 }
+

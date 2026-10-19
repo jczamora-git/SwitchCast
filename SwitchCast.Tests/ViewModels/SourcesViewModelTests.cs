@@ -159,4 +159,83 @@ public class SourcesViewModelTests
         Assert.Contains("PowerPoint (0)", options[4]);
         Assert.Contains("Cameras (0)", options[5]);
     }
+
+    [Fact]
+    public async Task ShowQueuedOnly_FiltersToOnlySelectedSources()
+    {
+        var vm = new SourcesViewModel(_mockStateService.Object, _mockWindowService.Object, _mockMonitorService.Object);
+        await vm.RefreshSourcesCommand.ExecuteAsync(null);
+
+        Assert.Equal(3, vm.DisplayedSources.Count);
+
+        // Select the second source
+        _mockStateService.Setup(s => s.IsSourceSelected("win-2")).Returns(true);
+        _mockStateService.Setup(s => s.SelectedSourceCount).Returns(1);
+
+        vm.ShowQueuedOnly = true;
+
+        Assert.Single(vm.DisplayedSources);
+        Assert.Equal("win-2", vm.DisplayedSources[0].Id);
+
+        // Toggling off restores all sources
+        vm.ShowQueuedOnly = false;
+        Assert.Equal(3, vm.DisplayedSources.Count);
+    }
+
+    [Fact]
+    public void QueueSummaryText_ReflectsSelectedCountCorrectly()
+    {
+        _mockStateService.SetupGet(s => s.SelectedSourceCount).Returns(0);
+        var vm = new SourcesViewModel(_mockStateService.Object, _mockWindowService.Object, _mockMonitorService.Object);
+        Assert.Equal("0 sources queued", vm.QueueSummaryText);
+
+        _mockStateService.SetupGet(s => s.SelectedSourceCount).Returns(1);
+        Assert.Equal("1 source queued", vm.QueueSummaryText);
+
+        _mockStateService.SetupGet(s => s.SelectedSourceCount).Returns(3);
+        Assert.Equal("3 sources queued", vm.QueueSummaryText);
+    }
+
+    [Fact]
+    public async Task SearchFeedbackText_UpdatesBasedOnSearchQueryAndResults()
+    {
+        var vm = new SourcesViewModel(_mockStateService.Object, _mockWindowService.Object, _mockMonitorService.Object);
+        await vm.RefreshSourcesCommand.ExecuteAsync(null);
+
+        Assert.False(vm.HasSearchFeedback);
+
+        vm.SearchQuery = "Visual";
+        Assert.True(vm.HasSearchFeedback);
+        Assert.Equal("1 result", vm.SearchFeedbackText);
+
+        vm.SearchQuery = "o"; // matches VS Code and Chrome (2 sources)
+        Assert.True(vm.HasSearchFeedback);
+        Assert.Equal("2 results", vm.SearchFeedbackText);
+
+        vm.ClearSearchCommand.Execute(null);
+        Assert.False(vm.HasSearchFeedback);
+    }
+
+    [Fact]
+    public async Task EmptyState_ProvidesAccurateTextForQueuedOnlyAndSearch()
+    {
+        var vm = new SourcesViewModel(_mockStateService.Object, _mockWindowService.Object, _mockMonitorService.Object);
+        await vm.RefreshSourcesCommand.ExecuteAsync(null);
+
+        // Search that yields no results
+        vm.SearchQuery = "NonExistentTermXYZ";
+        Assert.True(vm.IsEmpty);
+        Assert.Equal("No matching sources", vm.EmptyStateTitle);
+        Assert.Equal("Try another search term or change the category.", vm.EmptyStateSubtitle);
+
+        vm.ClearSearchCommand.Execute(null);
+        Assert.False(vm.IsEmpty);
+
+        // Queued only when nothing is queued
+        vm.ShowQueuedOnly = true;
+        Assert.True(vm.IsEmpty);
+        Assert.Equal("No queued sources", vm.EmptyStateTitle);
+        Assert.Contains("No sources are currently queued", vm.EmptyStateSubtitle);
+    }
 }
+

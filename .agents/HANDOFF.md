@@ -3,17 +3,33 @@
 ---
 
 ## Task Details
-- **Task**: SWITCHCAST v1.4.0 — UI & Playback Stability Recovery: Immediate Import Refresh, Responsive Sources, Direct Playlist Track Selection and Stutter Fixes
-- **Date**: 2026-10-20T00:15:00+08:00 (UTC+8)
-- **Status**: Completed, Validated & Ready for Local Commit (432 Tests Passing, 0 Build Warnings/Errors, Clean UI Architecture)
+- **Task**: SWITCHCAST v1.4.0 — Responsive Sources Page Specification (Layout Hierarchy, Search Toolbar, Queued Only Filtering, Queue Summary, Polite Import Feedback)
+- **Date**: 2026-10-20T00:35:00+08:00 (UTC+8)
+- **Status**: Completed, Validated & Ready for Local Commit (437 Tests Passing, 0 Build Warnings/Errors, Clean UI Architecture)
 
 ---
 
 ## 1. Objectives & Outcomes
 
-1. **Delayed Import Refresh Resolved**:
-   - **Root Cause**: Mutations to source and playlist collections were not always marshalled onto the WinUI `DispatcherQueue`, and `SourcesViewModel` did not automatically switch categories or clear restrictive search queries after an import completed. `MusicLibraryViewModel.SelectedPlaylistTracks` was previously exposed as `IReadOnlyList<MusicTrack>` rather than `ObservableCollection<MusicTrack>`, which caused the XAML ListView not to bind to `INotifyCollectionChanged`.
-   - **Fix**: Updated `SelectedPlaylistTracks` to return `ObservableCollection<MusicTrack>`. In `SourcesViewModel.AddPowerPointAsync` and `AddMediaAsync`, the view model now automatically switches to the imported category (or All Sources), clears non-matching search queries, and refreshes the list on the UI thread immediately.
+1. **Responsive 4-Area Hierarchy**:
+   - **Header**: Title "Sources", subtitle "Select windows, displays, and media to include in your presentation." Actions: Primary "Import PowerPoint" (`PrimaryAccentButtonStyle`), Secondary "Refresh", and "Add Media". Right-aligned on desktop (>=840px), cleanly wrapped to row 1 on smaller viewports without clipping or squeezing.
+   - **Dedicated Search & Filter Toolbar**: Search box with left search glyph (`\uE721`), right clear-search action, placeholder `Search windows, displays, media, or PowerPoint...`, min width 240px. Compact category dropdown `ComboBox` (210px width) containing all 6 categories with live counts. Compact "Queued Only" filter checkbox.
+   - **Source Results**: Compact source cards (~52-56px height) with 32x32 icon tile (app icon or glyph), primary title with character ellipsis and full title tooltip, secondary metadata, availability badge, delete button (for Media and PowerPoint), and queue checkbox with `AutomationProperties.Name` bound to title.
+   - **Queue Summary Footer**: Displays `{count} sources queued`. On wide desktop (>=840px), includes hotkey hint (`• Switch sources via hotkeys (Ctrl+Shift+Right/Left) or Presenter Dock.`); on smaller viewports, secondary hint collapses to keep queue controls visible.
+
+2. **3-Tier Measured Responsive Layout**:
+   - Evaluated based on available Sources content width (`RootContentStackPanel.ActualWidth`):
+     - `Wide (>=840px)`: Single-row toolbar, header actions right-aligned, queue summary hint visible.
+     - `Medium (560-839px)`: Header actions wrap below title, search occupies full row, category dropdown and Queued Only share second row, hint collapsed.
+     - `Narrow (<560px)`: Header actions wrap; search, category dropdown, and Queued Only stack vertically; hint collapsed.
+   - Zero horizontal clipping or page scrolling down to 895x690 windowed mode.
+
+3. **Polite Import Notifications**:
+   - When PowerPoint or media is imported while active category, search, or Queued Only filters hide it, a non-intrusive `InfoBar` appears: `"{fileName} imported successfully"` with a "View" button.
+   - Clicking "View" activates `ViewImportedSourceCommand`, switching category and clearing conflicting search queries without silently erasing user search terms during background imports.
+
+4. **Selection Re-Entrancy Guard**:
+   - Wrapped `ApplyFilter()` selection state syncing loop in `_isSyncingSelection = true` guard, preventing selection change events from re-entering `ApplyFilter()` during list population.
 
 2. **Redesigned Responsive Sources Filtering**:
    - Replaced horizontal radio buttons with a compact category selector dropdown (`ComboBox`) featuring all 6 categories with live counts: All Sources, Application Windows, Displays & Monitors, Media Files, PowerPoint, Cameras.

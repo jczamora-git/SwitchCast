@@ -35,7 +35,10 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
     private bool _isSyncingSelection;
 
     [ObservableProperty]
-    private int _selectedCategoryIndex = 0; // 0 = Windows, 1 = Displays, 2 = Media Files, 3 = PowerPoint, 4 = Cameras
+    private int _selectedCategoryIndex = 0; // 0 = All Sources, 1 = Windows, 2 = Displays, 3 = Media Files, 4 = PowerPoint, 5 = Cameras
+
+    [ObservableProperty]
+    private bool _showQueuedOnly;
 
     [ObservableProperty]
     private string _searchQuery = string.Empty;
@@ -48,6 +51,14 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private string _errorMessage = string.Empty;
+
+    [ObservableProperty]
+    private bool _hasImportNotice;
+
+    [ObservableProperty]
+    private string _importNoticeMessage = string.Empty;
+
+    private Action? _viewImportedAction;
 
     [ObservableProperty]
     private string _windowCategoryHeader = "Application Windows (0)";
@@ -140,6 +151,8 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
 
     public bool HasSelectedSources => SelectedSourceCount > 0;
 
+    public string QueueSummaryText => SelectedSourceCount == 1 ? "1 source queued" : $"{SelectedSourceCount} sources queued";
+
     public bool HasDiscoveredSources => DisplayedSources.Count > 0;
 
     public bool IsEmpty => !IsRefreshing && DisplayedSources.Count == 0;
@@ -158,6 +171,10 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
 
     public bool IsSearchQueryNotEmpty => !string.IsNullOrWhiteSpace(SearchQuery);
 
+    public bool HasSearchFeedback => IsSearchQueryNotEmpty && HasDiscoveredSources;
+
+    public string SearchFeedbackText => DisplayedSources.Count == 1 ? "1 result" : $"{DisplayedSources.Count} results";
+
     public int TotalSourcesCount => _allWindows.Count + _allDisplays.Count + _allMedia.Count + _allPowerPoint.Count + _allCameras.Count;
 
     public IReadOnlyList<string> CategoryDisplayOptions =>
@@ -170,27 +187,68 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
         CameraCategoryHeader
     ];
 
-    public string EmptyStateTitle => SelectedCategoryIndex switch
+    public string EmptyStateTitle
     {
-        0 => "No Presentation Sources Found",
-        1 => "No Application Windows Found",
-        2 => "No Displays Detected",
-        3 => "No Media Files Imported",
-        4 => "No PowerPoint Presentations Imported",
-        _ => "No Cameras Detected"
-    };
-
-    public string EmptyStateSubtitle => string.IsNullOrWhiteSpace(SearchQuery)
-        ? (SelectedCategoryIndex switch
+        get
         {
-            0 => "No presentation sources discovered. Click Refresh or import files.",
-            1 => "No running desktop application windows are currently visible. Launch an application and click Refresh.",
-            2 => "No display monitors detected on this system. Click Refresh to scan again.",
-            3 => "Import local images and videos to present them directly without third-party applications. Click 'Add Media'.",
-            4 => "Import PowerPoint decks (.pptx) to present slides directly or launch live slideshows. Click 'Import PowerPoint'.",
-            _ => "No webcam or USB video capture devices detected. Connect a camera and click Refresh."
-        })
-        : $"No presentation sources match '{SearchQuery}'.";
+            if (IsSearchQueryNotEmpty)
+            {
+                return "No matching sources";
+            }
+            if (ShowQueuedOnly)
+            {
+                return "No queued sources";
+            }
+            return SelectedCategoryIndex switch
+            {
+                0 => "No Presentation Sources Found",
+                1 => "No matching application windows",
+                2 => "No Displays Detected",
+                3 => "No Media Files Imported",
+                4 => "No PowerPoint files imported",
+                _ => "No cameras detected"
+            };
+        }
+    }
+
+    public string EmptyStateSubtitle
+    {
+        get
+        {
+            if (IsSearchQueryNotEmpty)
+            {
+                return "Try another search term or change the category.";
+            }
+            if (ShowQueuedOnly)
+            {
+                return "No sources are currently queued in this category. Check the Queue box on any source to include it.";
+            }
+            return SelectedCategoryIndex switch
+            {
+                0 => "No presentation sources discovered. Click Refresh or import files.",
+                1 => "No running desktop application windows are currently visible. Launch an application and click Refresh.",
+                2 => "No display monitors detected on this system. Click Refresh to scan again.",
+                3 => "Import local images and videos to present them directly without third-party applications. Click 'Add Media'.",
+                4 => "Import PowerPoint decks (.pptx) to present slides directly or launch live slideshows. Click 'Import PowerPoint'.",
+                _ => "No webcam or USB video capture devices detected. Connect a camera and click Refresh."
+            };
+        }
+    }
+
+    [RelayCommand]
+    public void ViewImportedSource()
+    {
+        _viewImportedAction?.Invoke();
+        _viewImportedAction = null;
+        HasImportNotice = false;
+    }
+
+    [RelayCommand]
+    public void DismissImportNotice()
+    {
+        HasImportNotice = false;
+        _viewImportedAction = null;
+    }
 
     [RelayCommand]
     public async Task RefreshSourcesAsync()
@@ -366,6 +424,8 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
                 StringComparer.OrdinalIgnoreCase);
 
             bool addedAny = false;
+            SelectableSourceItem? lastAddedItem = null;
+
             foreach (var path in pickedPaths)
             {
                 if (string.IsNullOrWhiteSpace(path) || existingPaths.Contains(path))
@@ -380,6 +440,7 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
                     var item = new SelectableSourceItem(mediaSource, isSelected, OnItemSelectionChanged);
                     _allMedia.Add(item);
                     existingPaths.Add(path);
+                    lastAddedItem = item;
                     addedAny = true;
                 }
             }
@@ -398,18 +459,29 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
                     await _settingsService.SaveSettingsAsync().ConfigureAwait(true);
                 }
 
-                if (SelectedCategoryIndex != 3 && SelectedCategoryIndex != 0)
-                {
-                    SelectedCategoryIndex = 3;
-                }
-
-                if (!string.IsNullOrWhiteSpace(SearchQuery))
-                {
-                    SearchQuery = string.Empty;
-                }
-
                 UpdateCategoryHeaders();
                 ApplyFilter();
+
+                // Provide feedback if active category or filters exclude the imported item
+                if (lastAddedItem != null && !IsItemVisibleUnderFilter(lastAddedItem, 3))
+                {
+                    var fileName = Path.GetFileName((lastAddedItem.Source as MediaFileSource)?.FilePath ?? lastAddedItem.Title);
+                    ImportNoticeMessage = $"{fileName} imported successfully";
+                    _viewImportedAction = () =>
+                    {
+                        SelectedCategoryIndex = 3;
+                        ShowQueuedOnly = false;
+                        if (!string.IsNullOrWhiteSpace(SearchQuery) && !MatchesSearch(lastAddedItem, SearchQuery))
+                        {
+                            SearchQuery = string.Empty;
+                        }
+                    };
+                    HasImportNotice = true;
+                }
+                else
+                {
+                    HasImportNotice = false;
+                }
             }
         }
         catch (Exception ex)
@@ -470,6 +542,8 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
                 StringComparer.OrdinalIgnoreCase);
 
             bool addedAny = false;
+            SelectableSourceItem? lastAddedItem = null;
+
             foreach (var path in pickedPaths)
             {
                 if (string.IsNullOrWhiteSpace(path) || existingPaths.Contains(path) || !File.Exists(path))
@@ -491,6 +565,7 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
                 var item = new SelectableSourceItem(pptSource, isSelected, OnItemSelectionChanged);
                 _allPowerPoint.Add(item);
                 existingPaths.Add(path);
+                lastAddedItem = item;
                 addedAny = true;
             }
 
@@ -508,18 +583,29 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
                     await _settingsService.SaveSettingsAsync().ConfigureAwait(true);
                 }
 
-                if (SelectedCategoryIndex != 4 && SelectedCategoryIndex != 0)
-                {
-                    SelectedCategoryIndex = 4;
-                }
-
-                if (!string.IsNullOrWhiteSpace(SearchQuery))
-                {
-                    SearchQuery = string.Empty;
-                }
-
                 UpdateCategoryHeaders();
                 ApplyFilter();
+
+                // Provide feedback if active category or filters exclude the imported item
+                if (lastAddedItem != null && !IsItemVisibleUnderFilter(lastAddedItem, 4))
+                {
+                    var fileName = Path.GetFileName((lastAddedItem.Source as PowerPointSource)?.FilePath ?? lastAddedItem.Title);
+                    ImportNoticeMessage = $"{fileName} imported successfully";
+                    _viewImportedAction = () =>
+                    {
+                        SelectedCategoryIndex = 4;
+                        ShowQueuedOnly = false;
+                        if (!string.IsNullOrWhiteSpace(SearchQuery) && !MatchesSearch(lastAddedItem, SearchQuery))
+                        {
+                            SearchQuery = string.Empty;
+                        }
+                    };
+                    HasImportNotice = true;
+                }
+                else
+                {
+                    HasImportNotice = false;
+                }
             }
         }
         catch (Exception ex)
@@ -650,10 +736,72 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
         ApplyFilter();
     }
 
+    partial void OnShowQueuedOnlyChanged(bool value)
+    {
+        ApplyFilter();
+    }
+
     partial void OnSearchQueryChanged(string value)
     {
         OnPropertyChanged(nameof(IsSearchQueryNotEmpty));
         ApplyFilter();
+    }
+
+    private static bool MatchesSearch(SelectableSourceItem item, string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return true;
+        }
+
+        if (item.Title.Contains(query, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (item.Source is WindowSource w)
+        {
+            if (w.ProcessName.Contains(query, StringComparison.OrdinalIgnoreCase)) return true;
+            if (!string.IsNullOrEmpty(w.ProcessPath) && w.ProcessPath.Contains(query, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        else if (item.Source is MediaFileSource m)
+        {
+            if (m.FilePath.Contains(query, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        else if (item.Source is PowerPointSource p)
+        {
+            if (p.FilePath.Contains(query, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        else if (item.Source is MonitorSource mon)
+        {
+            if (mon.DeviceName.Contains(query, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        else if (item.Source is CameraSource cam)
+        {
+            if (cam.DeviceId.Contains(query, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+
+        return false;
+    }
+
+    private bool IsItemVisibleUnderFilter(SelectableSourceItem item, int targetCategoryIndex)
+    {
+        if (SelectedCategoryIndex != 0 && SelectedCategoryIndex != targetCategoryIndex)
+        {
+            return false;
+        }
+
+        if (ShowQueuedOnly && !_presentationStateService.IsSourceSelected(item.Id))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(SearchQuery) && !MatchesSearch(item, SearchQuery))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private void ApplyFilter()
@@ -672,31 +820,39 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
                 _ => _allCameras
             };
 
+            if (ShowQueuedOnly)
+            {
+                sourceList = sourceList.Where(item => _presentationStateService.IsSourceSelected(item.Id));
+            }
+
             var query = SearchQuery?.Trim() ?? string.Empty;
 
             var filtered = string.IsNullOrEmpty(query)
                 ? sourceList
-                : sourceList.Where(item =>
-                    item.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                    (item.Source is WindowSource w && (
-                        w.ProcessName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                        (!string.IsNullOrEmpty(w.ProcessPath) && w.ProcessPath.Contains(query, StringComparison.OrdinalIgnoreCase)))) ||
-                    (item.Source is MediaFileSource m && m.FilePath.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
-                    (item.Source is PowerPointSource p && p.FilePath.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
-                    (item.Source is MonitorSource mon && mon.DeviceName.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
-                    (item.Source is CameraSource cam && cam.DeviceId.Contains(query, StringComparison.OrdinalIgnoreCase)));
+                : sourceList.Where(item => MatchesSearch(item, query));
 
-            foreach (var item in filtered)
+            _isSyncingSelection = true;
+            try
             {
-                // Sync selection state with authoritative state service
-                item.IsSelected = _presentationStateService.IsSourceSelected(item.Id);
-                DisplayedSources.Add(item);
+                foreach (var item in filtered)
+                {
+                    // Sync selection state with authoritative state service
+                    item.IsSelected = _presentationStateService.IsSourceSelected(item.Id);
+                    DisplayedSources.Add(item);
+                }
+            }
+            finally
+            {
+                _isSyncingSelection = false;
             }
 
             OnPropertyChanged(nameof(HasDiscoveredSources));
             OnPropertyChanged(nameof(IsEmpty));
             OnPropertyChanged(nameof(EmptyStateTitle));
             OnPropertyChanged(nameof(EmptyStateSubtitle));
+            OnPropertyChanged(nameof(HasSearchFeedback));
+            OnPropertyChanged(nameof(SearchFeedbackText));
+            OnPropertyChanged(nameof(QueueSummaryText));
         });
     }
 
@@ -715,6 +871,13 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
         {
             _presentationStateService.RemoveSelectedSource(item.Id);
         }
+
+        OnPropertyChanged(nameof(QueueSummaryText));
+
+        if (ShowQueuedOnly)
+        {
+            ApplyFilter();
+        }
     }
 
     private void OnPresentationStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -726,6 +889,7 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
             {
                 OnPropertyChanged(nameof(SelectedSourceCount));
                 OnPropertyChanged(nameof(HasSelectedSources));
+                OnPropertyChanged(nameof(QueueSummaryText));
 
                 _isSyncingSelection = true;
                 try
@@ -743,6 +907,11 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
                 finally
                 {
                     _isSyncingSelection = false;
+                }
+
+                if (ShowQueuedOnly)
+                {
+                    ApplyFilter();
                 }
             });
         }

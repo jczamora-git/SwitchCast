@@ -7,6 +7,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.4.0 — Responsive Sources Page Refinement] - 2026-10-20
+
+### Added (feat / ui / responsive / sources)
+- **4-Area Page Hierarchy & Responsive Layout**:
+  - Implemented 4-part hierarchy: Header (Title, description, actions), Dedicated Search & Filter Toolbar, Source Results, and Queue Summary Footer in `Views/SourcesPage.xaml`.
+  - Responsive 3-tier layout measured against available page width (`UpdateResponsiveLayout`):
+    - `Wide (>=840px)`: Single-row toolbar with search, 210px category dropdown, and Queued Only checkbox; header actions right-aligned; hotkey hint visible in queue summary footer.
+    - `Medium (560-839px)`: Header actions wrap below title; search occupies full row; category dropdown and Queued Only occupy second row; hotkey hint collapsed.
+    - `Narrow (<560px)`: Header actions wrap; search, category dropdown, and Queued Only stack vertically.
+    - Preserves full readability and accessibility down to 895x690 windowed mode without horizontal scrolling.
+- **Queued Only Filter**:
+  - Added `ShowQueuedOnly` observable property in `SourcesViewModel.cs` and compact checkbox in toolbar.
+  - Filters displayed sources to only currently queued presentation items without modifying presentation queue or active On Air source.
+- **Polite Import Notifications**:
+  - Implemented `HasImportNotice`, `ImportNoticeMessage`, and `ViewImportedSourceCommand` in `SourcesViewModel.cs`.
+  - When PowerPoint or media is imported while active category or search query excludes it, shows non-intrusive `InfoBar` with a "View" button that adjusts category/search on user action rather than silently clearing search or forcing navigation.
+- **Queue Summary Footer & Search Feedback**:
+  - Added `QueueSummaryText` displaying `{count} sources queued` and search feedback text (`{count} results`) when filtering.
+
+### Fixed (fix / ui / concurrency)
+- **Selection Sync Re-Entrancy**:
+  - Guarded `item.IsSelected` synchronization in `ApplyFilter()` with `_isSyncingSelection = true`, preventing item property changes from firing recursive filter passes or double-adding sources to presentation state.
+
+### Tests & Verification (test / build / quality-gates)
+- **437 Passing Tests**: Added unit tests for Queued Only filtering, QueueSummaryText formatting, search results feedback, tailored empty states, and polite import notice with View action. All 437 tests passing.
+- **Zero Compiler Warnings/Errors**: Both Debug x64 and Release x64 builds verified clean (0 warnings, 0 errors).
+
+---
+
 ## [v1.4.0 — UI & Playback Stability Recovery] - 2026-10-20
 
 ### Fixed (fix / ui / playback / transport / concurrency)

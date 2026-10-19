@@ -7,15 +7,32 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Version**: v1.4.0 — UI & Playback Stability Recovery (Immediate Import Refresh, Responsive Sources, Direct Playlist Track Selection, Audio Stutter & Rewind Fixes)
-- **Overall Status**: **Implemented & Validated (432 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
-- **Last Updated**: 2026-10-20T00:15:00+08:00 (UTC+8)
+- **Current Version**: v1.4.0 — Responsive Sources Page Refinement (Layout Hierarchy, Dedicated Search Toolbar, Queued Only Filtering, Queue Summary, Polite Import Feedback)
+- **Overall Status**: **Implemented & Validated (437 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
+- **Last Updated**: 2026-10-20T00:35:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **v1.4.0 Responsive Sources Page Refinement**:
+  - **4-Area Page Hierarchy**:
+    - **Header**: Title "Sources", description "Select windows, displays, and media to include in your presentation." Actions: Primary "Import PowerPoint", Secondary "Refresh", and "Add Media". Actions gracefully wrap below title on viewports <840px without squeezing or clipping.
+    - **Search & Filtering Toolbar**: Compact border container with dedicated full-width search `TextBox` (left-aligned `\uE721` icon, inline clear action, placeholder `Search windows, displays, media, or PowerPoint...`, min width 240px), compact category dropdown `ComboBox` (width 210px, live catalog counts for all 6 categories), and compact "Queued Only" checkbox filter.
+    - **Source Results**: Compact source cards (~52-56px height) featuring 32x32 icon tile (native app icon or glyph), primary title with character ellipsis and complete tooltip, secondary metadata, unavailability badge, and queue checkbox announcing source title for screen readers. Removable source types (Media and PowerPoint) provide individual delete actions.
+    - **Queue Summary Footer**: Compact footer displaying `{count} sources queued`, dynamic hotkey hint on wide desktop viewports (`• Switch sources via hotkeys (Ctrl+Shift+Right/Left) or Presenter Dock.`), collapsed on small viewports to save vertical space. Updates immediately when any checkbox changes.
+  - **Responsive 3-Tier Layout Rules**:
+    - `Wide (>=840px)`: Actions right-aligned in header; search, category dropdown, and Queued Only share a single toolbar row; hotkey hint visible in queue summary footer.
+    - `Medium (560-839px)`: Header actions wrap below title; search occupies full row; category dropdown and Queued Only occupy second row; hotkey hint collapsed.
+    - `Narrow (<560px)`: Header actions wrap; search, category dropdown, and Queued Only stack vertically; hotkey hint collapsed. No horizontal clipping down to 895x690 windowed mode.
+  - **Live Search & Results Feedback**:
+    - Real-time partial matching across title, process name, process path, media path, PowerPoint path, display name, and camera device ID.
+    - Separate search feedback text (e.g. `1 result`, `3 results`) displayed beneath toolbar when searching.
+    - Tailored empty states for search misses (`No matching sources - Try another search term or change the category`), empty queue (`No queued sources`), and empty categories.
+  - **Polite Import Notifications**:
+    - When importing PowerPoint or media while active filters or category exclude the item, non-intrusive `InfoBar` appears: `"{fileName} imported successfully"` with a "View" button that switches category and clears conflicting search terms without silently erasing active user state.
+  - **Automated Test Matrix**: 437 unit & regression tests passing (100% pass rate).
 - [x] **v1.4.0 UI & Playback Stability Recovery (Immediate Import Refresh, Responsive Sources, Direct Playlist Track Selection, Audio Stutter & Rewind Fixes)**:
   - **Immediate Import Refresh**:
     - PowerPoint Import (`SourcesViewModel.AddPowerPointAsync`): Automatically switches to PowerPoint category (or All Sources), clears stale search query if non-empty, and refreshes `DisplayedSources` and category counts immediately on `DispatcherQueue` without manual page navigation or manual refresh.
