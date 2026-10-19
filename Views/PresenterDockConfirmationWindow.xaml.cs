@@ -116,6 +116,8 @@ public sealed partial class PresenterDockConfirmationWindow : Window
             $"Closed | HWND=0x{WindowHandle:X} | PID={Environment.ProcessId} | confirmed={_userConfirmed}");
 
         _tcs?.TrySetResult(_userConfirmed);
+        _appWindow = null;
+        WindowHandle = IntPtr.Zero;
     }
 
     private void Dismiss(bool confirmed)

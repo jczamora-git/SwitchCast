@@ -375,8 +375,13 @@ public sealed partial class PresentationWindow : Window
 
         if (WindowHandle != IntPtr.Zero)
         {
-            RemoveWindowSubclass(WindowHandle, _subclassProc, new UIntPtr(1003));
+            if (IsWindow(WindowHandle))
+            {
+                RemoveWindowSubclass(WindowHandle, _subclassProc, new UIntPtr(1003));
+            }
+            WindowHandle = IntPtr.Zero;
         }
+        _appWindow = null;
     }
 
     private void OnWindowClosed(object sender, WindowEventArgs args)
@@ -424,6 +429,10 @@ public sealed partial class PresentationWindow : Window
 
     [DllImport("user32.dll")]
     private static extern IntPtr SetCursor(IntPtr hCursor);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindow(IntPtr hWnd);
 
     [DllImport("comctl32.dll", SetLastError = true)]
     private static extern bool SetWindowSubclass(IntPtr hWnd, SubclassProc pfnSubclass, UIntPtr uIdSubclass, IntPtr dwRefData);

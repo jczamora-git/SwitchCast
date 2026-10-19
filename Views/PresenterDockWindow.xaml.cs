@@ -31,6 +31,7 @@ public sealed partial class PresenterDockWindow : Window
     private PresenterDockMenuWindow? _activeMenuWindow;
     private long _lastMenuClosedTicks;
     private readonly SubclassProc _subclassProc;
+    private bool _isClosed;
 
     public PresenterDockWindow()
     {
@@ -119,12 +120,18 @@ public sealed partial class PresenterDockWindow : Window
 
     private void OnDockCardLoaded(object sender, RoutedEventArgs e)
     {
-        UpdateNonClientRegions();
+        if (!_isClosed && WindowHandle != IntPtr.Zero && IsWindow(WindowHandle))
+        {
+            UpdateNonClientRegions();
+        }
     }
 
     private void OnDockCardSizeChanged(object sender, SizeChangedEventArgs e)
     {
-        UpdateNonClientRegions();
+        if (!_isClosed && WindowHandle != IntPtr.Zero && IsWindow(WindowHandle))
+        {
+            UpdateNonClientRegions();
+        }
     }
 
     /// <summary>
@@ -133,7 +140,7 @@ public sealed partial class PresenterDockWindow : Window
     /// </summary>
     private void UpdateNonClientRegions()
     {
-        if (_nonClientPointerSource is null || _appWindow is null)
+        if (_isClosed || _nonClientPointerSource is null || _appWindow is null || WindowHandle == IntPtr.Zero || !IsWindow(WindowHandle))
         {
             return;
         }
@@ -226,35 +233,45 @@ public sealed partial class PresenterDockWindow : Window
     {
         CloseActiveMenu();
 
-        if (_appWindow is null)
+        if (_isClosed || _appWindow is null || WindowHandle == IntPtr.Zero || !IsWindow(WindowHandle))
         {
             return;
         }
 
-        uint dpi = GetDpiForWindow(WindowHandle);
-        if (dpi == 0)
+        try
         {
-            dpi = 96;
+            uint dpi = GetDpiForWindow(WindowHandle);
+            if (dpi == 0)
+            {
+                dpi = 96;
+            }
+
+            double scale = dpi / 96.0;
+
+            // Baseline width: 730 DIPs (comfortable single row with music & cursor controls).
+            // Height: 52 DIPs for standard sources, 86 DIPs when secondary controls row (PowerPoint / Video) is active.
+            double widthDip = 730.0;
+            double heightDip = isVideoActive ? 86.0 : 52.0;
+
+            int pixelWidth = (int)Math.Round(widthDip * scale);
+            int pixelHeight = (int)Math.Round(heightDip * scale);
+
+            _appWindow.Resize(new SizeInt32(pixelWidth, pixelHeight));
+
+            if (initialCenter)
+            {
+                CenterDockOnTopWorkArea(pixelWidth);
+            }
+
+            DispatcherQueue.TryEnqueue(UpdateNonClientRegions);
         }
-
-        double scale = dpi / 96.0;
-
-        // Baseline width: 730 DIPs (comfortable single row with music & cursor controls).
-        // Height: 52 DIPs for standard sources, 86 DIPs when secondary controls row (PowerPoint / Video) is active.
-        double widthDip = 730.0;
-        double heightDip = isVideoActive ? 86.0 : 52.0;
-
-        int pixelWidth = (int)Math.Round(widthDip * scale);
-        int pixelHeight = (int)Math.Round(heightDip * scale);
-
-        _appWindow.Resize(new SizeInt32(pixelWidth, pixelHeight));
-
-        if (initialCenter)
+        catch (Exception ex)
         {
-            CenterDockOnTopWorkArea(pixelWidth);
+            Services.Diagnostics.SwitchCastDiagnostics.LogException(
+                nameof(PresenterDockWindow),
+                nameof(ApplyWindowSizingAndPosition),
+                ex);
         }
-
-        DispatcherQueue.TryEnqueue(UpdateNonClientRegions);
     }
 
     private void CenterDockOnTopWorkArea(int pixelWidth)
@@ -364,6 +381,11 @@ public sealed partial class PresenterDockWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (_isClosed || WindowHandle == IntPtr.Zero || !IsWindow(WindowHandle))
+        {
+            return;
+        }
+
         if (e.PropertyName == nameof(PresenterDockViewModel.HasSecondaryRow) ||
             e.PropertyName == nameof(PresenterDockViewModel.IsActiveSourcePowerPoint) ||
             e.PropertyName == nameof(PresenterDockViewModel.IsActiveSourceVideo) ||
@@ -372,14 +394,34 @@ public sealed partial class PresenterDockWindow : Window
         {
             DispatcherQueue.TryEnqueue(() =>
             {
-                Bindings.Update();
-                ApplyWindowSizingAndPosition(ViewModel.HasSecondaryRow, initialCenter: false);
+                if (_isClosed || WindowHandle == IntPtr.Zero || !IsWindow(WindowHandle))
+                {
+                    return;
+                }
+
+                try
+                {
+                    Bindings.Update();
+                    ApplyWindowSizingAndPosition(ViewModel.HasSecondaryRow, initialCenter: false);
+                }
+                catch (Exception ex)
+                {
+                    Services.Diagnostics.SwitchCastDiagnostics.LogException(
+                        nameof(PresenterDockWindow),
+                        nameof(OnViewModelPropertyChanged),
+                        ex);
+                }
             });
         }
     }
 
     private void OnAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
     {
+        if (_isClosed || WindowHandle == IntPtr.Zero || !IsWindow(WindowHandle))
+        {
+            return;
+        }
+
         if (args.DidPresenterChange || args.DidSizeChange)
         {
             if (sender.Presenter is OverlappedPresenter presenter && presenter.State == OverlappedPresenterState.Maximized)
@@ -429,20 +471,35 @@ public sealed partial class PresenterDockWindow : Window
 
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
+        _isClosed = true;
+
         Services.Diagnostics.SwitchCastDiagnostics.LogInfo(
             nameof(PresenterDockWindow),
             $"Closed | HWND=0x{WindowHandle:X} | PID={Environment.ProcessId}");
 
         CloseActiveMenu();
+
+        DockCardBorder.Loaded -= OnDockCardLoaded;
+        DockCardBorder.SizeChanged -= OnDockCardSizeChanged;
+
         if (_appWindow is not null)
         {
             _appWindow.Changed -= OnAppWindowChanged;
             _appWindow.Closing -= OnAppWindowClosing;
+            _appWindow = null;
         }
+
+        _nonClientPointerSource = null;
+
         if (WindowHandle != IntPtr.Zero)
         {
-            RemoveWindowSubclass(WindowHandle, _subclassProc, new UIntPtr(1001));
+            if (IsWindow(WindowHandle))
+            {
+                RemoveWindowSubclass(WindowHandle, _subclassProc, new UIntPtr(1001));
+            }
+            WindowHandle = IntPtr.Zero;
         }
+
         ViewModel.PropertyChanged -= OnViewModelPropertyChanged;
         ViewModel.Dispose();
     }
@@ -581,4 +638,8 @@ public sealed partial class PresenterDockWindow : Window
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindow(IntPtr hWnd);
 }
