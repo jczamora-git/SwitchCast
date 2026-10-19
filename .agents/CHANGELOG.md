@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [v1.4.0 — Responsive Sources Page Refinement] - 2026-10-20
 
 ### Added (feat / ui / responsive / sources)
+- **Application Windows Default Category**:
+  - Configured `SourcesViewModel.SelectedCategoryIndex = 1` (Application Windows) as the default selected category when opening the Sources page.
+  - Preserves user category selection when navigating between pages during the current session via singleton ViewModel lifecycle.
 - **4-Area Page Hierarchy & Responsive Layout**:
   - Implemented 4-part hierarchy: Header (Title, description, actions), Dedicated Search & Filter Toolbar, Source Results, and Queue Summary Footer in `Views/SourcesPage.xaml`.
   - Responsive 3-tier layout measured against available page width (`UpdateResponsiveLayout`):

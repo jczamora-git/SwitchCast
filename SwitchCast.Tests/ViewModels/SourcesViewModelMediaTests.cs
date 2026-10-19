@@ -46,7 +46,8 @@ public class SourcesViewModelMediaTests
             _mockMediaPickerService.Object,
             _mockSettingsService.Object);
 
-        Assert.Equal(0, vm.SelectedCategoryIndex);
+        Assert.Equal(1, vm.SelectedCategoryIndex);
+        Assert.True(vm.IsWindowsCategorySelected);
         Assert.False(vm.IsMediaCategorySelected);
 
         vm.SelectedCategoryIndex = 3;

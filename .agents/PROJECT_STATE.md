@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Version**: v1.4.0 — Responsive Sources Page Refinement (Layout Hierarchy, Dedicated Search Toolbar, Queued Only Filtering, Queue Summary, Polite Import Feedback)
-- **Overall Status**: **Implemented & Validated (437 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
-- **Last Updated**: 2026-10-20T00:35:00+08:00 (UTC+8)
+- **Current Version**: v1.4.0 — Responsive Sources Page Refinement (Application Windows Default Category, Layout Hierarchy, Search Toolbar, Queued Only Filtering, Queue Summary, Polite Import Feedback)
+- **Overall Status**: **Implemented & Validated (438 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
+- **Last Updated**: 2026-10-20T00:52:00+08:00 (UTC+8)
 
 ---
 
@@ -17,6 +17,11 @@ This is the authoritative progress, state, and environmental tracking document f
 
 ### Implemented & Verified
 - [x] **v1.4.0 Responsive Sources Page Refinement**:
+  - **Application Windows Default Category**:
+    - Initialized `SourcesViewModel.SelectedCategoryIndex = 1` (Application Windows) as the default selected category when opening the Sources page for the first time.
+    - Category dropdown, search query, and Queued Only filters seamlessly reflect Application Windows on page load.
+    - When presenters navigate away (e.g. to Dashboard, Settings, or Music Library) and return to Sources, their manually selected category is preserved throughout the session via the singleton `SourcesViewModel` lifecycle.
+    - Presentation queue, On Air selection, and hotkey switching behavior remain untouched and fully synchronized.
   - **4-Area Page Hierarchy**:
     - **Header**: Title "Sources", description "Select windows, displays, and media to include in your presentation." Actions: Primary "Import PowerPoint", Secondary "Refresh", and "Add Media". Actions gracefully wrap below title on viewports <840px without squeezing or clipping.
     - **Search & Filtering Toolbar**: Compact border container with dedicated full-width search `TextBox` (left-aligned `\uE721` icon, inline clear action, placeholder `Search windows, displays, media, or PowerPoint...`, min width 240px), compact category dropdown `ComboBox` (width 210px, live catalog counts for all 6 categories), and compact "Queued Only" checkbox filter.

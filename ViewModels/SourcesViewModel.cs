@@ -35,7 +35,7 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
     private bool _isSyncingSelection;
 
     [ObservableProperty]
-    private int _selectedCategoryIndex = 0; // 0 = All Sources, 1 = Windows, 2 = Displays, 3 = Media Files, 4 = PowerPoint, 5 = Cameras
+    private int _selectedCategoryIndex = 1; // 0 = All Sources, 1 = Application Windows, 2 = Displays, 3 = Media Files, 4 = PowerPoint, 5 = Cameras
 
     [ObservableProperty]
     private bool _showQueuedOnly;

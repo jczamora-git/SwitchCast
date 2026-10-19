@@ -3,15 +3,24 @@
 ---
 
 ## Task Details
-- **Task**: SWITCHCAST v1.4.0 — Responsive Sources Page Specification (Layout Hierarchy, Search Toolbar, Queued Only Filtering, Queue Summary, Polite Import Feedback)
-- **Date**: 2026-10-20T00:35:00+08:00 (UTC+8)
-- **Status**: Completed, Validated & Ready for Local Commit (437 Tests Passing, 0 Build Warnings/Errors, Clean UI Architecture)
+- **Task**: SWITCHCAST v1.4.0 — Sources Page: Set Application Windows as Default Category & Preserve Session State
+- **Date**: 2026-10-20T00:52:00+08:00 (UTC+8)
+- **Status**: Completed, Validated & Ready for Local Commit (438 Tests Passing, 0 Build Warnings/Errors, Clean UI Architecture)
 
 ---
 
 ## 1. Objectives & Outcomes
 
-1. **Responsive 4-Area Hierarchy**:
+1. **Application Windows Default Category**:
+   - Initialized `SourcesViewModel.SelectedCategoryIndex = 1` (Application Windows) so when the Sources page opens for the first time, Application Windows is automatically selected and displayed.
+   - All other source categories (All Sources = 0, Displays = 2, Media = 3, PowerPoint = 4, Cameras = 5) remain fully selectable from the category dropdown with live catalog totals.
+   - Preserves user selection across page transitions within the current session via the singleton `SourcesViewModel` registered in `App.xaml.cs`.
+   - Presentation queue (`PresentationStateService`), active On Air source, and presenter hotkeys are completely untouched.
+
+2. **Automated Regression Suite**:
+   - Updated existing test assertions to verify `SelectedCategoryIndex` defaults to 1 and displays the 2 window items.
+   - Added `DefaultCategory_IsApplicationWindows_AndPreservesUserSelection` test fixture.
+   - Total test suite expanded to **438 passing tests (100% pass rate)**.
    - **Header**: Title "Sources", subtitle "Select windows, displays, and media to include in your presentation." Actions: Primary "Import PowerPoint" (`PrimaryAccentButtonStyle`), Secondary "Refresh", and "Add Media". Right-aligned on desktop (>=840px), cleanly wrapped to row 1 on smaller viewports without clipping or squeezing.
    - **Dedicated Search & Filter Toolbar**: Search box with left search glyph (`\uE721`), right clear-search action, placeholder `Search windows, displays, media, or PowerPoint...`, min width 240px. Compact category dropdown `ComboBox` (210px width) containing all 6 categories with live counts. Compact "Queued Only" filter checkbox.
    - **Source Results**: Compact source cards (~52-56px height) with 32x32 icon tile (app icon or glyph), primary title with character ellipsis and full title tooltip, secondary metadata, availability badge, delete button (for Media and PowerPoint), and queue checkbox with `AutomationProperties.Name` bound to title.

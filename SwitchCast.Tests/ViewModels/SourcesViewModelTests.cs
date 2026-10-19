@@ -37,7 +37,8 @@ public class SourcesViewModelTests
     {
         var vm = new SourcesViewModel(_mockStateService.Object, _mockWindowService.Object, _mockMonitorService.Object);
 
-        Assert.Equal(0, vm.SelectedCategoryIndex);
+        Assert.Equal(1, vm.SelectedCategoryIndex);
+        Assert.True(vm.IsWindowsCategorySelected);
         Assert.Empty(vm.DisplayedSources);
         Assert.False(vm.IsRefreshing);
         Assert.False(vm.HasError);
@@ -53,7 +54,7 @@ public class SourcesViewModelTests
 
         Assert.Equal("Application Windows (2)", vm.WindowCategoryHeader);
         Assert.Equal("Displays & Monitors (1)", vm.DisplayCategoryHeader);
-        Assert.Equal(3, vm.DisplayedSources.Count); // All Sources (2 windows + 1 monitor)
+        Assert.Equal(2, vm.DisplayedSources.Count); // Defaults to Application Windows (2 windows)
         Assert.True(vm.HasDiscoveredSources);
         Assert.False(vm.IsEmpty);
     }
@@ -75,13 +76,12 @@ public class SourcesViewModelTests
         var vm = new SourcesViewModel(_mockStateService.Object, _mockWindowService.Object, _mockMonitorService.Object);
         await vm.RefreshSourcesCommand.ExecuteAsync(null);
 
-        Assert.Equal(3, vm.DisplayedSources.Count); // All Sources category
+        Assert.Equal(2, vm.DisplayedSources.Count); // Defaults to Application Windows (2 windows)
 
-        vm.SelectedCategoryIndex = 1; // Windows category
-        Assert.Equal(2, vm.DisplayedSources.Count);
+        vm.SelectedCategoryIndex = 0; // All Sources category
+        Assert.Equal(3, vm.DisplayedSources.Count);
 
         vm.SelectedCategoryIndex = 2; // Displays category
-
         Assert.Single(vm.DisplayedSources);
         Assert.Equal("Display 1 (Primary)", vm.DisplayedSources[0].Title);
     }
@@ -141,7 +141,7 @@ public class SourcesViewModelTests
         vm.ClearSearchCommand.Execute(null);
         Assert.Empty(vm.SearchQuery);
         Assert.False(vm.IsSearchQueryNotEmpty);
-        Assert.Equal(3, vm.DisplayedSources.Count);
+        Assert.Equal(2, vm.DisplayedSources.Count); // Restores the 2 windows in Application Windows
     }
 
     [Fact]
@@ -166,7 +166,7 @@ public class SourcesViewModelTests
         var vm = new SourcesViewModel(_mockStateService.Object, _mockWindowService.Object, _mockMonitorService.Object);
         await vm.RefreshSourcesCommand.ExecuteAsync(null);
 
-        Assert.Equal(3, vm.DisplayedSources.Count);
+        Assert.Equal(2, vm.DisplayedSources.Count);
 
         // Select the second source
         _mockStateService.Setup(s => s.IsSourceSelected("win-2")).Returns(true);
@@ -177,9 +177,9 @@ public class SourcesViewModelTests
         Assert.Single(vm.DisplayedSources);
         Assert.Equal("win-2", vm.DisplayedSources[0].Id);
 
-        // Toggling off restores all sources
+        // Toggling off restores all sources in the category
         vm.ShowQueuedOnly = false;
-        Assert.Equal(3, vm.DisplayedSources.Count);
+        Assert.Equal(2, vm.DisplayedSources.Count);
     }
 
     [Fact]
@@ -236,6 +236,25 @@ public class SourcesViewModelTests
         Assert.True(vm.IsEmpty);
         Assert.Equal("No queued sources", vm.EmptyStateTitle);
         Assert.Contains("No sources are currently queued", vm.EmptyStateSubtitle);
+    }
+
+    [Fact]
+    public async Task DefaultCategory_IsApplicationWindows_AndPreservesUserSelection()
+    {
+        var vm = new SourcesViewModel(_mockStateService.Object, _mockWindowService.Object, _mockMonitorService.Object);
+        Assert.Equal(1, vm.SelectedCategoryIndex);
+        Assert.True(vm.IsWindowsCategorySelected);
+
+        await vm.RefreshSourcesCommand.ExecuteAsync(null);
+        Assert.Equal(2, vm.DisplayedSources.Count);
+
+        // User switches to Displays & Monitors
+        vm.SelectedCategoryIndex = 2;
+        Assert.True(vm.IsDisplaysCategorySelected);
+        Assert.Single(vm.DisplayedSources);
+
+        // Preserved during session
+        Assert.Equal(2, vm.SelectedCategoryIndex);
     }
 }
 
