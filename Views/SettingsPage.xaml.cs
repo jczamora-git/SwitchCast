@@ -30,9 +30,32 @@ public sealed partial class SettingsPage : Page
 
     private async void OnViewIncidentDetailsClick(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.Tag is DiagnosticIncident incident && XamlRoot is not null)
+        if ((sender as FrameworkElement)?.Tag is DiagnosticIncident incident)
         {
-            await ErrorReportDialog.ShowAsync(XamlRoot, incident, _reportingService, _reportBuilder);
+            var targetRoot = App.MainWindowInstance?.Content?.XamlRoot ?? XamlRoot;
+            await ErrorReportDialog.ShowAsync(targetRoot, incident, _reportingService, _reportBuilder);
+        }
+    }
+
+    private async void OnClearIncidentHistoryClick(object sender, RoutedEventArgs e)
+    {
+        var targetRoot = App.MainWindowInstance?.Content?.XamlRoot ?? XamlRoot;
+        if (targetRoot is null) return;
+
+        var confirmDialog = new ContentDialog
+        {
+            Title = "Clear Incident History?",
+            Content = "All local diagnostic reports and incident logs will be permanently deleted. This action cannot be undone.",
+            PrimaryButtonText = "Clear History",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = targetRoot
+        };
+
+        var result = await confirmDialog.ShowAsync();
+        if (result == ContentDialogResult.Primary)
+        {
+            await ViewModel.ClearDiagnosticsHistoryAsync();
         }
     }
 

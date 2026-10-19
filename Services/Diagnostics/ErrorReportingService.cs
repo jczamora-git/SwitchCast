@@ -209,10 +209,51 @@ public sealed class ErrorReportingService : IErrorReportingService
 
     public IReadOnlyList<DiagnosticIncident> GetRecentIncidents()
     {
+        var incidentsMap = new Dictionary<string, DiagnosticIncident>(StringComparer.OrdinalIgnoreCase);
+
+        // 1. Include in-memory incidents first
         lock (_stateLock)
         {
-            return _recentIncidents.ToList();
+            foreach (var inc in _recentIncidents)
+            {
+                incidentsMap[inc.Id] = inc;
+            }
         }
+
+        // 2. Load persisted incidents from disk to preserve history across restarts
+        try
+        {
+            if (Directory.Exists(_logsDirectory))
+            {
+                var files = Directory.GetFiles(_logsDirectory, "incident-*.json")
+                    .Select(f => new FileInfo(f))
+                    .OrderByDescending(f => f.LastWriteTimeUtc)
+                    .Take(MaxStoredIncidents);
+
+                foreach (var file in files)
+                {
+                    try
+                    {
+                        string json = File.ReadAllText(file.FullName);
+                        var inc = JsonSerializer.Deserialize<DiagnosticIncident>(json);
+                        if (inc is not null && !incidentsMap.ContainsKey(inc.Id))
+                        {
+                            incidentsMap[inc.Id] = inc;
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore individual corrupted file
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ErrorReportingService] GetRecentIncidents disk read failure: {ex.Message}");
+        }
+
+        return incidentsMap.Values.OrderByDescending(i => i.Timestamp).ToList();
     }
 
     public IReadOnlyList<DiagnosticEvent> GetRecentEvents()

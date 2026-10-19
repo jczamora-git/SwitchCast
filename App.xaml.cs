@@ -11,7 +11,8 @@ namespace SwitchCast;
 /// </summary>
 public partial class App : Application
 {
-    private Window? _mainWindow;
+    private MainWindow? _mainWindow;
+    public static MainWindow? MainWindowInstance { get; private set; }
 
     public App()
     {
@@ -278,6 +279,7 @@ public partial class App : Application
         hotkeyService.Initialize();
 
         _mainWindow = new MainWindow();
+        MainWindowInstance = _mainWindow;
 
         var windowIconService = Services.GetService<IWindowIconService>() as Win32WindowIconService;
         if (windowIconService is not null && _mainWindow.DispatcherQueue is not null)

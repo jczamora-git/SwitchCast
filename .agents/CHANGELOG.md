@@ -7,6 +7,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.4.0 — Diagnostics & Logs UX Rework] - 2026-10-19
+
+### Fixed (fix / ui / ux / diagnostics / settings)
+- **Removed Dashboard Crash Recovery Banner**:
+  - Eliminated intrusive recovery `InfoBar` from `DashboardPage.xaml` and its code-behind event handlers.
+  - Removed `CheckForPreviousCrash()` query from `DashboardViewModel.cs` constructor, preventing historical disk incident records from popping up as crash banners on repeated restarts.
+- **Centered Error Report Dialog**:
+  - Configured `ErrorReportDialog.xaml` with `Width="580"`, `MinWidth="480"`, `MaxWidth="640"`, `HorizontalAlignment="Center"`, and `VerticalAlignment="Center"`.
+  - Parented dialogs to `App.MainWindowInstance.Content.XamlRoot` ensuring consistent center alignment within `MainWindow`.
+  - Resolved native HWND via `App.MainWindowInstance` for file save picker operations.
+
+### Added (feat / diagnostics / settings / mvvm)
+- **Centralized Diagnostics & Logs in Settings**:
+  - Renamed Category 5 to "Diagnostics & Logs" in `Views/SettingsPage.xaml`.
+  - Added header, description, and 3-card summary overview (Recent Incidents, Last Recorded Error, and Log Storage Location).
+  - Implemented clean empty state ("No errors recorded") when no unhandled incidents exist.
+  - Rendered incident history items with severity badges, component badges, incident ID, hex HRESULT, formatted timestamp, error title, and technical operation details.
+  - Added confirmation `ContentDialog` before executing history purge.
+- **Disk History Loading in `ErrorReportingService`**:
+  - Enhanced `ErrorReportingService.GetRecentIncidents()` to read up to 10 stored `incident-*.json` files from disk, deduplicated with in-memory incidents, and sorted newest first.
+  - Historical reports remain preserved on disk and accessible in Settings without intrusive startup popups.
+
+### Tests & Verification (test / build / quality-gates)
+- **429 Passing Tests**: All unit tests passing in `ErrorReportingServiceTests.cs`, `DashboardViewModelTests.cs`, and existing suites (100% pass rate).
+- **Zero Compiler Warnings/Errors**: Both Debug x64 and Release x64 builds verified clean (0 warnings, 0 errors).
+
+---
+
 ## [v1.4.0 — Music Library, Playlist Navigation, Startup Crash Fix & Incident Report UI Polish] - 2026-10-19
 
 ### Fixed (fix / ui / xaml / bindings / startup)

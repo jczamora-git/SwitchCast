@@ -7,15 +7,36 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Version**: v1.4.0 — Background Music & Presenter Controls (Music Library, Playlist Navigation, Startup Crash Fix & Incident Report UI Polish)
-- **Overall Status**: **Implemented & Validated (426 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
-- **Last Updated**: 2026-10-19T22:20:00+08:00 (UTC+8)
+- **Current Version**: v1.4.0 — Diagnostics & Logs UX Rework (Remove Intrusive Crash Banners, Centralize Reports in Settings, Fix Dialog Positioning)
+- **Overall Status**: **Implemented & Validated (429 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
+- **Last Updated**: 2026-10-19T23:20:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **v1.4.0 Diagnostics & Logs UX Rework (Remove Intrusive Crash Banners, Centralize Reports, Fix Dialog Positioning)**:
+  - **Removed Dashboard Crash Banner**:
+    - Completely removed the large recovery `InfoBar` from `Views/DashboardPage.xaml` and code-behind event handlers.
+    - Removed `CheckForPreviousCrash()` query from `DashboardViewModel.cs` constructor, preventing historical disk incident files (such as `SC-20261019-D7EC6B4C`) from resurfacing as intrusive startup crash banners.
+    - Dashboard remains clean and dedicated to presentation status, source switching, preview workspace, presentation controls, and background music summary.
+  - **Centralized Diagnostics in Settings > Diagnostics & Logs**:
+    - Renamed Category 5 to "Diagnostics & Logs" in `Views/SettingsPage.xaml` navigation and page content.
+    - Added clean 3-card summary strip: Recent Incidents count, Last Recorded Error summary with timestamp, and Log Storage Location path.
+    - Implemented clean empty state ("No errors recorded") when no unhandled exceptions exist.
+    - Styled incident history with severity badges, component badges, incident reference ID, hex HRESULT, formatted timestamp, error title, and technical operation details.
+    - Added user confirmation `ContentDialog` prior to clearing incident history.
+  - **Disk History Loading & Persistence in `ErrorReportingService`**:
+    - Enhanced `GetRecentIncidents()` in `Services/Diagnostics/ErrorReportingService.cs` to enumerate up to 10 stored `incident-*.json` disk files, deserialize them safely, deduplicate with in-memory incidents, and sort newest first.
+    - Historical incidents remain preserved on disk and accessible in Settings without causing false startup alerts.
+    - Preserved offline privacy: 100% local storage, redaction of sensitive paths/credentials, zero telemetry, and user-initiated GitHub/developer reporting.
+  - **Centered Error Report Dialog**:
+    - Centered `ErrorReportDialog` relative to `MainWindow` by parenting to `App.MainWindowInstance.Content.XamlRoot` and configuring `Width="580"`, `MinWidth="480"`, `MaxWidth="640"`, `HorizontalAlignment="Center"`, and `VerticalAlignment="Center"`.
+    - Resolved native HWND via `App.MainWindowInstance` for file save picker operations.
+  - **Clean Shutdown Verification**:
+    - Clean exits with `ShutdownApproved = true` in `ApplicationLifecycleService` do not create crash records.
+  - **Automated Test Matrix**: 429 tests passing (100% pass rate).
 - [x] **v1.4.0 Music Library, Playlist Navigation, Startup Crash Fix & Incident Report UI Polish**:
   - **Startup Crash Resolution (`COMException 0x80004005` in `LookupConverter`)**:
     - Identified missing resource reference `{StaticResource BoolToAccentBrushConverter}` in `DashboardPage.xaml` bound to `IsMusicShuffleEnabled`.

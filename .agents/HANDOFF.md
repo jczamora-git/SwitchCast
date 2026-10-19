@@ -3,61 +3,46 @@
 ---
 
 ## Task Details
-- **Task**: SWITCHCAST v1.4.0 — Music Library, Playlist Navigation, Startup Crash Fix & Incident Report UI Polish
-- **Date**: 2026-10-19T22:20:00+08:00 (UTC+8)
-- **Status**: Completed, Validated & Ready for Local Commit (426 Tests Passing, 0 Build Warnings/Errors, Strict Dual-Player Isolation Verified)
+- **Task**: SWITCHCAST v1.4.0 — Diagnostics & Logs UX Rework: Remove Intrusive Crash Banners, Centralize Reports, and Fix Dialog Positioning
+- **Date**: 2026-10-19T23:20:00+08:00 (UTC+8)
+- **Status**: Completed, Validated & Ready for Local Commit (429 Tests Passing, 0 Build Warnings/Errors, Clean UI Architecture)
 
 ---
 
 ## 1. Objectives & Outcomes
 
-1. **Dashboard Startup Crash Resolved (`COMException 0x80004005`)**:
-   - **Root Cause**: `Views/DashboardPage.xaml` bound `Foreground="{x:Bind ViewModel.IsMusicShuffleEnabled, Mode=OneWay, Converter={StaticResource BoolToAccentBrushConverter}}"`. `BoolToAccentBrushConverter` was not registered in `App.xaml` or page resources, causing native WinRT `LookupConverter` COM failure during Dashboard initialization.
-   - **Remediation**: Replaced dynamic converter lookup with `Opacity="{x:Bind ViewModel.MusicShuffleOpacity, Mode=OneWay}"` and `Foreground="{ThemeResource AppAccentBrush}"`, eliminating converter lookup failure entirely.
+1. **Dashboard Crash Banner Removed**:
+   - **Root Cause of Resurfacing Incident**: `DashboardViewModel.cs` called `CheckForPreviousCrash()` in its constructor querying `GetPreviousCrashReports()` on disk, finding `SC-20261019-D7EC6B4C` (which occurred earlier before the converter fix), setting `HasPreviousCrashReport = true` and displaying the large recovery `InfoBar` on every startup even after normal clean shutdowns.
+   - **Remediation**: Removed `CheckForPreviousCrash()` query from `DashboardViewModel.cs`. Removed the recovery `InfoBar` and its event handlers from `Views/DashboardPage.xaml` and `Views/DashboardPage.xaml.cs`. Dashboard remains clean and focused on presentation workflow.
 
-2. **Dedicated Music & Playlists Navigation**:
-   - Added `Music & Playlists` navigation item (`\uE8D6`) to `MainWindow.xaml` NavigationView.
-   - Implemented `MusicLibraryPage.xaml`, `MusicLibraryPage.xaml.cs`, and `MusicLibraryViewModel.cs`.
-   - Wired `INavigationService.NavigateToMusicLibrary()`. Navigation between pages does not disrupt active music playback or presentation state.
+2. **Centralized Diagnostics & Logs in Settings**:
+   - Updated Category 5 in `Views/SettingsPage.xaml` and `MainWindow.xaml` navigation to "Diagnostics & Logs".
+   - Implemented standard SwitchCast header, description, and 3-card summary grid: Recent Incidents count (`IncidentsCountText`), Last Recorded Error (`LastRecordedErrorText` + `LastRecordedErrorTimestamp`), and Storage Location (`LogsDirectoryPath`).
+   - Clean empty state banner ("No errors recorded") when incident list is empty.
+   - Incident list items with severity badge, component badge, incident ID, hex HRESULT, formatted timestamp, error title, and technical operation details.
+   - Wired "View Report" button to `ErrorReportDialog` and "Clear Incident History" button to a confirmation `ContentDialog`.
 
-3. **Working Native Audio Importer**:
-   - Implemented `Win32MediaPickerService` using native `FileOpenPicker` initialized with `MainWindow` HWND.
-   - Supported formats: `.mp3`, `.wav`, `.m4a`, `.aac`, `.wma`.
-   - Prevents duplicate tracks based on full path while safely allowing identical file names across different folders.
-   - Graceful cancellation handling without false error banners.
+3. **Disk Incident History Loading in `ErrorReportingService`**:
+   - Enhanced `ErrorReportingService.GetRecentIncidents()` to enumerate stored `incident-*.json` files from disk, deserialize them safely, deduplicate with in-memory incidents, and sort newest first.
+   - Historical crash and exception reports remain persisted on disk and inspectable in Settings without resurfacing as intrusive startup crash banners.
 
-4. **Playlist Management & Persistence**:
-   - Full playlist lifecycle: Create, Rename, Delete, Set Active, Add/Remove/Reorder tracks.
-   - Reuses existing Default Playlist singleton without duplicate entries.
-   - Atomic persistence surviving application restart (library, ordering, repeat mode, shuffle preference, volume, mute).
-   - Missing media files marked with `IsAvailable = false` and warning badges without crashes or playback disruption of valid tracks.
+4. **Centered Error Report Dialog**:
+   - Configured `ErrorReportDialog.xaml` with `Width="580"`, `MinWidth="480"`, `MaxWidth="640"`, `HorizontalAlignment="Center"`, and `VerticalAlignment="Center"`.
+   - Exposed `App.MainWindowInstance` and set dialog `XamlRoot` to `App.MainWindowInstance.Content.XamlRoot` when invoked.
+   - Resolved native HWND via `App.MainWindowInstance` for file save picker operations.
 
-5. **Two-Way SwitchDeck Synchronization**:
-   - Added "Manage Playlists" button in SwitchDeck music popup (`PresenterDockMenuWindow.xaml`), activating `MainWindow` and navigating to `MusicLibraryPage` without restarting playback or interrupting live presentation.
-   - Real-time synchronization of playlist renames, additions, deletions, active selection, and now-playing transport status across SwitchDeck and Music Library.
-
-6. **Strict Dual-Player Isolation Preserved**:
-   - `MediaPresentationService` (Video) and `BackgroundMusicService` (BGM) remain completely isolated.
-   - Video playback controls affect video only; music playback controls affect music only.
-   - Source switching preserves background music playback according to audio policy.
-
-7. **Streamlined Dashboard Music Section**:
-   - Replaced heavy playlist editing on Dashboard with a compact playback overview + "Manage Playlists" direct shortcut button.
-
-8. **Incident Report UI Polish & Field Mapping**:
-   - Redesigned `ErrorReportDialog.xaml` (centered relative to `MainWindow`, responsive wrapped action buttons, non-clipped "Copy Report" button, non-overlapping bottom `InfoBar`, collapsed technical details).
-   - Sanitized `Active Source` field to `"None"` when null or corrupted (preventing HRESULT or exception message leakage into source name), mapped `Error Code` to hex HRESULT.
-   - Persist task tracking and robust deletion handling in `ErrorReportingService` ensuring atomic cleanup.
+5. **Clean Shutdown Preserved**:
+   - Clean user shutdowns (`ShutdownApproved = true` via `ApplicationLifecycleService`) do not record false crashes.
 
 ---
 
 ## 2. Verification Performed
 
-- **Automated Tests**: **426 passing tests (0 failures, 0 skipped)** across all test fixtures.
+- **Automated Tests**: **429 passing tests (0 failures, 0 skipped)** across all test fixtures.
 - **Compiler Gates**:
   - `dotnet build SwitchCast.csproj -c Debug -p:Platform=x64` -> 0 Errors, 0 Warnings.
   - `dotnet build SwitchCast.csproj -c Release -p:Platform=x64` -> 0 Errors, 0 Warnings.
-  - `dotnet test SwitchCast.Tests/SwitchCast.Tests.csproj -c Debug` -> 426 Passed, 0 Failed, 0 Skipped.
+  - `dotnet test SwitchCast.Tests/SwitchCast.Tests.csproj -c Debug` -> 429 Passed, 0 Failed, 0 Skipped.
 - **Native UI Verification**:
   - NATIVE UI VERIFICATION PENDING interactive desktop session. Automated bindings, models, commands, services, and viewmodels are fully validated.
 

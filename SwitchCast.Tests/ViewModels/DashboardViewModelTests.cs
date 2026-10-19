@@ -354,4 +354,27 @@ public class DashboardViewModelTests
         Assert.Equal("Start Presenting", vm.PresentationButtonText);
         Assert.Equal("\uE768", vm.PresentationButtonGlyph);
     }
+
+    [Fact]
+    public void DashboardViewModel_DoesNotExposeOrTriggerCrashBannerOnStartup()
+    {
+        var mockErrorReporting = new Mock<SwitchCast.Services.Diagnostics.IErrorReportingService>();
+        var incident = new SwitchCast.Models.Diagnostics.DiagnosticIncident
+        {
+            Id = "SC-HISTORICAL-01",
+            SafeMessage = "Old crash on disk",
+            Severity = SwitchCast.Models.Diagnostics.DiagnosticSeverity.Critical
+        };
+        mockErrorReporting.Setup(r => r.GetPreviousCrashReports()).Returns(new List<SwitchCast.Models.Diagnostics.DiagnosticIncident> { incident });
+
+        var vm = new DashboardViewModel(
+            _mockStateService.Object,
+            _mockNavigationService.Object,
+            _mockCaptureCoordinator.Object,
+            _mockPresentationCoordinator.Object,
+            reportingService: mockErrorReporting.Object);
+
+        // Crash banners are removed from Dashboard; DashboardViewModel does not query or pop up banners on initialization
+        mockErrorReporting.Verify(r => r.GetPreviousCrashReports(), Times.Never);
+    }
 }

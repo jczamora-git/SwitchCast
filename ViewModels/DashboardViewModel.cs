@@ -95,8 +95,6 @@ public partial class DashboardViewModel : ObservableObject, IDisposable
         var defaultSource = _presentationStateService.SelectedSources.FirstOrDefault(s => s.IsAvailable);
         _selectedPreviewSource = defaultSource;
         _selectedPresentationSource = defaultSource;
-
-        CheckForPreviousCrash();
     }
 
     private void CheckForPreviousCrash()

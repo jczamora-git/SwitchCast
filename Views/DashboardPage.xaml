@@ -53,20 +53,6 @@
                 </StackPanel>
             </Grid>
 
-            <!-- Crash Recovery Banner -->
-            <InfoBar IsOpen="{x:Bind ViewModel.HasPreviousCrashReport, Mode=OneWay}"
-                     Severity="Warning"
-                     Title="SwitchCast recovered from an unexpected shutdown"
-                     Message="{x:Bind ViewModel.LatestPreviousCrash.SafeMessage, Mode=OneWay}"
-                     IsClosable="True"
-                     CloseButtonClick="OnDismissCrashInfoBar">
-                <InfoBar.ActionButton>
-                    <Button Content="View Crash Report"
-                            Click="OnViewPreviousCrashReportClick"
-                            Style="{StaticResource PrimaryAccentButtonStyle}" />
-                </InfoBar.ActionButton>
-            </InfoBar>
-
             <!-- Status Strip -->
             <Grid Padding="14,10"
                   Background="{ThemeResource AppSurfaceBrush}"

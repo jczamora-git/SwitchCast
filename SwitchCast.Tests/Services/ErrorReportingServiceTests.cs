@@ -250,4 +250,37 @@ public class ErrorReportingServiceTests : IDisposable
         Assert.Contains("Active Source:     None", formatted);
         Assert.Contains("0x80004005", formatted);
     }
+
+    [Fact]
+    public void GetRecentIncidents_ReadsSavedDiskIncidents_AndDeduplicatesWithInMemory()
+    {
+        var ex1 = new InvalidOperationException("First error in memory and disk");
+        var incident1 = _reportingService.RecordException("ComponentA", "OpA", ex1);
+        _reportingService.FlushCriticalIncident(incident1);
+
+        // Create a separate service instance pointing to the same logs directory (simulating app restart)
+        var restoredService = new ErrorReportingService(_testLogsDirectory, _reportBuilder, _redactionService);
+        var recent = restoredService.GetRecentIncidents();
+
+        Assert.NotEmpty(recent);
+        Assert.Contains(recent, i => i.Id == incident1.Id && i.SafeMessage.Contains("First error"));
+    }
+
+    [Fact]
+    public async Task ClearIncidentHistoryAsync_PurgesDiskFilesAndRecentList()
+    {
+        var ex = new Exception("Error to clear");
+        var incident = _reportingService.RecordException("TestComp", "TestOp", ex);
+        _reportingService.FlushCriticalIncident(incident);
+
+        Assert.NotEmpty(_reportingService.GetRecentIncidents());
+        var filesBefore = Directory.GetFiles(_testLogsDirectory, "incident-*.json");
+        Assert.NotEmpty(filesBefore);
+
+        await _reportingService.ClearIncidentHistoryAsync();
+
+        Assert.Empty(_reportingService.GetRecentIncidents());
+        var filesAfter = Directory.GetFiles(_testLogsDirectory, "incident-*.json");
+        Assert.Empty(filesAfter);
+    }
 }

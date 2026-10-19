@@ -9,9 +9,13 @@
     CloseButtonText="Close"
     DefaultButton="Close"
     CornerRadius="8"
-    MaxWidth="640">
+    Width="580"
+    MinWidth="480"
+    MaxWidth="640"
+    HorizontalAlignment="Center"
+    VerticalAlignment="Center">
 
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="12" Padding="0,4,0,0">
+    <Grid Width="540" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="12" Padding="0,4,0,0" HorizontalAlignment="Center">
         <!-- 1. Header & Incident Summary -->
         <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="12">
             <Border Width="40" Height="40" CornerRadius="20" Background="#33FF4D4D" HorizontalAlignment="Center" VerticalAlignment="Top">

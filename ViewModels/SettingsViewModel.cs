@@ -178,6 +178,11 @@ public partial class SettingsViewModel : ObservableObject
     public Visibility ShortcutsCategoryVisibility => SelectedCategoryIndex == 4 ? Visibility.Visible : Visibility.Collapsed;
     public Visibility DiagnosticsCategoryVisibility => SelectedCategoryIndex == 5 ? Visibility.Visible : Visibility.Collapsed;
     public Visibility NoIncidentsVisibility => RecentIncidents.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility EmptyStateVisibility => RecentIncidents.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility HasIncidentsVisibility => RecentIncidents.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    public string IncidentsCountText => RecentIncidents.Count.ToString();
+    public string LastRecordedErrorText => RecentIncidents.FirstOrDefault()?.SafeMessage ?? "None recorded";
+    public string LastRecordedErrorTimestamp => RecentIncidents.FirstOrDefault()?.FormattedTimestamp ?? "—";
 
     public IEnumerable<HotkeyBinding> FilteredHotkeyBindings
     {
@@ -352,6 +357,11 @@ public partial class SettingsViewModel : ObservableObject
             }
         }
         OnPropertyChanged(nameof(NoIncidentsVisibility));
+        OnPropertyChanged(nameof(EmptyStateVisibility));
+        OnPropertyChanged(nameof(HasIncidentsVisibility));
+        OnPropertyChanged(nameof(IncidentsCountText));
+        OnPropertyChanged(nameof(LastRecordedErrorText));
+        OnPropertyChanged(nameof(LastRecordedErrorTimestamp));
     }
 
     [RelayCommand]

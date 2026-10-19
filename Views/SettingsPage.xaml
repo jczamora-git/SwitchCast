@@ -126,7 +126,7 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <FontIcon Grid.Column="0" Glyph="&#xE9D9;" FontSize="14" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="1" Text="Diagnostics &amp; Reports" FontSize="12" FontWeight="Normal" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Diagnostics &amp; Logs" FontSize="12" FontWeight="Normal" VerticalAlignment="Center" />
                             </Grid>
                         </ListViewItem>
                     </ListView>
@@ -579,7 +579,7 @@
                     </Border>
 
                     <!-- ========================================================= -->
-                    <!-- CATEGORY 5: DIAGNOSTICS & REPORTS                         -->
+                    <!-- CATEGORY 5: DIAGNOSTICS & LOGS                            -->
                     <!-- ========================================================= -->
                     <Border Visibility="{x:Bind ViewModel.DiagnosticsCategoryVisibility, Mode=OneWay}"
                             HorizontalAlignment="Stretch"
@@ -589,12 +589,18 @@
                             CornerRadius="8"
                             Padding="20">
                         <StackPanel Spacing="16">
-                            <TextBlock Text="Diagnostics &amp; Error Reports"
-                                       FontSize="14"
-                                       FontWeight="SemiBold"
-                                       Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                            <!-- HEADER -->
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Diagnostics &amp; Logs"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                <TextBlock Text="Review application events, error reports, and technical diagnostics."
+                                           FontSize="12"
+                                           Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                            </StackPanel>
 
-                            <!-- Diagnostics Description & Privacy Banner -->
+                            <!-- Privacy / Offline Notice -->
                             <Border Background="{ThemeResource AppSurfaceElevatedBrush}"
                                     BorderBrush="{ThemeResource AppBorderBrush}"
                                     BorderThickness="1"
@@ -616,7 +622,58 @@
                                 </Grid>
                             </Border>
 
-                            <!-- Diagnostics Actions Strip -->
+                            <!-- SUMMARY: Recent incidents, Last recorded error, Log storage location -->
+                            <Grid ColumnSpacing="12" Margin="0,2,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Card 1: Total Incidents -->
+                                <Border Grid.Column="0"
+                                        Background="{ThemeResource AppSurfaceElevatedBrush}"
+                                        BorderBrush="{ThemeResource AppBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="12,10">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="Recent Incidents" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                        <TextBlock Text="{x:Bind ViewModel.IncidentsCountText, Mode=OneWay}" FontSize="18" FontWeight="Bold" Foreground="{ThemeResource AppAccentBrush}" />
+                                        <TextBlock Text="Recorded in session / disk" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Card 2: Last Recorded Error -->
+                                <Border Grid.Column="1"
+                                        Background="{ThemeResource AppSurfaceElevatedBrush}"
+                                        BorderBrush="{ThemeResource AppBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="12,10">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="Last Recorded Error" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                        <TextBlock Text="{x:Bind ViewModel.LastRecordedErrorText, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" MaxLines="1" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind ViewModel.LastRecordedErrorTimestamp, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Card 3: Storage Location -->
+                                <Border Grid.Column="2"
+                                        Background="{ThemeResource AppSurfaceElevatedBrush}"
+                                        BorderBrush="{ThemeResource AppBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="12,10">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="Log Storage Location" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                        <TextBlock Text="{x:Bind ViewModel.LogsDirectoryPath, Mode=OneWay}" FontSize="10" FontFamily="Consolas, monospace" Foreground="{ThemeResource AppTextPrimaryBrush}" MaxLines="1" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="Local app data directory" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <!-- Actions Strip -->
                             <StackPanel Orientation="Horizontal" Spacing="10">
                                 <Button Command="{x:Bind ViewModel.OpenLogsFolderCommand}"
                                         Style="{StaticResource SubtleButtonStyle}"
@@ -638,7 +695,7 @@
                                         <TextBlock Text="Refresh Incidents" FontSize="12" />
                                     </StackPanel>
                                 </Button>
-                                <Button Command="{x:Bind ViewModel.ClearDiagnosticsHistoryCommand}"
+                                <Button Click="OnClearIncidentHistoryClick"
                                         Style="{StaticResource SubtleButtonStyle}"
                                         BorderBrush="{ThemeResource AppBorderBrush}"
                                         BorderThickness="1"
@@ -650,29 +707,35 @@
                                 </Button>
                             </StackPanel>
 
-                            <!-- Log Storage Details -->
-                            <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto" RowSpacing="6" Margin="0,4,0,0">
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Log Location:" FontSize="12" Foreground="{ThemeResource AppTextSecondaryBrush}" />
-                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{x:Bind ViewModel.LogsDirectoryPath, Mode=OneWay}" FontSize="12" FontFamily="Consolas, monospace" Foreground="{ThemeResource AppTextPrimaryBrush}" TextWrapping="Wrap" />
+                            <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
 
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Retention Policy:" FontSize="12" Foreground="{ThemeResource AppTextSecondaryBrush}" />
-                                <TextBlock Grid.Row="1" Grid.Column="1" Text="Up to 10 recent incident files, 30 days retention, bounded log size" FontSize="12" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                            <!-- INCIDENT HISTORY HEADER -->
+                            <Grid>
+                                <TextBlock Text="Incident History" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
                             </Grid>
 
-                            <!-- Recent Incidents Section -->
-                            <TextBlock Text="Recent Error Incidents" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" Margin="0,8,0,0" />
+                            <!-- EMPTY STATE: No errors recorded -->
+                            <Border Visibility="{x:Bind ViewModel.EmptyStateVisibility, Mode=OneWay}"
+                                    Background="{ThemeResource AppSurfaceElevatedBrush}"
+                                    BorderBrush="{ThemeResource AppBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="24,20"
+                                    HorizontalAlignment="Stretch">
+                                <StackPanel HorizontalAlignment="Center" Spacing="8">
+                                    <FontIcon Glyph="&#xE73E;" FontSize="24" Foreground="#4EC9B0" HorizontalAlignment="Center" />
+                                    <TextBlock Text="No errors recorded" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="SwitchCast has not encountered any unhandled exceptions or crash events." FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
 
-                            <TextBlock Text="No error incidents recorded. System is operating normally."
-                                       FontSize="12"
-                                       Foreground="{ThemeResource AppTextSecondaryBrush}"
-                                       Visibility="{x:Bind ViewModel.NoIncidentsVisibility, Mode=OneWay}"
-                                       Margin="4,0,0,0" />
-
-                            <ItemsControl ItemsSource="{x:Bind ViewModel.RecentIncidents, Mode=OneWay}">
+                            <!-- INCIDENT LIST -->
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.RecentIncidents, Mode=OneWay}"
+                                          Visibility="{x:Bind ViewModel.HasIncidentsVisibility, Mode=OneWay}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="diagModels:DiagnosticIncident">
-                                        <Grid Padding="12,10"
-                                              Margin="0,0,0,6"
+                                        <Grid Padding="14,12"
+                                              Margin="0,0,0,8"
                                               Background="{ThemeResource AppSurfaceElevatedBrush}"
                                               BorderBrush="{ThemeResource AppBorderBrush}"
                                               BorderThickness="1"
@@ -682,26 +745,38 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
 
-                                            <StackPanel Grid.Column="0" Spacing="3" Margin="0,0,12,0">
+                                            <StackPanel Grid.Column="0" Spacing="5" Margin="0,0,16,0">
+                                                <!-- Badges: Severity, Component, Category, Reference ID, Timestamp -->
                                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <TextBlock Text="{x:Bind Id}" FontFamily="Consolas, monospace" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppAccentBrush}" />
-                                                    <TextBlock Text="{x:Bind HResultHex}" FontFamily="Consolas, monospace" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
-                                                    <TextBlock Text="{x:Bind FormattedTimestamp}" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                                    <Border Background="{ThemeResource AppBadgeBackgroundBrush}" BorderBrush="{ThemeResource AppBorderBrush}" BorderThickness="1" Padding="6,2" CornerRadius="4">
+                                                        <TextBlock Text="{x:Bind Severity}" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource AppAccentBrush}" />
+                                                    </Border>
+                                                    <Border Background="{ThemeResource AppBadgeBackgroundBrush}" BorderBrush="{ThemeResource AppBorderBrush}" BorderThickness="1" Padding="6,2" CornerRadius="4">
+                                                        <TextBlock Text="{x:Bind Component}" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                                    </Border>
+                                                    <TextBlock Text="{x:Bind Id}" FontFamily="Consolas, monospace" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppAccentBrush}" VerticalAlignment="Center" />
+                                                    <TextBlock Text="{x:Bind HResultHex}" FontFamily="Consolas, monospace" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                                    <TextBlock Text="{x:Bind FormattedTimestamp}" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
                                                 </StackPanel>
+
+                                                <!-- Error title / Safe message -->
                                                 <TextBlock Text="{x:Bind SafeMessage}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" TextWrapping="Wrap" />
+
+                                                <!-- Technical description / Operation -->
                                                 <TextBlock Text="{x:Bind DisplayTitle}" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" TextWrapping="Wrap" />
                                             </StackPanel>
 
+                                            <!-- Row actions: Details, Copy -->
                                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                                 <Button Click="OnViewIncidentDetailsClick"
                                                         Tag="{x:Bind}"
                                                         Style="{StaticResource SubtleButtonStyle}"
                                                         BorderBrush="{ThemeResource AppBorderBrush}"
                                                         BorderThickness="1"
-                                                        Padding="8,5">
+                                                        Padding="10,6">
                                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                                         <FontIcon Glyph="&#xE7B3;" FontSize="12" />
-                                                        <TextBlock Text="Details" FontSize="11" />
+                                                        <TextBlock Text="View Report" FontSize="11" />
                                                     </StackPanel>
                                                 </Button>
                                                 <Button Click="OnCopyIncidentClick"
@@ -709,7 +784,7 @@
                                                         Style="{StaticResource SubtleButtonStyle}"
                                                         BorderBrush="{ThemeResource AppBorderBrush}"
                                                         BorderThickness="1"
-                                                        Padding="8,5">
+                                                        Padding="8,6">
                                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                                         <FontIcon Glyph="&#xE8C8;" FontSize="12" />
                                                         <TextBlock Text="Copy" FontSize="11" />

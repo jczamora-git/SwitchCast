@@ -41,15 +41,21 @@ public sealed partial class ErrorReportDialog : ContentDialog
     /// Returns true if the dialog was displayed, or false if another dialog was already active.
     /// </summary>
     public static async Task<bool> ShowAsync(
-        XamlRoot xamlRoot,
+        XamlRoot? xamlRoot,
         DiagnosticIncident incident,
         IErrorReportingService reportingService,
         IDiagnosticReportBuilder reportBuilder)
     {
-        ArgumentNullException.ThrowIfNull(xamlRoot);
         ArgumentNullException.ThrowIfNull(incident);
         ArgumentNullException.ThrowIfNull(reportingService);
         ArgumentNullException.ThrowIfNull(reportBuilder);
+
+        var targetRoot = App.MainWindowInstance?.Content?.XamlRoot ?? xamlRoot;
+        if (targetRoot is null)
+        {
+            Debug.WriteLine("[ErrorReportDialog] Cannot show dialog: XamlRoot is null.");
+            return false;
+        }
 
         lock (_dialogLock)
         {
@@ -66,7 +72,7 @@ public sealed partial class ErrorReportDialog : ContentDialog
         {
             var dialog = new ErrorReportDialog(incident, reportingService, reportBuilder)
             {
-                XamlRoot = xamlRoot
+                XamlRoot = targetRoot
             };
 
             await dialog.ShowAsync();
@@ -142,11 +148,9 @@ public sealed partial class ErrorReportDialog : ContentDialog
             string report = _reportBuilder.BuildPlainTextReport(_incident);
             string fileName = $"switchcast-report-{_incident.Id.ToLowerInvariant()}.txt";
 
-            IntPtr hwnd = GetActiveWindow();
-            if (App.Current.MainWindow is not null)
-            {
-                hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.Current.MainWindow);
-            }
+            IntPtr hwnd = App.MainWindowInstance is not null
+                ? WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindowInstance)
+                : GetActiveWindow();
 
             var savePicker = new FileSavePicker
             {
