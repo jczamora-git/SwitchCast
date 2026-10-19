@@ -53,7 +53,7 @@ public class SourcesViewModelTests
 
         Assert.Equal("Application Windows (2)", vm.WindowCategoryHeader);
         Assert.Equal("Displays & Monitors (1)", vm.DisplayCategoryHeader);
-        Assert.Equal(2, vm.DisplayedSources.Count);
+        Assert.Equal(3, vm.DisplayedSources.Count); // All Sources (2 windows + 1 monitor)
         Assert.True(vm.HasDiscoveredSources);
         Assert.False(vm.IsEmpty);
     }
@@ -75,9 +75,12 @@ public class SourcesViewModelTests
         var vm = new SourcesViewModel(_mockStateService.Object, _mockWindowService.Object, _mockMonitorService.Object);
         await vm.RefreshSourcesCommand.ExecuteAsync(null);
 
-        Assert.Equal(2, vm.DisplayedSources.Count); // Windows category
+        Assert.Equal(3, vm.DisplayedSources.Count); // All Sources category
 
-        vm.SelectedCategoryIndex = 1; // Displays category
+        vm.SelectedCategoryIndex = 1; // Windows category
+        Assert.Equal(2, vm.DisplayedSources.Count);
+
+        vm.SelectedCategoryIndex = 2; // Displays category
 
         Assert.Single(vm.DisplayedSources);
         Assert.Equal("Display 1 (Primary)", vm.DisplayedSources[0].Title);
@@ -123,5 +126,37 @@ public class SourcesViewModelTests
 
         Assert.True(vm.HasError);
         Assert.Contains("Enumeration failed", vm.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task SearchQuery_ClearSearch_RestoresFullList()
+    {
+        var vm = new SourcesViewModel(_mockStateService.Object, _mockWindowService.Object, _mockMonitorService.Object);
+        await vm.RefreshSourcesCommand.ExecuteAsync(null);
+
+        vm.SearchQuery = "Chrome";
+        Assert.Single(vm.DisplayedSources);
+        Assert.True(vm.IsSearchQueryNotEmpty);
+
+        vm.ClearSearchCommand.Execute(null);
+        Assert.Empty(vm.SearchQuery);
+        Assert.False(vm.IsSearchQueryNotEmpty);
+        Assert.Equal(3, vm.DisplayedSources.Count);
+    }
+
+    [Fact]
+    public async Task CategoryDisplayOptions_ExposesAllSixCategoriesWithCounts()
+    {
+        var vm = new SourcesViewModel(_mockStateService.Object, _mockWindowService.Object, _mockMonitorService.Object);
+        await vm.RefreshSourcesCommand.ExecuteAsync(null);
+
+        var options = vm.CategoryDisplayOptions;
+        Assert.Equal(6, options.Count);
+        Assert.Contains("All Sources (3)", options[0]);
+        Assert.Contains("Application Windows (2)", options[1]);
+        Assert.Contains("Displays & Monitors (1)", options[2]);
+        Assert.Contains("Media Files (0)", options[3]);
+        Assert.Contains("PowerPoint (0)", options[4]);
+        Assert.Contains("Cameras (0)", options[5]);
     }
 }

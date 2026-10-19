@@ -167,8 +167,8 @@ public class PowerPointCameraHotfixRegressionTests
             // Verify imported and persisted in UserSettings
             Assert.Contains(tempPptPath, settings.ImportedPowerPointPaths);
 
-            // Switch to PowerPoint category (index 3)
-            vm.SelectedCategoryIndex = 3;
+            // Switch to PowerPoint category (index 4)
+            vm.SelectedCategoryIndex = 4;
             Assert.Single(vm.DisplayedSources);
             var item = vm.DisplayedSources[0];
 
@@ -221,7 +221,7 @@ public class PowerPointCameraHotfixRegressionTests
             settingsService: mockSettings.Object);
 
         await vm.RefreshSourcesAsync();
-        vm.SelectedCategoryIndex = 3; // PowerPoint
+        vm.SelectedCategoryIndex = 4; // PowerPoint
 
         Assert.Single(vm.DisplayedSources);
         var sourceItem = vm.DisplayedSources[0];

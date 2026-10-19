@@ -31,12 +31,12 @@
 
                 <!-- Actions Header Strip -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <!-- Add Media Button (visible when Media Files selected) -->
+                    <!-- Add Media Button (visible when All Sources or Media Files selected) -->
                     <Button Command="{x:Bind ViewModel.AddMediaCommand}"
                             Visibility="{x:Bind ViewModel.IsMediaCategorySelected, Mode=OneWay}"
-                            Style="{StaticResource PrimaryAccentButtonStyle}"
+                            Style="{StaticResource SubtleButtonStyle}"
                             VerticalAlignment="Center"
-                            Padding="14,6"
+                            Padding="12,6"
                             ToolTipService.ToolTip="Import local images (PNG, JPG, BMP) and videos (MP4, WMV)">
                         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                             <FontIcon Glyph="&#xE710;" FontSize="13" />
@@ -44,9 +44,8 @@
                         </StackPanel>
                     </Button>
 
-                    <!-- Import PowerPoint Button (visible when PowerPoint selected) -->
+                    <!-- Import PowerPoint Button -->
                     <Button Command="{x:Bind ViewModel.AddPowerPointCommand}"
-                            Visibility="{x:Bind ViewModel.IsPowerPointCategorySelected, Mode=OneWay}"
                             Style="{StaticResource PrimaryAccentButtonStyle}"
                             VerticalAlignment="Center"
                             Padding="14,6"
@@ -77,47 +76,45 @@
                      Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
                      IsClosable="True" />
 
-            <!-- Unified Filter & Search Toolbar -->
+            <!-- Dedicated Search & Category Selector Toolbar -->
             <Border Background="{ThemeResource AppSurfaceBrush}"
                     BorderBrush="{ThemeResource AppBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="8"
-                    Padding="12,8">
-                <Grid>
+                    Padding="12,10">
+                <Grid ColumnSpacing="12" RowSpacing="8">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="220" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Category Selector (Windows / Displays / Media Files / PowerPoint / Cameras) -->
-                    <RadioButtons Grid.Column="0"
-                                  SelectedIndex="{x:Bind ViewModel.SelectedCategoryIndex, Mode=TwoWay}"
-                                  MaxColumns="5"
-                                  VerticalAlignment="Center">
-                        <RadioButton Content="{x:Bind ViewModel.WindowCategoryHeader, Mode=OneWay}"
-                                     FontSize="12"
-                                     Margin="0,0,14,0" />
-                        <RadioButton Content="{x:Bind ViewModel.DisplayCategoryHeader, Mode=OneWay}"
-                                     FontSize="12"
-                                     Margin="0,0,14,0" />
-                        <RadioButton Content="{x:Bind ViewModel.MediaCategoryHeader, Mode=OneWay}"
-                                     FontSize="12"
-                                     Margin="0,0,14,0" />
-                        <RadioButton Content="{x:Bind ViewModel.PowerPointCategoryHeader, Mode=OneWay}"
-                                     FontSize="12"
-                                     Margin="0,0,14,0" />
-                        <RadioButton Content="{x:Bind ViewModel.CameraCategoryHeader, Mode=OneWay}"
-                                     FontSize="12" />
-                    </RadioButtons>
+                    <!-- Compact Category Selection Dropdown -->
+                    <ComboBox Grid.Column="0"
+                              ItemsSource="{x:Bind ViewModel.CategoryDisplayOptions, Mode=OneWay}"
+                              SelectedIndex="{x:Bind ViewModel.SelectedCategoryIndex, Mode=TwoWay}"
+                              HorizontalAlignment="Stretch"
+                              FontSize="12"
+                              Padding="10,6"
+                              ToolTipService.ToolTip="Select source category" />
 
-                    <!-- Search Input -->
-                    <TextBox Grid.Column="2"
-                             Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             PlaceholderText="Filter by title, process, or filename..."
-                             Width="260"
-                             FontSize="12"
-                             VerticalAlignment="Center" />
+                    <!-- Dedicated Search Input with Clear Action -->
+                    <Grid Grid.Column="1" HorizontalAlignment="Stretch">
+                        <TextBox Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 PlaceholderText="Search title, process, app, or file name..."
+                                 FontSize="12"
+                                 HorizontalAlignment="Stretch"
+                                 VerticalAlignment="Center" />
+                        <Button Command="{x:Bind ViewModel.ClearSearchCommand}"
+                                Visibility="{x:Bind ViewModel.IsSearchQueryNotEmpty, Mode=OneWay}"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Margin="0,0,4,0"
+                                Padding="6,4"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                ToolTipService.ToolTip="Clear search">
+                            <FontIcon Glyph="&#xE711;" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                        </Button>
+                    </Grid>
                 </Grid>
             </Border>
 

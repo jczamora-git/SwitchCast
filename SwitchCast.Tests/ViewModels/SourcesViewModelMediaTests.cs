@@ -49,7 +49,7 @@ public class SourcesViewModelMediaTests
         Assert.Equal(0, vm.SelectedCategoryIndex);
         Assert.False(vm.IsMediaCategorySelected);
 
-        vm.SelectedCategoryIndex = 2;
+        vm.SelectedCategoryIndex = 3;
         Assert.True(vm.IsMediaCategorySelected);
     }
 
@@ -79,7 +79,7 @@ public class SourcesViewModelMediaTests
             _mockMediaPickerService.Object,
             _mockSettingsService.Object)
         {
-            SelectedCategoryIndex = 2 // Switch to Media category
+            SelectedCategoryIndex = 3 // Switch to Media category
         };
 
         await vm.AddMediaAsync();
@@ -116,7 +116,7 @@ public class SourcesViewModelMediaTests
             _mockMediaPickerService.Object,
             _mockSettingsService.Object)
         {
-            SelectedCategoryIndex = 2
+            SelectedCategoryIndex = 3
         };
 
         await vm.AddMediaAsync();

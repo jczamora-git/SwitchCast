@@ -91,6 +91,49 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
         _presentationStateService.PropertyChanged += OnPresentationStatePropertyChanged;
     }
 
+    public void SetDispatcherQueue(Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue)
+    {
+        _dispatcherQueue = dispatcherQueue;
+        _dispatcher = dispatcherQueue is not null ? new DispatcherQueueAdapter(dispatcherQueue) : null;
+    }
+
+    public void SetUIThreadDispatcher(IUIThreadDispatcher? dispatcher)
+    {
+        _dispatcher = dispatcher;
+    }
+
+    private void RunOnUIThread(Action action)
+    {
+        if (_disposed) return;
+        if (_dispatcher is not null)
+        {
+            if (_dispatcher.HasThreadAccess)
+            {
+                action();
+            }
+            else
+            {
+                _dispatcher.TryEnqueue(action);
+            }
+            return;
+        }
+        if (_dispatcherQueue is not null)
+        {
+            if (_dispatcherQueue.HasThreadAccess)
+            {
+                action();
+            }
+            else
+            {
+                _dispatcherQueue.TryEnqueue(() => action());
+            }
+        }
+        else
+        {
+            action();
+        }
+    }
+
     public ObservableCollection<SelectableSourceItem> DisplayedSources { get; }
 
     public int SelectedSourceCount => _presentationStateService.SelectedSourceCount;
@@ -101,28 +144,50 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
 
     public bool IsEmpty => !IsRefreshing && DisplayedSources.Count == 0;
 
-    public bool IsMediaCategorySelected => SelectedCategoryIndex == 2;
+    public bool IsAllSourcesCategorySelected => SelectedCategoryIndex == 0;
 
-    public bool IsPowerPointCategorySelected => SelectedCategoryIndex == 3;
+    public bool IsWindowsCategorySelected => SelectedCategoryIndex == 1;
 
-    public bool IsCameraCategorySelected => SelectedCategoryIndex == 4;
+    public bool IsDisplaysCategorySelected => SelectedCategoryIndex == 2;
+
+    public bool IsMediaCategorySelected => SelectedCategoryIndex == 3;
+
+    public bool IsPowerPointCategorySelected => SelectedCategoryIndex == 4;
+
+    public bool IsCameraCategorySelected => SelectedCategoryIndex == 5;
+
+    public bool IsSearchQueryNotEmpty => !string.IsNullOrWhiteSpace(SearchQuery);
+
+    public int TotalSourcesCount => _allWindows.Count + _allDisplays.Count + _allMedia.Count + _allPowerPoint.Count + _allCameras.Count;
+
+    public IReadOnlyList<string> CategoryDisplayOptions =>
+    [
+        $"All Sources ({TotalSourcesCount})",
+        WindowCategoryHeader,
+        DisplayCategoryHeader,
+        MediaCategoryHeader,
+        PowerPointCategoryHeader,
+        CameraCategoryHeader
+    ];
 
     public string EmptyStateTitle => SelectedCategoryIndex switch
     {
-        0 => "No Application Windows Found",
-        1 => "No Displays Detected",
-        2 => "No Media Files Imported",
-        3 => "No PowerPoint Presentations Imported",
+        0 => "No Presentation Sources Found",
+        1 => "No Application Windows Found",
+        2 => "No Displays Detected",
+        3 => "No Media Files Imported",
+        4 => "No PowerPoint Presentations Imported",
         _ => "No Cameras Detected"
     };
 
     public string EmptyStateSubtitle => string.IsNullOrWhiteSpace(SearchQuery)
         ? (SelectedCategoryIndex switch
         {
-            0 => "No running desktop application windows are currently visible. Launch an application and click Refresh.",
-            1 => "No display monitors detected on this system. Click Refresh to scan again.",
-            2 => "Import local images and videos to present them directly without third-party applications. Click 'Add Media'.",
-            3 => "Import PowerPoint decks (.pptx) to present slides directly or launch live slideshows. Click 'Import PowerPoint'.",
+            0 => "No presentation sources discovered. Click Refresh or import files.",
+            1 => "No running desktop application windows are currently visible. Launch an application and click Refresh.",
+            2 => "No display monitors detected on this system. Click Refresh to scan again.",
+            3 => "Import local images and videos to present them directly without third-party applications. Click 'Add Media'.",
+            4 => "Import PowerPoint decks (.pptx) to present slides directly or launch live slideshows. Click 'Import PowerPoint'.",
             _ => "No webcam or USB video capture devices detected. Connect a camera and click Refresh."
         })
         : $"No presentation sources match '{SearchQuery}'.";
@@ -333,6 +398,16 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
                     await _settingsService.SaveSettingsAsync().ConfigureAwait(true);
                 }
 
+                if (SelectedCategoryIndex != 3 && SelectedCategoryIndex != 0)
+                {
+                    SelectedCategoryIndex = 3;
+                }
+
+                if (!string.IsNullOrWhiteSpace(SearchQuery))
+                {
+                    SearchQuery = string.Empty;
+                }
+
                 UpdateCategoryHeaders();
                 ApplyFilter();
             }
@@ -433,6 +508,16 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
                     await _settingsService.SaveSettingsAsync().ConfigureAwait(true);
                 }
 
+                if (SelectedCategoryIndex != 4 && SelectedCategoryIndex != 0)
+                {
+                    SelectedCategoryIndex = 4;
+                }
+
+                if (!string.IsNullOrWhiteSpace(SearchQuery))
+                {
+                    SearchQuery = string.Empty;
+                }
+
                 UpdateCategoryHeaders();
                 ApplyFilter();
             }
@@ -491,6 +576,8 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
         MediaCategoryHeader = $"Media Files ({_allMedia.Count})";
         PowerPointCategoryHeader = $"PowerPoint ({_allPowerPoint.Count})";
         CameraCategoryHeader = $"Cameras ({_allCameras.Count})";
+        OnPropertyChanged(nameof(TotalSourcesCount));
+        OnPropertyChanged(nameof(CategoryDisplayOptions));
     }
 
     private async Task LoadIconsAsync(IEnumerable<SelectableSourceItem> items)
@@ -554,6 +641,9 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
 
     partial void OnSelectedCategoryIndexChanged(int value)
     {
+        OnPropertyChanged(nameof(IsAllSourcesCategorySelected));
+        OnPropertyChanged(nameof(IsWindowsCategorySelected));
+        OnPropertyChanged(nameof(IsDisplaysCategorySelected));
         OnPropertyChanged(nameof(IsMediaCategorySelected));
         OnPropertyChanged(nameof(IsPowerPointCategorySelected));
         OnPropertyChanged(nameof(IsCameraCategorySelected));
@@ -562,43 +652,52 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
 
     partial void OnSearchQueryChanged(string value)
     {
+        OnPropertyChanged(nameof(IsSearchQueryNotEmpty));
         ApplyFilter();
     }
 
     private void ApplyFilter()
     {
-        DisplayedSources.Clear();
-
-        var sourceList = SelectedCategoryIndex switch
+        RunOnUIThread(() =>
         {
-            0 => _allWindows,
-            1 => _allDisplays,
-            2 => _allMedia,
-            3 => _allPowerPoint,
-            _ => _allCameras
-        };
+            DisplayedSources.Clear();
 
-        var query = SearchQuery?.Trim() ?? string.Empty;
+            IEnumerable<SelectableSourceItem> sourceList = SelectedCategoryIndex switch
+            {
+                0 => _allWindows.Concat(_allDisplays).Concat(_allMedia).Concat(_allPowerPoint).Concat(_allCameras),
+                1 => _allWindows,
+                2 => _allDisplays,
+                3 => _allMedia,
+                4 => _allPowerPoint,
+                _ => _allCameras
+            };
 
-        var filtered = string.IsNullOrEmpty(query)
-            ? sourceList
-            : sourceList.Where(item =>
-                item.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                (item.Source is WindowSource w && w.ProcessName.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
-                (item.Source is MediaFileSource m && m.FilePath.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
-                (item.Source is PowerPointSource p && p.FilePath.Contains(query, StringComparison.OrdinalIgnoreCase)));
+            var query = SearchQuery?.Trim() ?? string.Empty;
 
-        foreach (var item in filtered)
-        {
-            // Sync selection state with authoritative state service
-            item.IsSelected = _presentationStateService.IsSourceSelected(item.Id);
-            DisplayedSources.Add(item);
-        }
+            var filtered = string.IsNullOrEmpty(query)
+                ? sourceList
+                : sourceList.Where(item =>
+                    item.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    (item.Source is WindowSource w && (
+                        w.ProcessName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                        (!string.IsNullOrEmpty(w.ProcessPath) && w.ProcessPath.Contains(query, StringComparison.OrdinalIgnoreCase)))) ||
+                    (item.Source is MediaFileSource m && m.FilePath.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
+                    (item.Source is PowerPointSource p && p.FilePath.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
+                    (item.Source is MonitorSource mon && mon.DeviceName.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
+                    (item.Source is CameraSource cam && cam.DeviceId.Contains(query, StringComparison.OrdinalIgnoreCase)));
 
-        OnPropertyChanged(nameof(HasDiscoveredSources));
-        OnPropertyChanged(nameof(IsEmpty));
-        OnPropertyChanged(nameof(EmptyStateTitle));
-        OnPropertyChanged(nameof(EmptyStateSubtitle));
+            foreach (var item in filtered)
+            {
+                // Sync selection state with authoritative state service
+                item.IsSelected = _presentationStateService.IsSourceSelected(item.Id);
+                DisplayedSources.Add(item);
+            }
+
+            OnPropertyChanged(nameof(HasDiscoveredSources));
+            OnPropertyChanged(nameof(IsEmpty));
+            OnPropertyChanged(nameof(EmptyStateTitle));
+            OnPropertyChanged(nameof(EmptyStateSubtitle));
+        });
     }
 
     private void OnItemSelectionChanged(SelectableSourceItem item, bool isSelected)
@@ -615,32 +714,6 @@ public partial class SourcesViewModel : ObservableObject, IDisposable
         else
         {
             _presentationStateService.RemoveSelectedSource(item.Id);
-        }
-    }
-
-    /// <summary>
-    /// Configures the authoritative UI thread DispatcherQueue for this ViewModel.
-    /// </summary>
-    public void SetDispatcherQueue(Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue)
-    {
-        _dispatcherQueue = dispatcherQueue;
-        _dispatcher = dispatcherQueue is not null ? new DispatcherQueueAdapter(dispatcherQueue) : null;
-    }
-
-    private void RunOnUIThread(Action action)
-    {
-        if (_disposed || _dispatcher is null)
-        {
-            return;
-        }
-
-        if (_dispatcher.HasThreadAccess)
-        {
-            action();
-        }
-        else
-        {
-            _dispatcher.TryEnqueue(action);
         }
     }
 
