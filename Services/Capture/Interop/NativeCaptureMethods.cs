@@ -10,7 +10,8 @@ public static class NativeCaptureMethods
     public const uint D3D11_CREATE_DEVICE_BGRA_SUPPORT = 0x20;
     public const uint D3D11_SDK_VERSION = 7;
     public const int D3D_DRIVER_TYPE_HARDWARE = 1;
-    public const int D3D_DRIVER_TYPE_WARP = 2;
+    public const int D3D_DRIVER_TYPE_REFERENCE = 2;
+    public const int D3D_DRIVER_TYPE_WARP = 5;
 
     public static readonly Guid IID_IGraphicsCaptureItemInterop = new("3628E81B-3CAC-4C60-B7F4-23CE0E0C3356");
     public static readonly Guid IID_IInspectable = new("AF86E2E0-B12D-4C6A-9C5A-D7AA65101E90");
