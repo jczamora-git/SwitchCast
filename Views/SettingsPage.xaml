@@ -129,6 +129,18 @@
                                 <TextBlock Grid.Column="1" Text="Diagnostics &amp; Logs" FontSize="12" FontWeight="Normal" VerticalAlignment="Center" />
                             </Grid>
                         </ListViewItem>
+
+                        <!-- 6: Performance & Rendering -->
+                        <ListViewItem>
+                            <Grid ColumnSpacing="10" VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Grid.Column="0" Glyph="&#xE9E9;" FontSize="14" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Performance" FontSize="12" FontWeight="Normal" VerticalAlignment="Center" />
+                            </Grid>
+                        </ListViewItem>
                     </ListView>
                 </Border>
 
@@ -795,6 +807,170 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ========================================================= -->
+                    <!-- CATEGORY 6: PERFORMANCE & ADAPTIVE RENDERING              -->
+                    <!-- ========================================================= -->
+                    <Border Visibility="{x:Bind ViewModel.PerformanceCategoryVisibility, Mode=OneWay}"
+                            HorizontalAlignment="Stretch"
+                            Background="{ThemeResource AppSurfaceBrush}"
+                            BorderBrush="{ThemeResource AppBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="20,18">
+                        <StackPanel Spacing="16">
+
+                            <!-- Section Header -->
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="Performance &amp; Adaptive Rendering"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                <TextBlock Text="Configure rendering acceleration, frame scheduling, and resource efficiency."
+                                           FontSize="12"
+                                           Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                            </StackPanel>
+
+                            <!-- RENDERING MODE ROW -->
+                            <Grid ColumnSpacing="16" VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Rendering Mode"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                    <TextBlock Text="Auto selects the best compatible backend. Prefer Hardware enforces Direct3D 11 GPU rendering. Compatibility Mode uses WARP software rasterization."
+                                               FontSize="11"
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ComboBox Grid.Column="1"
+                                          SelectedIndex="{x:Bind ViewModel.SelectedRenderingModeIndex, Mode=TwoWay}"
+                                          MinWidth="190">
+                                    <ComboBoxItem Content="Auto (Recommended)" />
+                                    <ComboBoxItem Content="Prefer Hardware" />
+                                    <ComboBoxItem Content="Compatibility Mode" />
+                                </ComboBox>
+                            </Grid>
+
+                            <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                            <!-- HARDWARE CAPABILITIES SUMMARY -->
+                            <Grid ColumnSpacing="12" Margin="0,2,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Card 1: Active Backend -->
+                                <Border Grid.Column="0"
+                                        Background="{ThemeResource AppSurfaceElevatedBrush}"
+                                        BorderBrush="{ThemeResource AppBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="12,10">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="Active Backend" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                        <TextBlock Text="{x:Bind ViewModel.ActiveBackendText, Mode=OneWay}" FontSize="13" FontWeight="Bold" Foreground="{ThemeResource AppAccentBrush}" MaxLines="1" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind ViewModel.HardwareAccelerationStatus, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Card 2: Primary Graphics Adapter -->
+                                <Border Grid.Column="1"
+                                        Background="{ThemeResource AppSurfaceElevatedBrush}"
+                                        BorderBrush="{ThemeResource AppBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="12,10">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="Graphics Adapter" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                        <TextBlock Text="{x:Bind ViewModel.PrimaryGpuName, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" MaxLines="1" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind ViewModel.DedicatedVideoMemory, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Card 3: Feature Level -->
+                                <Border Grid.Column="2"
+                                        Background="{ThemeResource AppSurfaceElevatedBrush}"
+                                        BorderBrush="{ThemeResource AppBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="12,10">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="Direct3D Level" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                        <TextBlock Text="{x:Bind ViewModel.Direct3DFeatureLevel, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                        <TextBlock Text="{x:Bind ViewModel.GpuVendorName, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <!-- FALLBACK AND OPTIMIZATION NOTE -->
+                            <Border Background="{ThemeResource AppSurfaceElevatedBrush}"
+                                    BorderBrush="{ThemeResource AppBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="14,12">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Grid.Column="0" Glyph="&#xE946;" FontSize="16" Foreground="{ThemeResource AppAccentBrush}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                                    <StackPanel Grid.Column="1" Spacing="4">
+                                        <TextBlock Text="Adaptive Resource Profile" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                        <TextBlock Text="{x:Bind ViewModel.FallbackNote, Mode=OneWay}"
+                                                   FontSize="11"
+                                                   Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                            <!-- PERFORMANCE DIAGNOSTICS TOGGLE ROW -->
+                            <Grid ColumnSpacing="16" VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Enable Performance Telemetry"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                    <TextBlock Text="Lightweight in-memory counter aggregation. Tracks live preview FPS, audience output FPS, and frame drop rates without disk writes."
+                                               FontSize="11"
+                                               Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsOn="{x:Bind ViewModel.EnablePerformanceDiagnostics, Mode=TwoWay}"
+                                              OnContent=""
+                                              OffContent="" />
+                            </Grid>
+
+                            <!-- REFRESH BUTTON ROW -->
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Button Command="{x:Bind ViewModel.RefreshPerformanceDataCommand}"
+                                        Style="{StaticResource SubtleButtonStyle}"
+                                        BorderBrush="{ThemeResource AppBorderBrush}"
+                                        BorderThickness="1"
+                                        Padding="12,6">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xE72C;" FontSize="13" />
+                                        <TextBlock Text="Refresh Hardware Info" FontSize="12" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
 
                         </StackPanel>
                     </Border>

@@ -1,6 +1,9 @@
 using Moq;
 using SwitchCast.Models;
+using SwitchCast.Models.Performance;
 using SwitchCast.Services;
+using SwitchCast.Services.Capture;
+using SwitchCast.Services.Performance;
 using SwitchCast.ViewModels;
 using Xunit;
 
@@ -90,5 +93,46 @@ public class SettingsViewModelTests
         Assert.Contains("Zero Telemetry", vm.PrivacyStatement);
         Assert.False(string.IsNullOrWhiteSpace(vm.AppVersion));
         Assert.NotNull(vm.OpenWebsiteCommand);
+    }
+
+    [Fact]
+    public void PerformanceCategory_VisibilityToggles()
+    {
+        var vm = new SettingsViewModel(_mockSettingsService.Object);
+
+        Assert.Equal(Microsoft.UI.Xaml.Visibility.Collapsed, vm.PerformanceCategoryVisibility);
+
+        vm.SelectedCategoryIndex = 6;
+        Assert.Equal(Microsoft.UI.Xaml.Visibility.Visible, vm.PerformanceCategoryVisibility);
+    }
+
+    [Fact]
+    public void ChangingSelectedRenderingModeIndex_UpdatesSettingsAndDeviceProvider()
+    {
+        var mockDevice = new Mock<IDirect3D11DeviceProvider>();
+        var vm = new SettingsViewModel(
+            _mockSettingsService.Object,
+            deviceProvider: mockDevice.Object);
+
+        vm.SelectedRenderingModeIndex = (int)RenderingMode.CompatibilityMode;
+
+        Assert.Equal(RenderingMode.CompatibilityMode, _mockSettingsService.Object.CurrentSettings.RenderingMode);
+        mockDevice.Verify(d => d.SetRenderingMode(RenderingMode.CompatibilityMode), Times.Once);
+        _mockSettingsService.Verify(s => s.SaveSettingsAsync(), Times.Once);
+    }
+
+    [Fact]
+    public void ChangingEnablePerformanceDiagnostics_UpdatesMetricsServiceAndSettings()
+    {
+        var mockMetrics = new Mock<IPerformanceMetricsService>();
+        var vm = new SettingsViewModel(
+            _mockSettingsService.Object,
+            metricsService: mockMetrics.Object);
+
+        vm.EnablePerformanceDiagnostics = true;
+
+        Assert.True(_mockSettingsService.Object.CurrentSettings.EnablePerformanceDiagnostics);
+        mockMetrics.VerifySet(m => m.IsDiagnosticsEnabled = true, Times.Once);
+        _mockSettingsService.Verify(s => s.SaveSettingsAsync(), Times.Once);
     }
 }

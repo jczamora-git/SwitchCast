@@ -21,9 +21,22 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IHotkeyService? _hotkeyService;
     private readonly IErrorReportingService? _errorReportingService;
     private readonly IDiagnosticReportBuilder? _reportBuilder;
+    private readonly Services.Performance.IGraphicsCapabilityService? _capabilityService;
+    private readonly Services.Capture.IDirect3D11DeviceProvider? _deviceProvider;
+    private readonly Services.Performance.IPerformanceMetricsService? _metricsService;
+    private Models.Performance.GraphicsCapabilities? _graphicsCapabilities;
 
     [ObservableProperty]
-    private int _selectedCategoryIndex = 0; // 0=General, 1=Appearance, 2=Window, 3=Presenter, 4=Shortcuts, 5=Diagnostics
+    private int _selectedCategoryIndex = 0; // 0=General, 1=Appearance, 2=Window, 3=Presenter, 4=Shortcuts, 5=Diagnostics, 6=Performance
+
+    [ObservableProperty]
+    private int _selectedRenderingModeIndex; // 0=Auto, 1=PreferHardware, 2=CompatibilityMode
+
+    [ObservableProperty]
+    private bool _enablePerformanceDiagnostics;
+
+    [ObservableProperty]
+    private Models.Performance.PerformanceSnapshot? _currentPerformanceSnapshot;
 
     [ObservableProperty]
     private int _selectedThemeIndex;
@@ -75,13 +88,19 @@ public partial class SettingsViewModel : ObservableObject
         IHotkeyService? hotkeyService = null,
         IMonitorDiscoveryService? monitorDiscoveryService = null,
         IErrorReportingService? errorReportingService = null,
-        IDiagnosticReportBuilder? reportBuilder = null)
+        IDiagnosticReportBuilder? reportBuilder = null,
+        Services.Performance.IGraphicsCapabilityService? capabilityService = null,
+        Services.Capture.IDirect3D11DeviceProvider? deviceProvider = null,
+        Services.Performance.IPerformanceMetricsService? metricsService = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _hotkeyService = hotkeyService;
         _monitorDiscoveryService = monitorDiscoveryService;
         _errorReportingService = errorReportingService;
         _reportBuilder = reportBuilder;
+        _capabilityService = capabilityService;
+        _deviceProvider = deviceProvider;
+        _metricsService = metricsService;
 
         var current = _settingsService.CurrentSettings;
         _selectedThemeIndex = (int)current.Theme;
@@ -94,6 +113,18 @@ public partial class SettingsViewModel : ObservableObject
         _autoDetectExternalDisplay = current.AutoDetectExternalDisplay;
         _autoFullscreenOnExternalDisplay = current.AutoFullscreenOnExternalDisplay;
         _hotkeyBindings = current.HotkeyBindings.ToList();
+        _selectedRenderingModeIndex = (int)current.RenderingMode;
+        _enablePerformanceDiagnostics = current.EnablePerformanceDiagnostics;
+
+        if (_metricsService is not null)
+        {
+            _metricsService.IsDiagnosticsEnabled = _enablePerformanceDiagnostics;
+        }
+
+        if (_capabilityService is not null)
+        {
+            _graphicsCapabilities = _capabilityService.GetCapabilities(forceRefresh: false);
+        }
 
         InitializeDisplayOptions(current.PreferredDisplayDeviceName);
         RefreshIncidents();
@@ -177,6 +208,21 @@ public partial class SettingsViewModel : ObservableObject
     public Visibility PresenterCategoryVisibility => SelectedCategoryIndex == 3 ? Visibility.Visible : Visibility.Collapsed;
     public Visibility ShortcutsCategoryVisibility => SelectedCategoryIndex == 4 ? Visibility.Visible : Visibility.Collapsed;
     public Visibility DiagnosticsCategoryVisibility => SelectedCategoryIndex == 5 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility PerformanceCategoryVisibility => SelectedCategoryIndex == 6 ? Visibility.Visible : Visibility.Collapsed;
+
+    public string PrimaryGpuName => _graphicsCapabilities?.PrimaryAdapter?.Name ?? "Default Display Adapter";
+    public string GpuVendorName => _graphicsCapabilities?.PrimaryAdapter?.VendorName ?? "Unknown";
+    public string DedicatedVideoMemory => _graphicsCapabilities?.PrimaryAdapter?.DedicatedMemoryMB ?? "—";
+    public string SharedVideoMemory => _graphicsCapabilities?.PrimaryAdapter?.SharedMemoryMB ?? "—";
+    public string Direct3DFeatureLevel => _graphicsCapabilities?.FeatureLevel ?? "Direct3D 11.0";
+    public string ActiveBackendText => _deviceProvider?.ActiveBackendDescription ?? "Direct3D 11 Hardware";
+    public string HardwareAccelerationStatus => (_deviceProvider?.IsHardwareAccelerated ?? true) ? "Hardware Accelerated" : "Software (WARP)";
+    public string CapabilitiesSummaryText => _graphicsCapabilities?.SummaryText ?? string.Empty;
+    public string FallbackNote => _deviceProvider?.ActiveMode == Models.Performance.RenderingMode.CompatibilityMode
+        ? "Compatibility Mode uses Direct3D 11 WARP software rasterization for reliable operation on devices with unstable or restricted display drivers."
+        : _graphicsCapabilities?.IsIntegratedGpu == true
+            ? "Integrated GPU detected. SwitchCast adapts frame queue pacing and eliminates redundant surface conversions automatically."
+            : "Direct3D 11 hardware pipeline active. Presentation Output is rendered with zero CPU readback.";
     public Visibility NoIncidentsVisibility => RecentIncidents.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     public Visibility EmptyStateVisibility => RecentIncidents.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     public Visibility HasIncidentsVisibility => RecentIncidents.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -208,10 +254,15 @@ public partial class SettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(PresenterCategoryVisibility));
         OnPropertyChanged(nameof(ShortcutsCategoryVisibility));
         OnPropertyChanged(nameof(DiagnosticsCategoryVisibility));
+        OnPropertyChanged(nameof(PerformanceCategoryVisibility));
 
         if (value == 5)
         {
             RefreshIncidents();
+        }
+        else if (value == 6)
+        {
+            RefreshPerformanceData();
         }
     }
 
@@ -292,6 +343,48 @@ public partial class SettingsViewModel : ObservableObject
             _settingsService.CurrentSettings.PreferredDisplayDeviceName = _discoveredMonitors[value - 1].DeviceName;
         }
         await _settingsService.SaveSettingsAsync();
+    }
+
+    async partial void OnSelectedRenderingModeIndexChanged(int value)
+    {
+        var mode = (Models.Performance.RenderingMode)value;
+        _settingsService.CurrentSettings.RenderingMode = mode;
+        _deviceProvider?.SetRenderingMode(mode);
+        await _settingsService.SaveSettingsAsync();
+        RefreshPerformanceData();
+    }
+
+    async partial void OnEnablePerformanceDiagnosticsChanged(bool value)
+    {
+        _settingsService.CurrentSettings.EnablePerformanceDiagnostics = value;
+        if (_metricsService is not null)
+        {
+            _metricsService.IsDiagnosticsEnabled = value;
+        }
+        await _settingsService.SaveSettingsAsync();
+        RefreshPerformanceData();
+    }
+
+    [RelayCommand]
+    public void RefreshPerformanceData()
+    {
+        if (_capabilityService is not null)
+        {
+            _graphicsCapabilities = _capabilityService.GetCapabilities(forceRefresh: false);
+        }
+        if (_metricsService is not null)
+        {
+            CurrentPerformanceSnapshot = _metricsService.GetCurrentSnapshot();
+        }
+        OnPropertyChanged(nameof(PrimaryGpuName));
+        OnPropertyChanged(nameof(GpuVendorName));
+        OnPropertyChanged(nameof(DedicatedVideoMemory));
+        OnPropertyChanged(nameof(SharedVideoMemory));
+        OnPropertyChanged(nameof(Direct3DFeatureLevel));
+        OnPropertyChanged(nameof(ActiveBackendText));
+        OnPropertyChanged(nameof(HardwareAccelerationStatus));
+        OnPropertyChanged(nameof(CapabilitiesSummaryText));
+        OnPropertyChanged(nameof(FallbackNote));
     }
 
     [RelayCommand]
