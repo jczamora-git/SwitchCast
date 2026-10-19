@@ -7,15 +7,47 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Phase**: OBS-Inspired Lightweight Performance Audit (Architecture Audit, Fallback Hierarchy & Empirical Benchmark Plan Defined in `docs/PERFORMANCE_OPTIMIZATION_PLAN.md`)
-- **Overall Status**: **Audited & Validated (411 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors], No Invasive Code Changes Applied)**
-- **Last Updated**: 2026-10-19T21:10:00+08:00 (UTC+8)
+- **Current Version**: v1.4.0 — Background Music & Presenter Controls (Music Library, Playlist Navigation, Startup Crash Fix & Incident Report UI Polish)
+- **Overall Status**: **Implemented & Validated (426 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
+- **Last Updated**: 2026-10-19T22:20:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **v1.4.0 Music Library, Playlist Navigation, Startup Crash Fix & Incident Report UI Polish**:
+  - **Startup Crash Resolution (`COMException 0x80004005` in `LookupConverter`)**:
+    - Identified missing resource reference `{StaticResource BoolToAccentBrushConverter}` in `DashboardPage.xaml` bound to `IsMusicShuffleEnabled`.
+    - Removed dynamic converter lookup and bound to `MusicShuffleOpacity` and `{ThemeResource AppAccentBrush}`, eliminating `0x80004005` during Dashboard initialization.
+  - **Dedicated Music & Playlists Navigation**:
+    - Added "Music & Playlists" navigation item (`\uE8D6`) to `MainWindow.xaml` NavigationView.
+    - Implemented `MusicLibraryPage.xaml`, `MusicLibraryPage.xaml.cs`, and `MusicLibraryViewModel.cs`.
+    - Integrated with `NavigationService.NavigateToMusicLibrary()` without disrupting ongoing presentations or active background music playback.
+  - **Working Native Audio Importer**:
+    - Multi-file native file picker via `Win32MediaPickerService` initialized with `MainWindow` native HWND.
+    - Supported formats: `.mp3`, `.wav`, `.m4a`, `.aac`, `.wma`.
+    - Prevents duplicate tracks based on full canonical path while safely allowing identical file names across different directories.
+    - Gracefully handles user cancellation without false error notifications.
+  - **Comprehensive Playlist Management & Persistence**:
+    - Full playlist lifecycle: Create, Rename, Delete, Set Active Playback, Add/Remove/Reorder tracks.
+    - Reuses existing Default Playlist singleton without creating redundant duplicates.
+    - Atomic persistence across application restarts preserving track library, order, repeat mode, shuffle preference, volume, and mute status.
+    - Gracefully handles missing/moved media files with explicit `IsAvailable` status and warning badges.
+  - **Two-Way SwitchDeck Synchronization**:
+    - Added "Manage Playlists" button in SwitchDeck music popup (`PresenterDockMenuWindow.xaml`), activating `MainWindow` and navigating to `MusicLibraryPage` without restarting playback or interrupting live presentation.
+    - Real-time synchronization of playlist renames, additions, deletions, active selection, and now-playing transport status across SwitchDeck and Music Library.
+  - **Dual-Player Isolation Verification**:
+    - Strict physical separation maintained between `BackgroundMusicService` and `MediaPresentationService`.
+    - Video playback and Background Music playback do not interfere in transport, volume, mute, seek, or lifecycle.
+  - **Streamlined Dashboard Music Section**:
+    - Replaced heavy playlist editing on Dashboard with a compact playback overview + "Manage Playlists" direct shortcut.
+  - **Incident Report UI Polish & Field Mapping**:
+    - Centered `ErrorReportDialog` relative to `MainWindow` with responsive wrapping buttons and non-clipped "Copy Report" button.
+    - Diagnostic details collapsed by default; non-overlapping bottom `InfoBar` for copy/save feedback.
+    - Fixed field mapping: `Active Source` sanitized to `"None"` when null or corrupted (preventing HRESULT or exception message leakage into source name), `Error Code` mapped to hex HRESULT.
+    - Persist task tracking and robust deletion handling in `ErrorReportingService` ensuring atomic cleanup.
+  - **Automated Test Matrix**: 426 tests passing (100% pass rate).
 - [x] **Mandatory Dual-Player Isolation Guards (Video MediaPlayer vs Background Music MediaPlayer)**:
   - **Strict Service Isolation**: `MediaPresentationService` exclusively owns its dedicated `MediaPlayer` for presentation output video; `BackgroundMusicService` exclusively owns its dedicated `MediaPlayer` for background music. Neither service shares instances, mutable state, or disposal.
   - **Command Ownership**: SwitchDeck and Dashboard video commands (`ToggleVideoPlaybackCommand`, `RestartVideoCommand`, `SeekBackward10Command`, `SeekForward10Command`, `ToggleMediaMuteCommand`) exclusively control `MediaPresentationService`. SwitchDeck music commands (`ToggleBackgroundMusicPlayPauseCommand`, `NextBackgroundMusicTrackCommand`, `PreviousBackgroundMusicTrackCommand`, `ToggleBackgroundMusicShuffleCommand`, `CycleBackgroundMusicRepeatModeCommand`, `ToggleBackgroundMusicMuteCommand`) exclusively control `BackgroundMusicService`. PowerPoint and source switching commands remain strictly separate.

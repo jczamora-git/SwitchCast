@@ -663,5 +663,26 @@ public class PresenterDockViewModelTests
 
         _mockCoordinator.Verify(c => c.SetShowPresentationCursorAsync(false), Times.Once);
     }
+
+    [Fact]
+    public void ManagePlaylistsCommand_ActivatesMainWindow_AndNavigatesToMusicLibrary()
+    {
+        var mockNavService = new Mock<INavigationService>();
+        var mockActivationService = new Mock<IWindowActivationService>();
+
+        var vm = new PresenterDockViewModel(
+            _mockCoordinator.Object,
+            _mockStateService.Object,
+            _mockWindowService.Object,
+            _mockDockService.Object,
+            _mockSettingsService.Object,
+            navigationService: mockNavService.Object,
+            activationService: mockActivationService.Object);
+
+        vm.ManagePlaylistsCommand.Execute(null);
+
+        mockActivationService.Verify(a => a.ActivateMainWindow(), Times.Once);
+        mockNavService.Verify(n => n.NavigateToMusicLibrary(null), Times.Once);
+    }
 }
 

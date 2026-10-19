@@ -463,6 +463,21 @@
                             <FontIcon Glyph="{x:Bind ViewModel.BackgroundMusicMuteGlyph, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" />
                         </Button>
                     </Grid>
+
+                    <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" Margin="0,2,0,1" />
+
+                    <!-- Manage Playlists Action -->
+                    <Button Command="{x:Bind ViewModel.ManagePlaylistsCommand}"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            HorizontalAlignment="Stretch"
+                            Padding="6,4"
+                            Margin="4,1,4,2"
+                            ToolTipService.ToolTip="Open Music &amp; Playlists in SwitchCast">
+                        <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                            <FontIcon Glyph="&#xE8D6;" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" />
+                            <TextBlock Text="Manage Playlists" FontSize="11" Foreground="{ThemeResource AppAccentBrush}" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </Grid>
         </Border>

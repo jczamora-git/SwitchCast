@@ -79,6 +79,21 @@ public class NavigationService : INavigationService
         return false;
     }
 
+    public bool NavigateToMusicLibrary(object? parameter = null)
+    {
+        var musicLibraryType = Type.GetType("SwitchCast.Views.MusicLibraryPage, SwitchCast") ??
+                               AppDomain.CurrentDomain.GetAssemblies()
+                                   .Select(a => a.GetType("SwitchCast.Views.MusicLibraryPage"))
+                                   .FirstOrDefault(t => t is not null);
+
+        if (musicLibraryType is not null)
+        {
+            return NavigateTo(musicLibraryType, parameter);
+        }
+
+        return false;
+    }
+
     public bool GoBack()
     {
         if (_frame is not null && _frame.CanGoBack)

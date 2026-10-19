@@ -85,5 +85,6 @@
     <Compile Include="..\ViewModels\SourcesViewModel.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />
     <Compile Include="..\ViewModels\SelectableSourceItem.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />
     <Compile Include="..\ViewModels\SettingsViewModel.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />
+    <Compile Include="..\ViewModels\MusicLibraryViewModel.cs" Link="Linked\ViewModels\%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

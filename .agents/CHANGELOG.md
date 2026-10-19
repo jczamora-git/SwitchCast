@@ -7,6 +7,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.4.0 — Music Library, Playlist Navigation, Startup Crash Fix & Incident Report UI Polish] - 2026-10-19
+
+### Fixed (fix / ui / xaml / bindings / startup)
+- **Resolved Dashboard Startup Crash (`COMException 0x80004005` in `LookupConverter`)**:
+  - Eliminated missing `{StaticResource BoolToAccentBrushConverter}` dynamic converter reference on `DashboardPage.xaml`'s `IsMusicShuffleEnabled` binding.
+  - Replaced with direct `Opacity="{x:Bind ViewModel.MusicShuffleOpacity, Mode=OneWay}"` and static `{ThemeResource AppAccentBrush}`, eliminating native WinRT `ResourceDictionary::Lookup` `E_FAIL` errors during initialization.
+- **Fixed Incident Report Field Mapping**:
+  - Sanitized `Active Source` field to `"None"` when null, empty, or corrupted by exception text, preventing `HResult=0x80004005, Message=Unspecified error` from leaking into presentation source metadata.
+  - Correctly mapped `Error Code` to hex HRESULT (`0x80004005`).
+- **Incident Report UI Polish**:
+  - Redesigned `Views/Dialogs/ErrorReportDialog.xaml` to center within `MainWindow`.
+  - Wrapped action buttons to prevent width overflow and clipping of the "Copy Report" button.
+  - Relocated copy/save feedback into a non-overlapping bottom `InfoBar` so dialog content remains legible.
+  - Collapsed Technical Details by default with scrollable diagnostic container.
+  - Added persistence task synchronization and retry deletion to `ErrorReportingService` ensuring atomic log rotation and history clearance.
+
+### Added (feat / music / library / navigation / mvvm)
+- **Dedicated Music & Playlists Page & Navigation**:
+  - Added "Music & Playlists" navigation item (`\uE8D6`) to `MainWindow.xaml` NavigationView.
+  - Created `MusicLibraryPage.xaml`, `MusicLibraryPage.xaml.cs`, and `MusicLibraryViewModel.cs`.
+  - Added `INavigationService.NavigateToMusicLibrary()` allowing navigation between Dashboard, Sources, Music & Playlists, and Settings without interrupting live presentation or background music playback.
+- **Native Audio File Import**:
+  - Implemented multi-file audio import using `Win32MediaPickerService` initialized with `MainWindow` HWND.
+  - Supported audio formats: `.mp3`, `.wav`, `.m4a`, `.aac`, `.wma`.
+  - Validated track uniqueness by full canonical file path, allowing files with identical names across different directories while preventing duplicate library entries.
+  - Handled user cancellation gracefully without error banners.
+- **Playlist Management & Persistence**:
+  - Supported full playlist lifecycle: Create, Rename, Delete, Set Active, Add/Remove tracks, and Up/Down track reordering.
+  - Reused existing Default Playlist singleton without redundant creation.
+  - Preserved playlist configuration and playback settings across application restarts.
+  - Added `MissingBadgeVisibility` on `MusicTrack` to gracefully flag missing or moved audio files without crashing.
+- **Two-Way SwitchDeck Synchronization**:
+  - Added "Manage Playlists" button in SwitchDeck music popup (`Views/PresenterDockMenuWindow.xaml`), activating `MainWindow` and navigating to `MusicLibraryPage` without restarting playback or interrupting live presentation.
+  - Synchronized playlist renames, additions, deletions, and active selection between SwitchDeck and Music Library in real time.
+- **Streamlined Dashboard Music Section**:
+  - Replaced full playlist editor on `DashboardPage.xaml` with a compact playback overview and direct "Manage Playlists" shortcut.
+
+### Tests & Verification (test / build / quality-gates)
+- **426 Passing Tests**: Unit tests in `SwitchCast.Tests/ViewModels/MusicLibraryViewModelTests.cs`, `ErrorReportingServiceTests.cs`, `PresenterDockViewModelTests.cs`, and all existing suites passing (100% pass rate).
+- **Zero Compiler Warnings/Errors**: Both Debug x64 and Release x64 builds verified with 0 warnings and 0 errors.
+
+---
+
 ## [OBS-Inspired Lightweight Performance Audit] - 2026-10-19
 
 ### Documentation & Architecture Audit (docs / performance / architecture / capture / direct3d)

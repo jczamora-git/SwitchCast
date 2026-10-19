@@ -25,11 +25,16 @@ public partial class MusicTrack : ObservableObject
     private TimeSpan _duration = TimeSpan.Zero;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MissingBadgeVisibility))]
     private bool _isAvailable = true;
+
+    public Microsoft.UI.Xaml.Visibility MissingBadgeVisibility => IsAvailable ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
 
     public string DurationText => Duration.TotalHours >= 1
         ? Duration.ToString(@"h\:mm\:ss")
         : Duration.ToString(@"m\:ss");
+
+    public string FormattedDuration => DurationText;
 
     public string DisplayText => string.IsNullOrWhiteSpace(Artist)
         ? (string.IsNullOrWhiteSpace(Title) ? "Untitled Track" : Title)

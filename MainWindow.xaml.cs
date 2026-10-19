@@ -231,6 +231,9 @@ public sealed partial class MainWindow : Window
                 case "Sources":
                     _navigationService.NavigateTo<SourcesPage>();
                     break;
+                case "MusicLibrary":
+                    _navigationService.NavigateTo<MusicLibraryPage>();
+                    break;
             }
         }
     }
@@ -248,6 +251,10 @@ public sealed partial class MainWindow : Window
         else if (pageType == typeof(SourcesPage))
         {
             NavView.SelectedItem = NavView.MenuItems[1];
+        }
+        else if (pageType == typeof(MusicLibraryPage))
+        {
+            NavView.SelectedItem = NavView.MenuItems[2];
         }
     }
 

@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml;
 using SwitchCast.Models;
 using SwitchCast.Services;
 using SwitchCast.Services.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace SwitchCast.ViewModels;
 
@@ -22,6 +23,8 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
     private readonly IApplicationSettingsService _settingsService;
     private readonly IApplicationLifecycleService? _lifecycleService;
     private readonly Services.Music.IBackgroundMusicService? _backgroundMusicService;
+    private readonly INavigationService? _navigationService;
+    private readonly IWindowActivationService? _activationService;
     private DispatcherQueue? _dispatcherQueue;
     private IUIThreadDispatcher? _dispatcher;
     private DispatcherQueueTimer? _playbackTimer;
@@ -39,7 +42,9 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         IApplicationSettingsService settingsService,
         IApplicationLifecycleService? lifecycleService = null,
         IUIThreadDispatcher? uiDispatcher = null,
-        Services.Music.IBackgroundMusicService? backgroundMusicService = null)
+        Services.Music.IBackgroundMusicService? backgroundMusicService = null,
+        INavigationService? navigationService = null,
+        IWindowActivationService? activationService = null)
     {
         _presentationCoordinator = presentationCoordinator ?? throw new ArgumentNullException(nameof(presentationCoordinator));
         _presentationStateService = presentationStateService ?? throw new ArgumentNullException(nameof(presentationStateService));
@@ -48,6 +53,8 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _lifecycleService = lifecycleService;
         _backgroundMusicService = backgroundMusicService ?? _presentationCoordinator.BackgroundMusicService;
+        _navigationService = navigationService;
+        _activationService = activationService;
 
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _dispatcher = UIThreadDispatcherProvider.Resolve(uiDispatcher);
@@ -68,6 +75,7 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
             _backgroundMusicService.PlaybackStateChanged += OnBackgroundMusicPlaybackStateChanged;
             _backgroundMusicService.TrackChanged += OnBackgroundMusicTrackChanged;
             _backgroundMusicService.PositionChanged += OnBackgroundMusicPositionChanged;
+            _backgroundMusicService.PlaylistChanged += OnBackgroundMusicPlaylistChanged;
         }
 
         InitializePlaybackTimer();
@@ -208,6 +216,7 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
             _backgroundMusicService.PlaybackStateChanged -= OnBackgroundMusicPlaybackStateChanged;
             _backgroundMusicService.TrackChanged -= OnBackgroundMusicTrackChanged;
             _backgroundMusicService.PositionChanged -= OnBackgroundMusicPositionChanged;
+            _backgroundMusicService.PlaylistChanged -= OnBackgroundMusicPlaylistChanged;
         }
     }
 
@@ -1029,6 +1038,21 @@ public partial class PresenterDockViewModel : ObservableObject, IDisposable
         _backgroundMusicService?.Seek(TimeSpan.FromSeconds(targetSeconds));
         NotifyBackgroundMusicProperties();
     }
+
+    [RelayCommand]
+    public void ManagePlaylists()
+    {
+        _activationService?.ActivateMainWindow();
+        _navigationService?.NavigateToMusicLibrary();
+    }
+
+    private void OnBackgroundMusicPlaylistChanged(object? sender, EventArgs e) => RunOnUIThread(() =>
+    {
+        OnPropertyChanged(nameof(Playlists));
+        OnPropertyChanged(nameof(ActivePlaylist));
+        OnPropertyChanged(nameof(BackgroundMusicPlaylistName));
+        OnPropertyChanged(nameof(BackgroundMusicTrackTitle));
+    });
 
     private void OnBackgroundMusicPlaybackStateChanged(object? sender, EventArgs e) => RunOnUIThread(NotifyBackgroundMusicProperties);
 

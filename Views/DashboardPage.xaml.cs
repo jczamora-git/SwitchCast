@@ -59,4 +59,10 @@ public sealed partial class DashboardPage : Page
             ViewModel.RemoveMusicTrack(track);
         }
     }
+
+    private void OnManagePlaylistsClick(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        var navService = App.Current.Services.GetService<Services.INavigationService>();
+        navService?.NavigateToMusicLibrary();
+    }
 }

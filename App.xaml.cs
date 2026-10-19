@@ -33,7 +33,7 @@ public partial class App : Application
                 "App",
                 "UnhandledException",
                 e.Exception,
-                $"HResult=0x{e.Exception.HResult:X8}, Message={e.Message}");
+                GetActivePresentationSourceType());
             System.Diagnostics.Debug.WriteLine($"[App.UnhandledException] HResult=0x{e.Exception.HResult:X8} - {e.Message}\n{e.Exception}");
         }
         catch
@@ -54,7 +54,7 @@ public partial class App : Application
                         "AppDomain",
                         "UnhandledException",
                         ex,
-                        $"IsTerminating=True, HResult=0x{ex.HResult:X8}");
+                        GetActivePresentationSourceType());
                 }
                 else
                 {
@@ -62,7 +62,7 @@ public partial class App : Application
                         "AppDomain",
                         "UnhandledException",
                         ex,
-                        $"IsTerminating=False, HResult=0x{ex.HResult:X8}");
+                        GetActivePresentationSourceType());
                 }
                 System.Diagnostics.Debug.WriteLine($"[AppDomain.UnhandledException] IsTerminating={e.IsTerminating} - {ex}");
             }
@@ -85,13 +85,26 @@ public partial class App : Application
                 "TaskScheduler",
                 "UnobservedTaskException",
                 e.Exception,
-                $"Observed={e.Observed}, HResult=0x{e.Exception.HResult:X8}");
+                GetActivePresentationSourceType());
             System.Diagnostics.Debug.WriteLine($"[TaskScheduler.UnobservedTaskException] {e.Exception}");
             e.SetObserved();
         }
         catch
         {
             // Fail-safe
+        }
+    }
+
+    private string? GetActivePresentationSourceType()
+    {
+        try
+        {
+            var coordinator = Services?.GetService<IPresentationCoordinator>();
+            return coordinator?.CurrentPresentationSource?.Type.ToString();
+        }
+        catch
+        {
+            return null;
         }
     }
 
@@ -146,7 +159,8 @@ public partial class App : Application
 
         // Media Services
         services.AddSingleton<Services.Media.IMediaDiscoveryService, Services.Media.MediaDiscoveryService>();
-        services.AddSingleton<Services.Media.IMediaPickerService, Services.Media.Win32MediaPickerService>();
+        services.AddSingleton<Services.Media.IMediaPickerService>(sp =>
+            new Services.Media.Win32MediaPickerService(() => App.Current?.MainWindow?.WindowHandle ?? IntPtr.Zero));
         services.AddSingleton<Services.Media.IMediaPresentationService, Services.Media.MediaPresentationService>();
 
         // Background Music Services
@@ -183,6 +197,8 @@ public partial class App : Application
         services.AddTransient<PresentationViewModel>();
         services.AddTransient<PresenterDockViewModel>();
         services.AddTransient<SettingsViewModel>();
+        services.AddTransient<MusicLibraryViewModel>();
+        services.AddTransient<Views.MusicLibraryPage>();
 
         return services.BuildServiceProvider();
     }

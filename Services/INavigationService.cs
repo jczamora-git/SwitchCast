@@ -41,6 +41,11 @@ public interface INavigationService
     bool NavigateToDashboard(object? parameter = null);
 
     /// <summary>
+    /// Navigates to the dedicated Music & Playlists library view.
+    /// </summary>
+    bool NavigateToMusicLibrary(object? parameter = null);
+
+    /// <summary>
     /// Navigates back one step in the navigation stack.
     /// </summary>
     bool GoBack();

@@ -433,6 +433,14 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
                 continue;
             }
 
+            lock (_stateLock)
+            {
+                if (playlist.Tracks.Any(t => string.Equals(t.FilePath, path, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+            }
+
             var track = await CreateTrackFromFileAsync(path).ConfigureAwait(false);
             newTracks.Add(track);
         }
