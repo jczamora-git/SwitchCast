@@ -273,4 +273,52 @@ public class BackgroundMusicServiceTests : IDisposable
         vm.MusicVolume = 80;
         mockBgm.VerifySet(b => b.Volume = 0.8, Times.Once);
     }
+
+    [Fact]
+    public async Task LoadPlaylistsAsync_ReconcilesInPlace_PreservingTrackInstances()
+    {
+        using var service = new BackgroundMusicService(_testStoragePath);
+        await service.LoadPlaylistsAsync();
+
+        var playlist = service.CreatePlaylist("Persistent Playlist");
+        var track = new MusicTrack
+        {
+            Id = "reconcile-track-1",
+            Title = "Song A",
+            FilePath = @"C:\Music\songA.mp3",
+            Duration = TimeSpan.FromMinutes(3)
+        };
+        playlist.Tracks.Add(track);
+        playlist.NotifyTracksChanged();
+        await service.SavePlaylistsAsync();
+
+        // Reload playlists on the same service instance
+        await service.LoadPlaylistsAsync();
+
+        var reloadedPlaylist = service.Playlists.FirstOrDefault(p => p.Id == playlist.Id);
+        Assert.NotNull(reloadedPlaylist);
+        Assert.Same(playlist, reloadedPlaylist); // Same instance preserved
+        var reloadedTrack = reloadedPlaylist.Tracks.FirstOrDefault(t => t.Id == track.Id);
+        Assert.NotNull(reloadedTrack);
+        Assert.Same(track, reloadedTrack); // Track instance preserved
+    }
+
+    [Fact]
+    public async Task AddTracksAsync_IgnoresExistingTracks_AndPreventsDuplicates()
+    {
+        using var service = new BackgroundMusicService(_testStoragePath);
+        await service.LoadPlaylistsAsync();
+
+        var playlist = service.CreatePlaylist("Duplicate Test");
+        var fakeFilePath = Path.Combine(_tempTestDir, "test_audio.mp3");
+        await File.WriteAllTextAsync(fakeFilePath, "dummy audio content");
+
+        // First import
+        await service.AddTracksAsync(playlist.Id, new[] { fakeFilePath });
+        Assert.Single(playlist.Tracks);
+
+        // Second import with same path
+        await service.AddTracksAsync(playlist.Id, new[] { fakeFilePath });
+        Assert.Single(playlist.Tracks); // No duplicate
+    }
 }

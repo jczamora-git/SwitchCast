@@ -4,7 +4,9 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Microsoft.UI.Dispatching;
 using SwitchCast.Models.Music;
+using SwitchCast.Services;
 using SwitchCast.Services.Diagnostics;
 using Windows.Media.Core;
 using Windows.Media.Playback;
@@ -34,6 +36,8 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
     private MediaPlayer? _player;
     private MediaSource? _currentMediaSource;
     private System.Threading.Timer? _positionTimer;
+    private DispatcherQueue? _dispatcherQueue;
+    private IUIThreadDispatcher? _dispatcher;
     private bool _disposed;
 
     private readonly List<MusicPlaylist> _playlists = [];
@@ -91,7 +95,7 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
         }
     }
 
-    public BackgroundMusicService(string? customStoragePath = null)
+    public BackgroundMusicService(string? customStoragePath = null, IUIThreadDispatcher? uiDispatcher = null)
     {
         if (!string.IsNullOrWhiteSpace(customStoragePath))
         {
@@ -104,7 +108,56 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
             _storageFilePath = Path.Combine(appDir, "playlists.json");
         }
 
+        _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+        _dispatcher = UIThreadDispatcherProvider.Resolve(uiDispatcher);
+
         InitializePlayer();
+    }
+
+    public void SetDispatcherQueue(DispatcherQueue? dispatcherQueue)
+    {
+        if (_disposed) return;
+        _dispatcherQueue = dispatcherQueue;
+        _dispatcher = dispatcherQueue is not null ? new DispatcherQueueAdapter(dispatcherQueue) : null;
+    }
+
+    public void SetUIThreadDispatcher(IUIThreadDispatcher? dispatcher)
+    {
+        _dispatcher = dispatcher;
+    }
+
+    private async Task RunOnUIThreadAsync(Action action)
+    {
+        if (_disposed) return;
+
+        if (_dispatcher is null || _dispatcher.HasThreadAccess)
+        {
+            action();
+            return;
+        }
+
+        var tcs = new TaskCompletionSource<bool>();
+        bool enqueued = _dispatcher.TryEnqueue(() =>
+        {
+            try
+            {
+                action();
+                tcs.TrySetResult(true);
+            }
+            catch (Exception ex)
+            {
+                tcs.TrySetException(ex);
+            }
+        });
+
+        if (enqueued)
+        {
+            await tcs.Task.ConfigureAwait(false);
+        }
+        else
+        {
+            action();
+        }
     }
 
     private void InitializePlayer()
@@ -193,7 +246,7 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
         {
             if (!File.Exists(_storageFilePath))
             {
-                CreateDefaultPlaylistIfEmpty();
+                await RunOnUIThreadAsync(CreateDefaultPlaylistIfEmpty).ConfigureAwait(false);
                 return;
             }
 
@@ -201,70 +254,175 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
             var data = JsonSerializer.Deserialize<PersistedPlaylistsData>(json, JsonOptions);
             if (data is null || data.Playlists.Count == 0)
             {
-                CreateDefaultPlaylistIfEmpty();
+                await RunOnUIThreadAsync(CreateDefaultPlaylistIfEmpty).ConfigureAwait(false);
                 return;
             }
 
-            lock (_stateLock)
+            await RunOnUIThreadAsync(() =>
             {
-                _playlists.Clear();
-                foreach (var pData in data.Playlists)
+                lock (_stateLock)
                 {
-                    var playlist = new MusicPlaylist
-                    {
-                        Id = pData.Id ?? Guid.NewGuid().ToString("N"),
-                        Name = pData.Name ?? "Playlist"
-                    };
-
-                    if (pData.Tracks is not null)
-                    {
-                        foreach (var tData in pData.Tracks)
-                        {
-                            bool exists = !string.IsNullOrWhiteSpace(tData.FilePath) && File.Exists(tData.FilePath);
-                            playlist.Tracks.Add(new MusicTrack
-                            {
-                                Id = tData.Id ?? Guid.NewGuid().ToString("N"),
-                                Title = tData.Title ?? (exists ? Path.GetFileNameWithoutExtension(tData.FilePath ?? string.Empty) : "Missing Track"),
-                                Artist = tData.Artist,
-                                FilePath = tData.FilePath ?? string.Empty,
-                                Duration = tData.Duration,
-                                IsAvailable = exists
-                            });
-                        }
-                    }
-
-                    _playlists.Add(playlist);
+                    ReconcilePlaylists(data);
                 }
 
-                RepeatMode = data.RepeatMode;
-                IsShuffleEnabled = data.IsShuffleEnabled;
-                if (data.Volume >= 0.0 && data.Volume <= 1.0)
-                {
-                    Volume = data.Volume;
-                }
-                IsMuted = data.IsMuted;
-
-                if (!string.IsNullOrEmpty(data.ActivePlaylistId))
-                {
-                    CurrentPlaylist = _playlists.FirstOrDefault(p => p.Id == data.ActivePlaylistId) ?? _playlists.FirstOrDefault();
-                }
-                else
-                {
-                    CurrentPlaylist = _playlists.FirstOrDefault();
-                }
-            }
-
-            PlaylistChanged?.Invoke(this, EventArgs.Empty);
+                PlaylistChanged?.Invoke(this, EventArgs.Empty);
+            }).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             SwitchCastDiagnostics.LogException(nameof(BackgroundMusicService), nameof(LoadPlaylistsAsync), ex);
-            CreateDefaultPlaylistIfEmpty();
+            await RunOnUIThreadAsync(CreateDefaultPlaylistIfEmpty).ConfigureAwait(false);
         }
         finally
         {
             _fileLock.Release();
         }
+    }
+
+    private void ReconcilePlaylists(PersistedPlaylistsData data)
+    {
+        var existingPlaylistsById = _playlists.ToDictionary(p => p.Id);
+        var activeId = !string.IsNullOrEmpty(data.ActivePlaylistId) ? data.ActivePlaylistId : CurrentPlaylist?.Id;
+        var newPlaylists = new List<MusicPlaylist>();
+
+        foreach (var pData in data.Playlists)
+        {
+            var id = pData.Id ?? Guid.NewGuid().ToString("N");
+            if (existingPlaylistsById.TryGetValue(id, out var existingPlaylist))
+            {
+                existingPlaylist.Name = pData.Name ?? existingPlaylist.Name;
+                ReconcileTracks(existingPlaylist, pData.Tracks);
+                newPlaylists.Add(existingPlaylist);
+                existingPlaylistsById.Remove(id);
+            }
+            else
+            {
+                var created = new MusicPlaylist
+                {
+                    Id = id,
+                    Name = pData.Name ?? "Playlist"
+                };
+
+                if (pData.Tracks is not null)
+                {
+                    foreach (var tData in pData.Tracks)
+                    {
+                        bool exists = !string.IsNullOrWhiteSpace(tData.FilePath) && File.Exists(tData.FilePath);
+                        created.Tracks.Add(new MusicTrack
+                        {
+                            Id = tData.Id ?? Guid.NewGuid().ToString("N"),
+                            Title = tData.Title ?? (exists ? Path.GetFileNameWithoutExtension(tData.FilePath ?? string.Empty) : "Missing Track"),
+                            Artist = tData.Artist,
+                            FilePath = tData.FilePath ?? string.Empty,
+                            Duration = tData.Duration,
+                            IsAvailable = exists
+                        });
+                    }
+                }
+
+                created.NotifyTracksChanged();
+                newPlaylists.Add(created);
+            }
+        }
+
+        _playlists.Clear();
+        _playlists.AddRange(newPlaylists);
+
+        RepeatMode = data.RepeatMode;
+        IsShuffleEnabled = data.IsShuffleEnabled;
+        if (data.Volume >= 0.0 && data.Volume <= 1.0)
+        {
+            Volume = data.Volume;
+        }
+        IsMuted = data.IsMuted;
+
+        if (!string.IsNullOrEmpty(activeId))
+        {
+            CurrentPlaylist = _playlists.FirstOrDefault(p => p.Id == activeId) ?? _playlists.FirstOrDefault();
+        }
+        else
+        {
+            CurrentPlaylist = _playlists.FirstOrDefault();
+        }
+
+        // Preserve CurrentTrack reference if it exists in CurrentPlaylist
+        if (CurrentTrack is not null && CurrentPlaylist is not null)
+        {
+            var matching = CurrentPlaylist.Tracks.FirstOrDefault(t =>
+                t.Id == CurrentTrack.Id ||
+                (!string.IsNullOrEmpty(t.FilePath) && string.Equals(t.FilePath, CurrentTrack.FilePath, StringComparison.OrdinalIgnoreCase)));
+
+            if (matching is not null)
+            {
+                CurrentTrack = matching;
+                CurrentTrackIndex = CurrentPlaylist.Tracks.IndexOf(matching);
+            }
+        }
+
+        if (_playlists.Count == 0)
+        {
+            CreateDefaultPlaylistIfEmpty();
+        }
+    }
+
+    private static void ReconcileTracks(MusicPlaylist playlist, List<PersistedTrackData>? persistedTracks)
+    {
+        if (persistedTracks is null || persistedTracks.Count == 0)
+        {
+            playlist.Tracks.Clear();
+            playlist.NotifyTracksChanged();
+            return;
+        }
+
+        var existingTracksByPath = playlist.Tracks
+            .Where(t => !string.IsNullOrEmpty(t.FilePath))
+            .ToDictionary(t => t.FilePath, StringComparer.OrdinalIgnoreCase);
+
+        var existingTracksById = playlist.Tracks.ToDictionary(t => t.Id);
+
+        var reconciledTracks = new List<MusicTrack>();
+        foreach (var tData in persistedTracks)
+        {
+            bool exists = !string.IsNullOrWhiteSpace(tData.FilePath) && File.Exists(tData.FilePath);
+            MusicTrack? track = null;
+
+            if (!string.IsNullOrWhiteSpace(tData.FilePath) && existingTracksByPath.TryGetValue(tData.FilePath, out var byPath))
+            {
+                track = byPath;
+            }
+            else if (tData.Id is not null && existingTracksById.TryGetValue(tData.Id, out var byId))
+            {
+                track = byId;
+            }
+
+            if (track is not null)
+            {
+                track.Title = tData.Title ?? (exists ? Path.GetFileNameWithoutExtension(tData.FilePath ?? string.Empty) : track.Title);
+                track.Artist = tData.Artist ?? track.Artist;
+                track.Duration = tData.Duration != TimeSpan.Zero ? tData.Duration : track.Duration;
+                track.IsAvailable = exists;
+                reconciledTracks.Add(track);
+            }
+            else
+            {
+                reconciledTracks.Add(new MusicTrack
+                {
+                    Id = tData.Id ?? Guid.NewGuid().ToString("N"),
+                    Title = tData.Title ?? (exists ? Path.GetFileNameWithoutExtension(tData.FilePath ?? string.Empty) : "Missing Track"),
+                    Artist = tData.Artist,
+                    FilePath = tData.FilePath ?? string.Empty,
+                    Duration = tData.Duration,
+                    IsAvailable = exists
+                });
+            }
+        }
+
+        playlist.Tracks.Clear();
+        foreach (var t in reconciledTracks)
+        {
+            playlist.Tracks.Add(t);
+        }
+        playlist.NotifyTracksChanged();
     }
 
     private void CreateDefaultPlaylistIfEmpty()
@@ -473,16 +631,23 @@ public sealed partial class BackgroundMusicService : ObservableObject, IBackgrou
             return;
         }
 
-        lock (_stateLock)
+        await RunOnUIThreadAsync(() =>
         {
-            foreach (var t in newTracks)
+            lock (_stateLock)
             {
-                playlist.Tracks.Add(t);
+                foreach (var t in newTracks)
+                {
+                    if (!playlist.Tracks.Any(existing => string.Equals(existing.FilePath, t.FilePath, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        playlist.Tracks.Add(t);
+                    }
+                }
+                playlist.NotifyTracksChanged();
             }
-            playlist.NotifyTracksChanged();
-        }
 
-        PlaylistChanged?.Invoke(this, EventArgs.Empty);
+            PlaylistChanged?.Invoke(this, EventArgs.Empty);
+        }).ConfigureAwait(false);
+
         await SavePlaylistsAsync().ConfigureAwait(false);
     }
 

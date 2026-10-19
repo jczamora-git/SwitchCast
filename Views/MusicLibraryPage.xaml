@@ -75,17 +75,43 @@
                         <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8">
                             <!-- Playlists Header -->
                             <Grid Grid.Row="0" Margin="4,2,4,4">
-                                <TextBlock Text="PLAYLISTS"
-                                           FontSize="11"
-                                           FontWeight="SemiBold"
-                                           Foreground="{ThemeResource AppTextTertiaryBrush}"
-                                           VerticalAlignment="Center" />
-                                <TextBlock Text="{x:Bind ViewModel.PlaylistsCountText, Mode=OneWay}"
-                                           FontSize="11"
-                                           FontWeight="SemiBold"
-                                           Foreground="{ThemeResource AppTextTertiaryBrush}"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Center" />
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                    <TextBlock Text="PLAYLISTS"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{ThemeResource AppTextTertiaryBrush}"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Text="{x:Bind ViewModel.PlaylistsCountText, Mode=OneWay}"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{ThemeResource AppTextTertiaryBrush}"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                    <ProgressRing IsActive="{x:Bind ViewModel.IsRefreshing, Mode=OneWay}"
+                                                  Visibility="{x:Bind ViewModel.IsRefreshingVisibility, Mode=OneWay}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center" />
+
+                                    <Button Command="{x:Bind ViewModel.RefreshPlaylistsCommand}"
+                                            IsEnabled="{x:Bind ViewModel.IsNotRefreshing, Mode=OneWay}"
+                                            Style="{StaticResource SubtleButtonStyle}"
+                                            Padding="4,2"
+                                            MinWidth="24"
+                                            MinHeight="24"
+                                            ToolTipService.ToolTip="Reload playlists from library"
+                                            AutomationProperties.Name="Reload playlists"
+                                            VerticalAlignment="Center">
+                                        <FontIcon Glyph="&#xE72C;" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                    </Button>
+                                </StackPanel>
                             </Grid>
 
                             <!-- Playlists List -->
@@ -105,7 +131,7 @@
                                                            Foreground="{ThemeResource AppTextPrimaryBrush}"
                                                            TextTrimming="CharacterEllipsis"
                                                            MaxLines="1" />
-                                                <TextBlock Text="{x:Bind Tracks.Count, Mode=OneWay}"
+                                                <TextBlock Text="{x:Bind TrackCountText, Mode=OneWay}"
                                                            FontSize="10"
                                                            Foreground="{ThemeResource AppTextSecondaryBrush}" />
                                             </StackPanel>

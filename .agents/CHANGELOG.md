@@ -7,6 +7,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [v1.4.0 — Fix Playlist Refresh After Import] - 2026-10-20
+
+### Fixed (fix / ui / music / playlists / threading)
+- **Automatic Refresh After Audio Import**:
+  - Resolved WinUI 3 `ObservableCollection` cross-thread marshaling failure where `BackgroundMusicService.AddTracksAsync` added tracks on a worker thread after async metadata reading.
+  - Added UI thread marshaling (`RunOnUIThreadAsync`) with `IUIThreadDispatcher` integration so `playlist.Tracks.Add(t)`, `playlist.NotifyTracksChanged()`, and `PlaylistChanged` execute synchronously on the WinUI 3 UI thread before import completes.
+  - Replaced static `Tracks.Count` binding in `MusicLibraryPage.xaml` playlist template with observable `{x:Bind TrackCountText, Mode=OneWay}`, ensuring left navigation playlist counts update immediately upon import.
+  - Fixed import status message in `MusicLibraryViewModel.cs` to accurately report the number of newly added tracks and target playlist name (e.g. `Imported 3 track(s). Added to "Default Playlist".`), or inform when files are already in the playlist (`Selected audio files are already in this playlist.`).
+  - Added in-place reconciliation in `BackgroundMusicService.LoadPlaylistsAsync()` to match existing playlists and tracks by ID/path, preventing destructive object recreation, preserving `CurrentTrack` references, and never interrupting active music playback.
+
+### Added (feat / ui / music / playlists)
+- **Mini Refresh Button & Progress Ring**:
+  - Added a compact refresh button (`\uE72C`, `SubtleButtonStyle`, 24x24) beside the PLAYLISTS heading in `MusicLibraryPage.xaml`.
+  - Added subtle loading indicator (`ProgressRing`, 14x14) active during library reloads.
+  - Bound to `MusicLibraryViewModel.RefreshPlaylistsCommand`, which reloads authoritative playlists from disk, preserves the currently selected playlist and track by ID, and provides non-intrusive `StatusMessage = "Playlists reloaded."`.
+  - Added `TrackCountText` to `MusicPlaylist` with automatic notification on `NotifyTracksChanged()`.
+
+### Tests & Verification (test / build / quality-gates)
+- **443 Passing Tests**: Expanded automated test suite from 438 to 443 tests (+5 new tests covering `RefreshPlaylistsAsync`, duplicate imports, in-place reconciliation, and `TrackCountText` property notifications).
+- **Clean Compiler Validation**: Debug x64 and Release x64 builds verified with 0 warnings and 0 errors.
+
+---
+
 ## [v1.4.0 — Responsive Sources Page Refinement] - 2026-10-20
 
 ### Added (feat / ui / responsive / sources)

@@ -19,12 +19,15 @@ public partial class MusicPlaylist : ObservableObject
 
     public int TrackCount => Tracks.Count;
 
+    public string TrackCountText => $"{TrackCount} {(TrackCount == 1 ? "track" : "tracks")}";
+
     public string SummaryText => $"{TrackCount} {(TrackCount == 1 ? "track" : "tracks")} • {(TotalDuration.TotalHours >= 1 ? TotalDuration.ToString(@"h\:mm\:ss") : TotalDuration.ToString(@"m\:ss"))}";
 
     public void NotifyTracksChanged()
     {
         OnPropertyChanged(nameof(TotalDuration));
         OnPropertyChanged(nameof(TrackCount));
+        OnPropertyChanged(nameof(TrackCountText));
         OnPropertyChanged(nameof(SummaryText));
     }
 }

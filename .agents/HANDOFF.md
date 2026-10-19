@@ -3,24 +3,33 @@
 ---
 
 ## Task Details
-- **Task**: SWITCHCAST v1.4.0 — Sources Page: Set Application Windows as Default Category & Preserve Session State
-- **Date**: 2026-10-20T00:52:00+08:00 (UTC+8)
-- **Status**: Completed, Validated & Ready for Local Commit (438 Tests Passing, 0 Build Warnings/Errors, Clean UI Architecture)
+- **Task**: SWITCHCAST v1.4.0 — Fix Playlist Refresh After Import
+- **Date**: 2026-10-20T01:10:00+08:00 (UTC+8)
+- **Status**: Completed, Validated & Ready for Local Commit (443 Tests Passing, 0 Build Warnings/Errors, Clean UI Architecture)
 
 ---
 
 ## 1. Objectives & Outcomes
 
-1. **Application Windows Default Category**:
-   - Initialized `SourcesViewModel.SelectedCategoryIndex = 1` (Application Windows) so when the Sources page opens for the first time, Application Windows is automatically selected and displayed.
-   - All other source categories (All Sources = 0, Displays = 2, Media = 3, PowerPoint = 4, Cameras = 5) remain fully selectable from the category dropdown with live catalog totals.
-   - Preserves user selection across page transitions within the current session via the singleton `SourcesViewModel` registered in `App.xaml.cs`.
-   - Presentation queue (`PresentationStateService`), active On Air source, and presenter hotkeys are completely untouched.
+1. **Automatic Refresh After Audio Import**:
+   - Fixed background thread `ObservableCollection` mutation in `BackgroundMusicService.AddTracksAsync`: audio file metadata extraction now uses `RunOnUIThreadAsync` so `playlist.Tracks.Add(t)`, `playlist.NotifyTracksChanged()`, and `PlaylistChanged` execute synchronously on the WinUI 3 UI thread before `AddTracksAsync` completes.
+   - Updated `MusicLibraryPage.xaml` playlist template to bind to `{x:Bind TrackCountText, Mode=OneWay}` instead of non-observable `Tracks.Count`. Left navigation panel track counts update immediately upon audio import.
+   - In `MusicLibraryViewModel.ImportAudioAsync`, track count before and after import is measured to provide accurate user feedback: `Imported N track(s). Added to "{playlistName}".` or `Selected audio files are already in this playlist.`.
+   - Preserves the currently selected playlist and active On Air playback state without interrupting music or reloading the view.
 
-2. **Automated Regression Suite**:
-   - Updated existing test assertions to verify `SelectedCategoryIndex` defaults to 1 and displays the 2 window items.
-   - Added `DefaultCategory_IsApplicationWindows_AndPreservesUserSelection` test fixture.
-   - Total test suite expanded to **438 passing tests (100% pass rate)**.
+2. **Mini Refresh Button & Progress Ring**:
+   - Added compact refresh icon button (`\uE72C`, 24x24) with `SubtleButtonStyle` and tooltips beside the PLAYLISTS heading in `MusicLibraryPage.xaml`.
+   - Embedded a subtle loading indicator (`ProgressRing`, 14x14) that activates only while reloading.
+   - Wired to `MusicLibraryViewModel.RefreshPlaylistsCommand`, which reloads playlists via `_musicService.LoadPlaylistsAsync()` while preserving `SelectedPlaylist` and `SelectedTrack` by ID.
+
+3. **In-Place Reconciliation & State Synchronization**:
+   - Upgraded `BackgroundMusicService.LoadPlaylistsAsync()` to reconcile existing `MusicPlaylist` and `MusicTrack` instances in-place instead of calling destructive `_playlists.Clear()`.
+   - Prevents `CurrentTrack` from becoming detached, preserves playback position and volume, and prevents duplicate tracks.
+   - SwitchDeck music popup (`PresenterDockMenuWindow.xaml`) stays fully synchronized via `_backgroundMusicService.PlaylistChanged`.
+
+4. **Automated Regression Suite**:
+   - Added 5 new tests in `MusicLibraryViewModelTests.cs` and `BackgroundMusicServiceTests.cs`.
+   - Test suite expanded to **443 passing tests (100% pass rate)**.
    - **Header**: Title "Sources", subtitle "Select windows, displays, and media to include in your presentation." Actions: Primary "Import PowerPoint" (`PrimaryAccentButtonStyle`), Secondary "Refresh", and "Add Media". Right-aligned on desktop (>=840px), cleanly wrapped to row 1 on smaller viewports without clipping or squeezing.
    - **Dedicated Search & Filter Toolbar**: Search box with left search glyph (`\uE721`), right clear-search action, placeholder `Search windows, displays, media, or PowerPoint...`, min width 240px. Compact category dropdown `ComboBox` (210px width) containing all 6 categories with live counts. Compact "Queued Only" filter checkbox.
    - **Source Results**: Compact source cards (~52-56px height) with 32x32 icon tile (app icon or glyph), primary title with character ellipsis and full title tooltip, secondary metadata, availability badge, delete button (for Media and PowerPoint), and queue checkbox with `AutomationProperties.Name` bound to title.

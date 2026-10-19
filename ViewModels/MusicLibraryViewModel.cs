@@ -38,6 +38,19 @@ public partial class MusicLibraryViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string? _statusMessage;
 
+    [ObservableProperty]
+    private bool _isRefreshing;
+
+    public bool IsNotRefreshing => !IsRefreshing;
+
+    public Visibility IsRefreshingVisibility => IsRefreshing ? Visibility.Visible : Visibility.Collapsed;
+
+    partial void OnIsRefreshingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsNotRefreshing));
+        OnPropertyChanged(nameof(IsRefreshingVisibility));
+    }
+
     public MusicLibraryViewModel(
         IBackgroundMusicService musicService,
         IMediaPickerService mediaPickerService,
@@ -47,6 +60,11 @@ public partial class MusicLibraryViewModel : ObservableObject, IDisposable
         _mediaPickerService = mediaPickerService ?? throw new ArgumentNullException(nameof(mediaPickerService));
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _dispatcher = UIThreadDispatcherProvider.Resolve(uiDispatcher);
+
+        if (_musicService is BackgroundMusicService bgService)
+        {
+            bgService.SetUIThreadDispatcher(_dispatcher);
+        }
 
         _musicService.PlaybackStateChanged += OnPlaybackStateChanged;
         _musicService.TrackChanged += OnTrackChanged;
@@ -61,11 +79,19 @@ public partial class MusicLibraryViewModel : ObservableObject, IDisposable
     {
         _dispatcherQueue = dispatcherQueue;
         _dispatcher = dispatcherQueue is not null ? new DispatcherQueueAdapter(dispatcherQueue) : null;
+        if (_musicService is BackgroundMusicService bgService)
+        {
+            bgService.SetDispatcherQueue(dispatcherQueue);
+        }
     }
 
     public void SetUIThreadDispatcher(IUIThreadDispatcher? dispatcher)
     {
         _dispatcher = dispatcher;
+        if (_musicService is BackgroundMusicService bgService)
+        {
+            bgService.SetUIThreadDispatcher(dispatcher);
+        }
     }
 
     #region Properties
@@ -224,14 +250,76 @@ public partial class MusicLibraryViewModel : ObservableObject, IDisposable
                 SelectedPlaylist = target;
             }
 
+            int countBefore = target.Tracks.Count;
             await _musicService.AddTracksAsync(target.Id, files);
+            int addedCount = target.Tracks.Count - countBefore;
+
+            NotifyPlaylistsChanged();
             NotifySelectedPlaylistChanged();
-            StatusMessage = $"Imported {files.Count} track(s).";
+
+            if (addedCount > 0)
+            {
+                StatusMessage = $"Imported {addedCount} track(s). Added to \"{target.Name}\".";
+            }
+            else
+            {
+                StatusMessage = "Selected audio files are already in this playlist.";
+            }
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[MusicLibraryViewModel] ImportAudioAsync error: {ex.Message}");
             StatusMessage = $"Failed to import audio: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public async Task RefreshPlaylistsAsync()
+    {
+        if (IsRefreshing)
+        {
+            return;
+        }
+
+        try
+        {
+            IsRefreshing = true;
+
+            string? selectedId = SelectedPlaylist?.Id;
+            string? selectedTrackId = SelectedTrack?.Id;
+
+            await _musicService.LoadPlaylistsAsync();
+
+            if (!string.IsNullOrEmpty(selectedId))
+            {
+                SelectedPlaylist = _musicService.Playlists.FirstOrDefault(p => p.Id == selectedId)
+                    ?? _musicService.CurrentPlaylist
+                    ?? _musicService.Playlists.FirstOrDefault();
+            }
+            else
+            {
+                SelectedPlaylist = _musicService.CurrentPlaylist ?? _musicService.Playlists.FirstOrDefault();
+            }
+
+            if (!string.IsNullOrEmpty(selectedTrackId) && SelectedPlaylist is not null)
+            {
+                SelectedTrack = SelectedPlaylist.Tracks.FirstOrDefault(t => t.Id == selectedTrackId);
+            }
+
+            NotifyPlaylistsChanged();
+            NotifySelectedPlaylistChanged();
+            NotifyPlaybackProperties();
+
+            StatusMessage = "Playlists reloaded.";
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MusicLibraryViewModel] RefreshPlaylistsAsync error: {ex.Message}");
+            StatusMessage = $"Failed to reload playlists: {ex.Message}";
+        }
+        finally
+        {
+            IsRefreshing = false;
         }
     }
 

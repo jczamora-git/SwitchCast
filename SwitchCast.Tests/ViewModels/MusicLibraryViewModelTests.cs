@@ -284,4 +284,62 @@ public class MusicLibraryViewModelTests
         Assert.Equal(Microsoft.UI.Xaml.Visibility.Collapsed, availableTrack.MissingBadgeVisibility);
         Assert.Equal(Microsoft.UI.Xaml.Visibility.Visible, missingTrack.MissingBadgeVisibility);
     }
+
+    [Fact]
+    public async Task ImportAudio_AllDuplicates_ShowsAlreadyInPlaylistMessage()
+    {
+        var pickedFiles = new[] { @"C:\Music\existing.mp3" };
+        _mockPickerService.Setup(p => p.PickAudioFilesAsync()).ReturnsAsync(pickedFiles);
+
+        // Service does not add duplicate tracks
+        _mockMusicService.Setup(m => m.AddTracksAsync(_defaultPlaylist.Id, pickedFiles))
+            .Returns(Task.CompletedTask);
+
+        using var vm = CreateViewModel();
+        await vm.ImportAudioAsync();
+
+        Assert.Equal("Selected audio files are already in this playlist.", vm.StatusMessage);
+    }
+
+    [Fact]
+    public async Task RefreshPlaylists_InvokesServiceLoadAndPreservesSelection()
+    {
+        using var vm = CreateViewModel();
+        vm.SelectedPlaylist = _defaultPlaylist;
+
+        _mockMusicService.Setup(m => m.LoadPlaylistsAsync()).Returns(Task.CompletedTask);
+
+        await vm.RefreshPlaylistsAsync();
+
+        _mockMusicService.Verify(m => m.LoadPlaylistsAsync(), Times.Once);
+        Assert.Equal(_defaultPlaylist, vm.SelectedPlaylist);
+        Assert.False(vm.IsRefreshing);
+        Assert.True(vm.IsNotRefreshing);
+        Assert.Equal(Microsoft.UI.Xaml.Visibility.Collapsed, vm.IsRefreshingVisibility);
+        Assert.Equal("Playlists reloaded.", vm.StatusMessage);
+    }
+
+    [Fact]
+    public void MusicPlaylist_TrackCountText_UpdatesAndNotifies()
+    {
+        var playlist = new MusicPlaylist { Name = "Test" };
+        Assert.Equal(0, playlist.TrackCount);
+        Assert.Equal("0 tracks", playlist.TrackCountText);
+
+        bool notified = false;
+        playlist.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(MusicPlaylist.TrackCountText))
+            {
+                notified = true;
+            }
+        };
+
+        playlist.Tracks.Add(new MusicTrack { Title = "Song 1", Duration = TimeSpan.FromMinutes(2) });
+        playlist.NotifyTracksChanged();
+
+        Assert.True(notified);
+        Assert.Equal(1, playlist.TrackCount);
+        Assert.Equal("1 track", playlist.TrackCountText);
+    }
 }

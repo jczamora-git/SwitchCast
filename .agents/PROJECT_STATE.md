@@ -7,15 +7,30 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Version**: v1.4.0 — Responsive Sources Page Refinement (Application Windows Default Category, Layout Hierarchy, Search Toolbar, Queued Only Filtering, Queue Summary, Polite Import Feedback)
-- **Overall Status**: **Implemented & Validated (438 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
-- **Last Updated**: 2026-10-20T00:52:00+08:00 (UTC+8)
+- **Current Version**: v1.4.0 — Fix Playlist Refresh After Import (Immediate Import Refresh, Mini Refresh Button, In-Place Reconciliation, Thread-Safe Collection Synchronization)
+- **Overall Status**: **Implemented & Validated (443 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
+- **Last Updated**: 2026-10-20T01:10:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **v1.4.0 Fix Playlist Refresh After Import**:
+  - **Automatic Refresh After Audio Import**:
+    - Dispatched `playlist.Tracks.Add(t)`, `playlist.NotifyTracksChanged()`, and `PlaylistChanged` to UI thread via `RunOnUIThreadAsync` and `IUIThreadDispatcher` in `BackgroundMusicService.AddTracksAsync`. WinUI 3 `ObservableVector` adapter receives collection notifications synchronously on the UI thread without dropping changes.
+    - Updated `MusicLibraryPage.xaml` playlist template to bind to observable `{x:Bind TrackCountText, Mode=OneWay}` instead of non-observable `Tracks.Count`. Left playlist counts update immediately on import.
+    - Accurately tracks imported track delta in `MusicLibraryViewModel.ImportAudioAsync`: reports `Imported N track(s). Added to "{playlistName}".` or `Selected audio files are already in this playlist.`.
+    - Preserves currently selected playlist, active track, and continuous playback during imports without page reloads.
+  - **Mini Refresh Button & Subtle Loading Indicator**:
+    - Added compact 24x24 refresh icon button (`\uE72C`, `SubtleButtonStyle`) beside the PLAYLISTS heading in `MusicLibraryPage.xaml`.
+    - Added subtle 14x14 `ProgressRing` indicating refresh progress.
+    - Bound to `RefreshPlaylistsCommand`, which reloads playlists from disk and preserves `SelectedPlaylist` and `SelectedTrack` by ID.
+  - **In-Place Reconciliation & State Synchronization**:
+    - Reconciles `MusicPlaylist` and `MusicTrack` items in `BackgroundMusicService.LoadPlaylistsAsync()` by ID and file path instead of calling destructive `_playlists.Clear()`.
+    - Prevents `CurrentTrack` severance, retains audio volume, position, and repeat/shuffle settings, and prevents duplicate tracks.
+    - Synchronizes changes with SwitchDeck music popup (`PresenterDockMenuWindow.xaml`) via `PlaylistChanged`.
+  - **Automated Test Matrix**: 443 unit & regression tests passing (100% pass rate).
 - [x] **v1.4.0 Responsive Sources Page Refinement**:
   - **Application Windows Default Category**:
     - Initialized `SourcesViewModel.SelectedCategoryIndex = 1` (Application Windows) as the default selected category when opening the Sources page for the first time.
