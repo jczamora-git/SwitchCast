@@ -9,6 +9,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [v1.5.0 — Lightweight Performance & Adaptive Rendering] - 2026-10-20
 
+### Fixed (sources / dropdown / lifecycle / invalid-hwnd / d3d11-reset)
+- **Sources Category Synchronization & Collapsed Dropdown Label**:
+  - Fixed blank category ComboBox when collapsed and unexpected default selection of Cameras.
+  - Introduced stable `SourceCategoryOption` model (`Models/SourceCategoryOption.cs`) with observable `DisplayText = $"{Name} ({Count})"`.
+  - Initialized `SelectedCategoryIndex = 1` (`Application Windows`) by default on fresh application sessions, displaying discovered application windows automatically.
+  - Bound `CategoryComboBox` in `Views/SourcesPage.xaml` to `CategoryOptions` with `SelectedItem="{x:Bind ViewModel.SelectedCategoryOption, Mode=TwoWay}"` and `DisplayMemberPath="DisplayText"`.
+  - Moved `ViewModel` assignment before `InitializeComponent()` in `Views/SourcesPage.xaml.cs` to guarantee binding initialization during page load.
+  - Preserves category selection across session navigations (Dashboard <-> Sources) via singleton `SourcesViewModel` lifetime.
+  - Hardened `ApplyFilter()` switch to default safely to Application Windows (`_ => _allWindows`), preventing invalid or -1 indices from defaulting to Cameras.
+  - Guarded against negative or out-of-range indices in `OnSelectedCategoryIndexChanged`.
+- **P0 Invalid Window Handle (`0x80070578`) Teardown Guard**:
+  - Fixed `COMException (0x80070578): Invalid window handle` occurring after SwitchDeck Stop & Close.
+  - Discovered root cause: presentation stop enqueued `ApplyWindowSizingAndPosition` on `DispatcherQueue` due to `IsActiveSourcePowerPoint` state change. When `CloseDock()` destroyed the HWND immediately afterward, the queued lambda invoked `_appWindow.Resize(...)` on the destroyed handle.
+  - Added `_isClosed` flag in `PresenterDockWindow.xaml.cs`, unsubscribing handlers, nulling `_appWindow`, zeroing `WindowHandle = IntPtr.Zero`, and adding `IsWindow` checks.
+  - Protected `PresenterDockConfirmationWindow.xaml.cs` and `PresentationWindow.xaml.cs` with zeroed handles and nulled `_appWindow` on window closure.
+- **Direct3D 11 Reset Diagnostics & Device Recovery**:
+  - Eliminated 6 false "Direct3D 11 device reset event recorded." warnings logged during capability probing/startup before presentation.
+  - Refactored `SetRenderingMode()` in `Direct3D11DeviceProvider.cs` to avoid calling `ResetDevice()` and only recreate the device when an active device mode actually changes.
+  - Enhanced `CaptureSessionManager.cs` to log comprehensive diagnostics on genuine device loss (`0x887A0005`, `0x887A0007`, `0x887A0006`) with HRESULT, Operation, Mode, Backend, Generation, RecoveryAttempt, and RecoveryResult without double-counting reset events.
+
 ### Added (feat / perf / graphics / directx / adaptive)
 - **Hardware Capability Detection Service (`IGraphicsCapabilityService`, `GraphicsCapabilityService`)**:
   - Implemented zero-allocation native DXGI 1.1 COM adapter enumeration (`CreateDXGIFactory1`, `EnumAdapters1`, `DXGI_ADAPTER_DESC1`).

@@ -8,15 +8,37 @@ This is the authoritative progress, state, and environmental tracking document f
 
 - **Project**: SwitchCast
 - **Project**: SwitchCast
-- **Current Version**: v1.5.0 — Lightweight Performance & Adaptive Rendering (Phased Implementation: Capability Probing, Adaptive Backend Selection, GPU-Backed Frame Pipeline, Device Loss Recovery, Performance Settings UI)
-- **Overall Status**: **Implemented & Validated (463 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
-- **Last Updated**: 2026-10-20T02:05:00+08:00 (UTC+8)
+- **Current Version**: v1.5.0 — Native Stability, Sources Synchronization & Adaptive Rendering Hotfix
+- **Overall Status**: **Implemented & Validated (471 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
+- **Last Updated**: 2026-10-20T02:35:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **v1.5.0 Native Stability, Sources Synchronization & D3D11 Reset Hotfix**:
+  - **Sources Default Category & Synchronized Dropdown**:
+    - Introduced stable `SourceCategoryOption` model (`CategoryIndex`, `Name`, observable `Count`, observable `DisplayText = $"{Name} ({Count})"`) in `Models/SourceCategoryOption.cs`.
+    - `SourcesViewModel` maintains a permanent `ObservableCollection<SourceCategoryOption> CategoryOptions` collection initialized with 6 categories.
+    - Default selection initialized to index 1 (`Application Windows`), displaying discovered application windows automatically on fresh application launch.
+    - Bound `CategoryComboBox` in `Views/SourcesPage.xaml` to `CategoryOptions` with `SelectedItem="{x:Bind ViewModel.SelectedCategoryOption, Mode=TwoWay}"` and `DisplayMemberPath="DisplayText"`.
+    - In `Views/SourcesPage.xaml.cs`, moved `ViewModel = App.Current.Services.GetRequiredService<SourcesViewModel>()` before `InitializeComponent()`, ensuring the ComboBox binds to populated category options during initial page creation.
+    - Preserves category selection across session navigations (Dashboard <-> Sources) via singleton `SourcesViewModel` lifetime.
+    - Count updates in `UpdateCategoryHeaders()` update items in-place via `INotifyPropertyChanged` without resetting ComboBox selection or blanking the collapsed label.
+    - Hardened `ApplyFilter()` switch statement to safely default to Application Windows (`_ => _allWindows`), eliminating the previous bug where invalid/unselected states silently defaulted to Cameras (`_ => _allCameras`).
+    - Added guard in `OnSelectedCategoryIndexChanged` preventing out-of-range or negative indices (-1) from de-synchronizing selection.
+  - **P0 Invalid Window Handle (`0x80070578`) Teardown Guard**:
+    - Discovered root cause: during `StopPresentationAsync`, clearing active source triggered `OnViewModelPropertyChanged` for `IsActiveSourcePowerPoint` and `HasSecondaryRow`, enqueueing `ApplyWindowSizingAndPosition` via `DispatcherQueue.TryEnqueue`. Immediately afterward, `_dockService.CloseDock()` destroyed the window handle (`target.Close()`). When the dispatcher processed the queued lambda, `_appWindow.Resize(...)` ran on the destroyed HWND, throwing `COMException (0x80070578): Invalid window handle`.
+    - Added `_isClosed` flag to `Views/PresenterDockWindow.xaml.cs`, unsubscribing size/load/property/appwindow handlers in `OnWindowClosed`, setting `_appWindow = null`, and zeroing `WindowHandle = IntPtr.Zero`.
+    - Added `IsWindow(WindowHandle)` and `_isClosed` guards to `ApplyWindowSizingAndPosition`, `UpdateNonClientRegions`, `OnViewModelPropertyChanged`, and `OnAppWindowChanged` with defensive exception logging.
+    - Hardened `PresenterDockConfirmationWindow.xaml.cs` and `PresentationWindow.xaml.cs` to zero `WindowHandle` and null `_appWindow` on window closure.
+  - **Direct3D 11 Reset Diagnostics & Device Recovery**:
+    - Discovered root cause of 6 false device reset warnings: `SetRenderingMode()` in `Direct3D11DeviceProvider.cs` was unconditionally calling `ResetDevice()`, which logged a warning via `_metricsService?.RecordDeviceReset()`. Additionally, if `_winrtDevice` was null at startup, it called `ResetDevice()` even when setting the default Auto mode.
+    - Refactored `SetRenderingMode(mode)`: if mode is unchanged, returns immediately; if mode changed, safely recreates the device without calling `ResetDevice()` or recording false device loss events.
+    - In `CaptureSessionManager.cs`, added comprehensive diagnostics logging on genuine device loss (`0x887A0005`, `0x887A0007`, `0x887A0006`): HRESULT, Operation (`CaptureFrameProcessing`), Mode, Backend, Generation, RecoveryAttempt, and RecoveryResult. Removed duplicate `RecordDeviceReset()` call.
+    - Preserved complete Auto, PreferHardware, and CompatibilityMode adaptive rendering behavior.
+  - **Automated Test Matrix**: 471 unit & regression tests passing (100% pass rate).
 - [x] **v1.5.0 Lightweight Performance & Adaptive Rendering**:
   - **Phase A — Hardware Capability Detection & In-Memory Performance Telemetry**:
     - `IGraphicsCapabilityService` & `GraphicsCapabilityService`: Zero-allocation native DXGI 1.1 adapter enumeration (`CreateDXGIFactory1`, `EnumAdapters1`, `DXGI_ADAPTER_DESC1`) extracting adapter name, dedicated VRAM, shared system memory, vendor ID, and software flags.
