@@ -62,6 +62,14 @@ public sealed class Direct3D11DeviceProvider : IDirect3D11DeviceProvider
         }
     }
 
+    public bool IsInitialized
+    {
+        get
+        {
+            lock (_lock) { return _d3d11DevicePtr != IntPtr.Zero && _winrtDevice is not null; }
+        }
+    }
+
     public void SetRenderingMode(RenderingMode mode)
     {
         lock (_lock)

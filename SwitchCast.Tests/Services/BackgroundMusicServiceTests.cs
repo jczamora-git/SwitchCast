@@ -60,6 +60,7 @@ public class BackgroundMusicServiceTests : IDisposable
 
         var playlist = service.CreatePlaylist("Old Name");
         service.RenamePlaylist(playlist.Id, "New Renamed Title");
+        await service.SavePlaylistsAsync();
 
         Assert.Equal("New Renamed Title", playlist.Name);
 

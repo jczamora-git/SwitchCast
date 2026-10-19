@@ -33,6 +33,25 @@ public sealed class PerformanceMetricsService : IPerformanceMetricsService
     private long _outputFramesInWindow;
     private double _currentOutputFps;
 
+    // Rolling CPU tracking
+    private readonly object _cpuLock = new();
+    private TimeSpan _lastCpuTotalProcessorTime;
+    private long _lastCpuTimestamp = Stopwatch.GetTimestamp();
+    private double _lastCalculatedCpuPercent;
+
+    public PerformanceMetricsService()
+    {
+        try
+        {
+            using var currentProcess = Process.GetCurrentProcess();
+            _lastCpuTotalProcessorTime = currentProcess.TotalProcessorTime;
+        }
+        catch
+        {
+            // Fallback if process inspection is restricted
+        }
+    }
+
     public bool IsDiagnosticsEnabled { get; set; }
 
     public void RecordStartupDuration(double durationMs)
@@ -141,18 +160,57 @@ public sealed class PerformanceMetricsService : IPerformanceMetricsService
         Interlocked.Exchange(ref _mediaStallCount, 0);
         Volatile.Write(ref _currentPreviewFps, 0);
         Volatile.Write(ref _currentOutputFps, 0);
+
+        lock (_cpuLock)
+        {
+            _lastCpuTimestamp = Stopwatch.GetTimestamp();
+            _lastCalculatedCpuPercent = 0.0;
+            try
+            {
+                using var currentProcess = Process.GetCurrentProcess();
+                _lastCpuTotalProcessorTime = currentProcess.TotalProcessorTime;
+            }
+            catch
+            {
+                // Fallback if process inspection is restricted
+            }
+        }
     }
 
     public PerformanceSnapshot GetCurrentSnapshot()
     {
         long workingSet = 0;
         long privateBytes = 0;
+        double cpuPercent = 0.0;
 
         try
         {
             using var currentProcess = Process.GetCurrentProcess();
             workingSet = currentProcess.WorkingSet64;
             privateBytes = currentProcess.PrivateMemorySize64;
+
+            lock (_cpuLock)
+            {
+                TimeSpan currentCpuTime = currentProcess.TotalProcessorTime;
+                long now = Stopwatch.GetTimestamp();
+                long elapsedTicks = now - _lastCpuTimestamp;
+
+                if (_lastCpuTimestamp > 0 && elapsedTicks > 0)
+                {
+                    double elapsedWallSeconds = (double)elapsedTicks / Stopwatch.Frequency;
+                    double elapsedCpuSeconds = (currentCpuTime - _lastCpuTotalProcessorTime).TotalSeconds;
+
+                    if (elapsedWallSeconds > 0)
+                    {
+                        double rawPercent = (elapsedCpuSeconds / (elapsedWallSeconds * Environment.ProcessorCount)) * 100.0;
+                        _lastCalculatedCpuPercent = Math.Round(Math.Clamp(rawPercent, 0.0, 100.0), 1);
+                    }
+                }
+
+                _lastCpuTotalProcessorTime = currentCpuTime;
+                _lastCpuTimestamp = now;
+                cpuPercent = _lastCalculatedCpuPercent;
+            }
         }
         catch
         {
@@ -173,6 +231,7 @@ public sealed class PerformanceMetricsService : IPerformanceMetricsService
             FrameQueueDepth = Volatile.Read(ref _frameQueueDepth),
             ProcessWorkingSetBytes = workingSet,
             ProcessPrivateBytes = privateBytes,
+            ProcessCpuPercent = cpuPercent,
             GpuDeviceResetCount = Volatile.Read(ref _deviceResetCount),
             MediaPlaybackStalls = Volatile.Read(ref _mediaStallCount),
             IsDiagnosticsActive = IsDiagnosticsEnabled

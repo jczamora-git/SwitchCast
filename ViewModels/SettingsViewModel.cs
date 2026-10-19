@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using SwitchCast.Models;
 using SwitchCast.Models.Diagnostics;
@@ -15,7 +16,7 @@ namespace SwitchCast.ViewModels;
 /// <summary>
 /// ViewModel managing application theme configuration, preferences, presenter settings, shortcuts, version metadata, and diagnostics.
 /// </summary>
-public partial class SettingsViewModel : ObservableObject
+public partial class SettingsViewModel : ObservableObject, IDisposable
 {
     private readonly IApplicationSettingsService _settingsService;
     private readonly IHotkeyService? _hotkeyService;
@@ -24,7 +25,13 @@ public partial class SettingsViewModel : ObservableObject
     private readonly Services.Performance.IGraphicsCapabilityService? _capabilityService;
     private readonly Services.Capture.IDirect3D11DeviceProvider? _deviceProvider;
     private readonly Services.Performance.IPerformanceMetricsService? _metricsService;
+    private readonly IPresentationStateService? _presentationStateService;
     private Models.Performance.GraphicsCapabilities? _graphicsCapabilities;
+
+    private DispatcherQueue? _dispatcherQueue;
+    private DispatcherQueueTimer? _telemetryTimer;
+    private bool _isPageLoaded;
+    private bool _isDisposed;
 
     [ObservableProperty]
     private int _selectedCategoryIndex = 0; // 0=General, 1=Appearance, 2=Window, 3=Presenter, 4=Shortcuts, 5=Diagnostics, 6=Performance
@@ -91,7 +98,8 @@ public partial class SettingsViewModel : ObservableObject
         IDiagnosticReportBuilder? reportBuilder = null,
         Services.Performance.IGraphicsCapabilityService? capabilityService = null,
         Services.Capture.IDirect3D11DeviceProvider? deviceProvider = null,
-        Services.Performance.IPerformanceMetricsService? metricsService = null)
+        Services.Performance.IPerformanceMetricsService? metricsService = null,
+        IPresentationStateService? presentationStateService = null)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _hotkeyService = hotkeyService;
@@ -101,6 +109,12 @@ public partial class SettingsViewModel : ObservableObject
         _capabilityService = capabilityService;
         _deviceProvider = deviceProvider;
         _metricsService = metricsService;
+        _presentationStateService = presentationStateService;
+
+        if (_presentationStateService is not null)
+        {
+            _presentationStateService.PropertyChanged += OnPresentationStatePropertyChanged;
+        }
 
         var current = _settingsService.CurrentSettings;
         _selectedThemeIndex = (int)current.Theme;
@@ -119,6 +133,11 @@ public partial class SettingsViewModel : ObservableObject
         if (_metricsService is not null)
         {
             _metricsService.IsDiagnosticsEnabled = _enablePerformanceDiagnostics;
+        }
+
+        if (_enablePerformanceDiagnostics && _metricsService is not null)
+        {
+            _currentPerformanceSnapshot = _metricsService.GetCurrentSnapshot();
         }
 
         if (_capabilityService is not null)
@@ -223,6 +242,160 @@ public partial class SettingsViewModel : ObservableObject
         : _graphicsCapabilities?.IsIntegratedGpu == true
             ? "Integrated GPU detected. SwitchCast adapts frame queue pacing and eliminates redundant surface conversions automatically."
             : "Direct3D 11 hardware pipeline active. Presentation Output is rendered with zero CPU readback.";
+
+    // --- LIVE PERFORMANCE TELEMETRY MONITOR PROPERTIES ---
+    public bool IsTelemetryActive => EnablePerformanceDiagnostics;
+    public Visibility TelemetryActiveVisibility => EnablePerformanceDiagnostics ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility TelemetryDisabledVisibility => EnablePerformanceDiagnostics ? Visibility.Collapsed : Visibility.Visible;
+
+    public string ProcessCpuUsageText => (EnablePerformanceDiagnostics && CurrentPerformanceSnapshot is not null)
+        ? $"{CurrentPerformanceSnapshot.ProcessCpuPercent:F1}%"
+        : "—";
+
+    public string WorkingSetMemoryText => (EnablePerformanceDiagnostics && CurrentPerformanceSnapshot is not null)
+        ? $"{CurrentPerformanceSnapshot.WorkingSetMB:F1} MB"
+        : "—";
+
+    public string GpuUtilizationText => "Unsupported";
+    public string GpuUtilizationDetail => "Zero-Overhead • ETW tracing required for %";
+
+    public string LiveOutputFpsText
+    {
+        get
+        {
+            if (!EnablePerformanceDiagnostics)
+            {
+                return "—";
+            }
+
+            bool isPresenting = _presentationStateService?.Status == PresentationStatus.Active;
+            if (!isPresenting)
+            {
+                return "Not Presenting";
+            }
+
+            double fps = CurrentPerformanceSnapshot?.OutputFps ?? 0.0;
+            return $"{fps:F1} FPS";
+        }
+    }
+
+    public string LivePreviewFpsText
+    {
+        get
+        {
+            if (!EnablePerformanceDiagnostics)
+            {
+                return "—";
+            }
+
+            double fps = CurrentPerformanceSnapshot?.PreviewFps ?? 0.0;
+            if (fps <= 0.0)
+            {
+                return "Idle";
+            }
+
+            return $"{fps:F1} FPS";
+        }
+    }
+
+    public string DroppedFramesText => (EnablePerformanceDiagnostics && CurrentPerformanceSnapshot is not null)
+        ? $"{CurrentPerformanceSnapshot.FramesDropped:N0} frames"
+        : "—";
+
+    public string PresentationStartupLatencyText
+    {
+        get
+        {
+            if (!EnablePerformanceDiagnostics || CurrentPerformanceSnapshot is null)
+            {
+                return "—";
+            }
+
+            if (CurrentPerformanceSnapshot.PresentationStartupLatencyMs <= 0)
+            {
+                return "Not Available";
+            }
+
+            return $"{CurrentPerformanceSnapshot.PresentationStartupLatencyMs:F1} ms";
+        }
+    }
+
+    public string SourceSwitchLatencyText
+    {
+        get
+        {
+            if (!EnablePerformanceDiagnostics || CurrentPerformanceSnapshot is null)
+            {
+                return "—";
+            }
+
+            if (CurrentPerformanceSnapshot.LastSourceSwitchLatencyMs <= 0)
+            {
+                return "Not Available";
+            }
+
+            return $"{CurrentPerformanceSnapshot.LastSourceSwitchLatencyMs:F1} ms";
+        }
+    }
+
+    public string LiveActiveBackendText
+    {
+        get
+        {
+            if (_deviceProvider is null || !_deviceProvider.IsInitialized)
+            {
+                return "Not Initialized";
+            }
+
+            return _deviceProvider.ActiveBackendDescription;
+        }
+    }
+
+    public string LiveHardwareAccelerationText
+    {
+        get
+        {
+            if (_deviceProvider is null || !_deviceProvider.IsInitialized)
+            {
+                return "Not Initialized";
+            }
+
+            return _deviceProvider.IsHardwareAccelerated ? "Hardware Accelerated" : "Software (WARP)";
+        }
+    }
+
+    public string DeviceResetCountText => (EnablePerformanceDiagnostics && CurrentPerformanceSnapshot is not null)
+        ? $"{CurrentPerformanceSnapshot.GpuDeviceResetCount}"
+        : "0";
+
+    public string PipelineRecoveryStatusText
+    {
+        get
+        {
+            if (_deviceProvider is null || !_deviceProvider.IsInitialized)
+            {
+                return "Not Initialized";
+            }
+
+            int resets = CurrentPerformanceSnapshot?.GpuDeviceResetCount ?? 0;
+            if (_deviceProvider.ActiveBackendDescription.Contains("Fallback", StringComparison.OrdinalIgnoreCase))
+            {
+                return "WARP Fallback Active";
+            }
+
+            if (_deviceProvider.ActiveMode == Models.Performance.RenderingMode.CompatibilityMode)
+            {
+                return "Compatibility Mode (WARP)";
+            }
+
+            if (resets > 0)
+            {
+                return $"Recovered ({resets} reset{(resets == 1 ? "" : "s")})";
+            }
+
+            return "Operational";
+        }
+    }
     public Visibility NoIncidentsVisibility => RecentIncidents.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     public Visibility EmptyStateVisibility => RecentIncidents.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     public Visibility HasIncidentsVisibility => RecentIncidents.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -264,6 +437,8 @@ public partial class SettingsViewModel : ObservableObject
         {
             RefreshPerformanceData();
         }
+
+        UpdateTelemetryTimerState();
     }
 
     partial void OnShortcutSearchQueryChanged(string value)
@@ -362,7 +537,136 @@ public partial class SettingsViewModel : ObservableObject
             _metricsService.IsDiagnosticsEnabled = value;
         }
         await _settingsService.SaveSettingsAsync();
-        RefreshPerformanceData();
+
+        if (!value)
+        {
+            StopTelemetryTimer();
+            CurrentPerformanceSnapshot = null;
+        }
+        else
+        {
+            SampleTelemetry();
+            UpdateTelemetryTimerState();
+        }
+
+        NotifyTelemetryPropertiesChanged();
+        OnPropertyChanged(nameof(IsTelemetryActive));
+        OnPropertyChanged(nameof(TelemetryActiveVisibility));
+        OnPropertyChanged(nameof(TelemetryDisabledVisibility));
+    }
+
+    public void SetDispatcherQueue(DispatcherQueue? dispatcherQueue)
+    {
+        _dispatcherQueue = dispatcherQueue;
+        UpdateTelemetryTimerState();
+    }
+
+    public void OnPageLoaded()
+    {
+        _isPageLoaded = true;
+        UpdateTelemetryTimerState();
+    }
+
+    public void OnPageUnloaded()
+    {
+        _isPageLoaded = false;
+        StopTelemetryTimer();
+    }
+
+    private void UpdateTelemetryTimerState()
+    {
+        if (_isDisposed)
+        {
+            StopTelemetryTimer();
+            return;
+        }
+
+        bool shouldRun = EnablePerformanceDiagnostics && (_isPageLoaded || _dispatcherQueue is null) && SelectedCategoryIndex == 6;
+
+        if (shouldRun)
+        {
+            StartTelemetryTimer();
+        }
+        else
+        {
+            StopTelemetryTimer();
+        }
+    }
+
+    private void StartTelemetryTimer()
+    {
+        if (_telemetryTimer is not null && _telemetryTimer.IsRunning)
+        {
+            return;
+        }
+
+        SampleTelemetry();
+
+        if (_dispatcherQueue is not null)
+        {
+            try
+            {
+                if (_telemetryTimer is null)
+                {
+                    _telemetryTimer = _dispatcherQueue.CreateTimer();
+                    _telemetryTimer.Interval = TimeSpan.FromSeconds(1);
+                    _telemetryTimer.IsRepeating = true;
+                    _telemetryTimer.Tick += (s, e) => SampleTelemetry();
+                }
+                _telemetryTimer.Start();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[SettingsViewModel] Failed to start telemetry timer: {ex.Message}");
+            }
+        }
+    }
+
+    private void StopTelemetryTimer()
+    {
+        if (_telemetryTimer is not null)
+        {
+            try
+            {
+                _telemetryTimer.Stop();
+            }
+            catch
+            {
+                // Ignore cleanup error
+            }
+        }
+    }
+
+    public void SampleTelemetry()
+    {
+        if (_metricsService is not null)
+        {
+            CurrentPerformanceSnapshot = _metricsService.GetCurrentSnapshot();
+        }
+        NotifyTelemetryPropertiesChanged();
+    }
+
+    private void NotifyTelemetryPropertiesChanged()
+    {
+        OnPropertyChanged(nameof(ProcessCpuUsageText));
+        OnPropertyChanged(nameof(WorkingSetMemoryText));
+        OnPropertyChanged(nameof(LiveOutputFpsText));
+        OnPropertyChanged(nameof(LivePreviewFpsText));
+        OnPropertyChanged(nameof(DroppedFramesText));
+        OnPropertyChanged(nameof(PresentationStartupLatencyText));
+        OnPropertyChanged(nameof(SourceSwitchLatencyText));
+        OnPropertyChanged(nameof(LiveActiveBackendText));
+        OnPropertyChanged(nameof(LiveHardwareAccelerationText));
+        OnPropertyChanged(nameof(DeviceResetCountText));
+        OnPropertyChanged(nameof(PipelineRecoveryStatusText));
+    }
+
+    private void OnPresentationStatePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(IPresentationStateService.Status))
+        {
+            OnPropertyChanged(nameof(LiveOutputFpsText));
+        }
     }
 
     [RelayCommand]
@@ -385,6 +689,23 @@ public partial class SettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(HardwareAccelerationStatus));
         OnPropertyChanged(nameof(CapabilitiesSummaryText));
         OnPropertyChanged(nameof(FallbackNote));
+        NotifyTelemetryPropertiesChanged();
+    }
+
+    public void Dispose()
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        _isDisposed = true;
+        StopTelemetryTimer();
+
+        if (_presentationStateService is not null)
+        {
+            _presentationStateService.PropertyChanged -= OnPresentationStatePropertyChanged;
+        }
     }
 
     [RelayCommand]

@@ -35,6 +35,11 @@ public interface IDirect3D11DeviceProvider : IDisposable
     string ActiveBackendDescription { get; }
 
     /// <summary>
+    /// Gets whether the native Direct3D 11 device has been created and initialized.
+    /// </summary>
+    bool IsInitialized { get; }
+
+    /// <summary>
     /// Updates the target rendering mode and reinitializes device state if changed.
     /// </summary>
     void SetRenderingMode(RenderingMode mode);

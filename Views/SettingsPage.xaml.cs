@@ -22,8 +22,12 @@ public sealed partial class SettingsPage : Page
     {
         InitializeComponent();
         ViewModel = App.Current.Services.GetRequiredService<SettingsViewModel>();
+        ViewModel.SetDispatcherQueue(DispatcherQueue);
         _reportingService = App.Current.Services.GetRequiredService<IErrorReportingService>();
         _reportBuilder = App.Current.Services.GetRequiredService<IDiagnosticReportBuilder>();
+
+        Loaded += (s, e) => ViewModel.OnPageLoaded();
+        Unloaded += (s, e) => ViewModel.OnPageUnloaded();
     }
 
     public SettingsViewModel ViewModel { get; }

@@ -116,4 +116,13 @@ public class PerformanceMetricsServiceTests
 
         Assert.True(snapshot.ProcessWorkingSetBytes > 0);
     }
+
+    [Fact]
+    public void ProcessCpuPercent_Snapshot_CalculatesValidRange()
+    {
+        var service = new PerformanceMetricsService();
+        var snapshot = service.GetCurrentSnapshot();
+
+        Assert.True(snapshot.ProcessCpuPercent >= 0.0 && snapshot.ProcessCpuPercent <= 100.0);
+    }
 }

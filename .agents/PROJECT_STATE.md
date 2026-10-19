@@ -7,16 +7,34 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Project**: SwitchCast
-- **Current Version**: v1.5.0 — Native Stability, Sources Synchronization & Adaptive Rendering Hotfix
-- **Overall Status**: **Implemented & Validated (471 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
-- **Last Updated**: 2026-10-20T02:35:00+08:00 (UTC+8)
+- **Current Version**: v1.5.0 — Live Performance Telemetry UI & Adaptive Rendering
+- **Overall Status**: **Implemented & Validated (476 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
+- **Last Updated**: 2026-10-20T03:33:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **v1.5.0 Live Performance Telemetry UI & Monitor**:
+  - **Live Performance Monitor in Settings > Performance**:
+    - Embedded compact, responsive performance telemetry panel directly below the existing rendering mode and adapter cards inside `SettingsPage.xaml`.
+    - Implemented live pulse indicator (coral accent `#FF5252` / `ThemeResource AppAccentBrush`) and badge indicating lightweight ~1-second sampling with zero disk logging.
+    - Responsive layout with `VisualStateManager` (`AdaptiveTrigger MinWindowWidth="720"`): displays two columns on wide layouts and stacks single-column on narrow layouts without horizontal scrollbar or overflow.
+  - **Real, Genuinely Measured Metrics**:
+    - **Resource Usage**: Process CPU usage (%) via `Process.TotalProcessorTime` elapsed delta normalized by `Environment.ProcessorCount * 100.0`. Physical working-set memory (MB) via `Process.WorkingSet64`. GPU utilization transparently reported as unsupported without elevated ETW tracing, adhering strictly to zero-overhead offline privacy policy (never fake numbers).
+    - **Presentation**: Live Presentation Output FPS (`Direct3D11PresentationRenderer`), Live Preview FPS (`Direct3D11PreviewRenderer`), Dropped/Superseded Frame Counter, Presentation Startup Latency (ms), and Last Source Switch Latency (ms).
+    - **Graphics & Direct3D 11 Pipeline**: Active Rendering Backend (`IDirect3D11DeviceProvider.ActiveBackendDescription`), Hardware / WARP indication, Primary DXGI display adapter name, D3D11 device reset count, and pipeline recovery health status.
+  - **Authoritative Idle States**:
+    - When presentation is inactive, Presentation Output FPS displays `"Not Presenting"`.
+    - When preview is inactive, Preview FPS displays `"Idle"`.
+    - Latencies not yet measured display `"Not Available"` (never fake zero values).
+    - When D3D11 graphics device is uninitialized, backend displays `"Not Initialized"`.
+  - **Clean Telemetry Lifecycle & Zero Leaks**:
+    - Governed by authoritative `EnablePerformanceDiagnostics` toggle in `SettingsViewModel`.
+    - Lightweight 1-second `DispatcherQueueTimer` runs only when telemetry is enabled, page is loaded, and Performance tab (Category 6) is active.
+    - Automatically stops sampling when navigating away from Performance tab, when `SettingsPage` is unloaded, or upon ViewModel disposal.
+    - When disabled, detailed monitor is hidden and a compact "Performance Monitor is Idle" card is displayed without stale values.
 - [x] **v1.5.0 Native Stability, Sources Synchronization & D3D11 Reset Hotfix**:
   - **Sources Default Category & Synchronized Dropdown**:
     - Introduced stable `SourceCategoryOption` model (`CategoryIndex`, `Name`, observable `Count`, observable `DisplayText = $"{Name} ({Count})"`) in `Models/SourceCategoryOption.cs`.

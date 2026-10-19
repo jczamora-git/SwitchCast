@@ -11,6 +11,26 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <Grid HorizontalAlignment="Stretch">
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup>
+                    <VisualState x:Name="WideLayout">
+                        <VisualState.StateTriggers>
+                            <AdaptiveTrigger MinWindowWidth="720" />
+                        </VisualState.StateTriggers>
+                    </VisualState>
+                    <VisualState x:Name="NarrowLayout">
+                        <VisualState.StateTriggers>
+                            <AdaptiveTrigger MinWindowWidth="0" />
+                        </VisualState.StateTriggers>
+                        <VisualState.Setters>
+                            <Setter Target="PerfRightCol.(Grid.Row)" Value="1" />
+                            <Setter Target="PerfRightCol.(Grid.Column)" Value="0" />
+                            <Setter Target="PerfMonitorCol1.Width" Value="0" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+
             <StackPanel Spacing="16" Padding="28,20,28,28" MaxWidth="1160" HorizontalAlignment="Stretch">
             
             <!-- Page Header -->
@@ -957,6 +977,268 @@
                                               OnContent=""
                                               OffContent="" />
                             </Grid>
+
+                            <!-- TELEMETRY DISABLED PLACEHOLDER -->
+                            <Border Visibility="{x:Bind ViewModel.TelemetryDisabledVisibility, Mode=OneWay}"
+                                    Background="{ThemeResource AppSurfaceElevatedBrush}"
+                                    BorderBrush="{ThemeResource AppBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    Padding="14,12">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Grid.Column="0" Glyph="&#xE9D9;" FontSize="16" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" Spacing="2">
+                                        <TextBlock Text="Performance Monitor is Idle" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                        <TextBlock Text="Enable telemetry above to begin lightweight, ~1s in-memory sampling of CPU usage, working-set memory, presentation FPS, and Direct3D 11 pipeline metrics."
+                                                   FontSize="11"
+                                                   Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- LIVE PERFORMANCE MONITOR PANEL -->
+                            <StackPanel Visibility="{x:Bind ViewModel.TelemetryActiveVisibility, Mode=OneWay}" Spacing="12">
+
+                                <!-- Panel Header with live pulse dot -->
+                                <Grid VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Ellipse Width="8" Height="8" Fill="{ThemeResource AppAccentBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Text="LIVE PERFORMANCE MONITOR" FontSize="11" FontWeight="Bold" Foreground="{ThemeResource AppAccentBrush}" CharacterSpacing="50" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="Updated ~1s • Zero Disk Writes" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                </Grid>
+
+                                <!-- Two-column responsive metric cards grid -->
+                                <Grid x:Name="PerfMonitorGrid" ColumnSpacing="12" RowSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition x:Name="PerfMonitorCol0" Width="*" />
+                                        <ColumnDefinition x:Name="PerfMonitorCol1" Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition x:Name="PerfMonitorRow1" Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Column 0 Panel: Resource Usage & Direct3D Pipeline -->
+                                    <StackPanel x:Name="PerfLeftCol" Grid.Row="0" Grid.Column="0" Spacing="12">
+
+                                        <!-- Card: Resource Usage -->
+                                        <Border Background="{ThemeResource AppSurfaceElevatedBrush}"
+                                                BorderBrush="{ThemeResource AppBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6"
+                                                Padding="14,12">
+                                            <StackPanel Spacing="10">
+                                                <TextBlock Text="RESOURCE USAGE" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" CharacterSpacing="50" />
+
+                                                <!-- Process CPU -->
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="Process CPU Usage" FontSize="12" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                                        <TextBlock Text="Normalized across all logical cores" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.ProcessCpuUsageText, Mode=OneWay}" FontSize="14" FontWeight="Bold" Foreground="{ThemeResource AppAccentBrush}" VerticalAlignment="Center" />
+                                                </Grid>
+
+                                                <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                                                <!-- Working Set Memory -->
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="Working-Set Memory" FontSize="12" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                                        <TextBlock Text="Physical RAM allocated to SwitchCast" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.WorkingSetMemoryText, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
+                                                </Grid>
+
+                                                <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                                                <!-- GPU Utilization (Unprivileged Policy) -->
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="GPU Utilization" FontSize="12" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                                        <TextBlock Text="{x:Bind ViewModel.GpuUtilizationDetail, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.GpuUtilizationText, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Card: Graphics & D3D11 Pipeline -->
+                                        <Border Background="{ThemeResource AppSurfaceElevatedBrush}"
+                                                BorderBrush="{ThemeResource AppBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6"
+                                                Padding="14,12">
+                                            <StackPanel Spacing="10">
+                                                <TextBlock Text="GRAPHICS &amp; DIRECT3D 11 PIPELINE" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" CharacterSpacing="50" />
+
+                                                <!-- Active Backend -->
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="Active Backend" FontSize="12" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.LiveActiveBackendText, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppAccentBrush}" VerticalAlignment="Center" />
+                                                </Grid>
+
+                                                <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                                                <!-- Acceleration Mode -->
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="Acceleration Mode" FontSize="12" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.LiveHardwareAccelerationText, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AppTextSecondaryBrush}" VerticalAlignment="Center" />
+                                                </Grid>
+
+                                                <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                                                <!-- D3D11 Device Resets -->
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="D3D11 Device Resets" FontSize="12" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                                        <TextBlock Text="Driver resets, TDR events, or removals" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.DeviceResetCountText, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
+                                                </Grid>
+
+                                                <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                                                <!-- Pipeline Health Status -->
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="Pipeline Status" FontSize="12" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.PipelineRecoveryStatusText, Mode=OneWay}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+
+                                    </StackPanel>
+
+                                    <!-- Column 1 Panel: Presentation Metrics -->
+                                    <StackPanel x:Name="PerfRightCol" Grid.Row="0" Grid.Column="1" Spacing="12">
+
+                                        <!-- Card: Presentation Output & Preview -->
+                                        <Border Background="{ThemeResource AppSurfaceElevatedBrush}"
+                                                BorderBrush="{ThemeResource AppBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="6"
+                                                Padding="14,12">
+                                            <StackPanel Spacing="10">
+                                                <TextBlock Text="PRESENTATION &amp; CAPTURE" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AppTextSecondaryBrush}" CharacterSpacing="50" />
+
+                                                <!-- Presentation Output FPS -->
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="Presentation Output FPS" FontSize="12" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                                        <TextBlock Text="Audience presentation window rate" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.LiveOutputFpsText, Mode=OneWay}" FontSize="14" FontWeight="Bold" Foreground="{ThemeResource AppAccentBrush}" VerticalAlignment="Center" />
+                                                </Grid>
+
+                                                <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                                                <!-- Preview FPS -->
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="Preview FPS" FontSize="12" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                                        <TextBlock Text="In-app presenter preview canvas" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.LivePreviewFpsText, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
+                                                </Grid>
+
+                                                <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                                                <!-- Dropped / Superseded Frames -->
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="Dropped / Superseded Frames" FontSize="12" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                                        <TextBlock Text="Pacing drops or unrendered frames" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.DroppedFramesText, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
+                                                </Grid>
+
+                                                <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                                                <!-- Presentation Startup Latency -->
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="Presentation Startup Latency" FontSize="12" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                                        <TextBlock Text="Time to initial presentation frame" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.PresentationStartupLatencyText, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
+                                                </Grid>
+
+                                                <Rectangle Height="1" Fill="{ThemeResource AppSubtleDividerBrush}" />
+
+                                                <!-- Last Source Switch Latency -->
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="Last Source Switch Latency" FontSize="12" Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                                                        <TextBlock Text="Transition between queued sources" FontSize="10" Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.SourceSwitchLatencyText, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AppTextPrimaryBrush}" VerticalAlignment="Center" />
+                                                </Grid>
+
+                                            </StackPanel>
+                                        </Border>
+
+                                    </StackPanel>
+                                </Grid>
+
+                            </StackPanel>
 
                             <!-- REFRESH BUTTON ROW -->
                             <StackPanel Orientation="Horizontal" Spacing="10">

@@ -17,6 +17,7 @@ public sealed class PerformanceSnapshot
     public int FrameQueueDepth { get; init; }
     public long ProcessWorkingSetBytes { get; init; }
     public long ProcessPrivateBytes { get; init; }
+    public double ProcessCpuPercent { get; init; }
     public int GpuDeviceResetCount { get; init; }
     public int MediaPlaybackStalls { get; init; }
     public bool IsDiagnosticsActive { get; init; }

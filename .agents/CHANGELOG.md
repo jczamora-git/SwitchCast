@@ -9,6 +9,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [v1.5.0 — Lightweight Performance & Adaptive Rendering] - 2026-10-20
 
+### Added (feat / perf / telemetry / ui)
+- **Live Performance Telemetry UI Monitor (`SettingsPage.xaml`, `SettingsViewModel.cs`)**:
+  - Implemented live performance telemetry panel directly within `Settings > Performance` when `EnablePerformanceDiagnostics` is toggled on.
+  - Displays real, measured metrics:
+    - **Resource Usage**: Process CPU usage (%) via `Process.TotalProcessorTime` normalized across all logical cores, physical working-set memory (MB), and transparent notification that per-process GPU % is not supported in user-mode without ETW tracing (preserving zero-overhead offline privacy without fabricating numbers).
+    - **Presentation & Capture**: Live Presentation Output FPS (`Direct3D11PresentationRenderer`), Live Preview FPS (`Direct3D11PreviewRenderer`), Dropped/Superseded Frame Counter, Presentation Startup Latency (ms), and Last Source Switch Latency (ms).
+    - **Graphics & D3D11 Pipeline**: Active backend description, hardware vs software WARP indication, detected DXGI primary adapter, D3D11 device reset count, and pipeline recovery health status.
+  - Implemented authoritative idle states: Output FPS displays "Not Presenting" when presentation is stopped; Preview FPS displays "Idle" when not previewing; latencies display "Not Available" when unmeasured; GPU displays "Not Initialized" when uninitialized.
+  - Implemented lightweight 1-second `DispatcherQueueTimer` bound to page lifecycle (`Loaded`, `Unloaded`) and Performance tab selection (Category 6), stopping sampling when navigating away to prevent CPU/memory spikes or memory leaks.
+  - Implemented responsive layout using `VisualStateManager` (`AdaptiveTrigger MinWindowWidth="720"`): 2 columns on wide screens, stacked single-column on narrow screens with no horizontal scrollbar or overflow.
+  - Added compact "Performance Monitor is Idle" placeholder card when telemetry is disabled.
+
 ### Fixed (sources / dropdown / lifecycle / invalid-hwnd / d3d11-reset)
 - **Sources Category Synchronization & Collapsed Dropdown Label**:
   - Fixed blank category ComboBox when collapsed and unexpected default selection of Cameras.

@@ -489,17 +489,27 @@ The v1.5.0 Lightweight Performance & Adaptive Rendering release was implemented 
 
 ### 5. Phase F: Performance Settings UI & Documentation
 - **Settings Page Integration (`SettingsPage.xaml`, `SettingsViewModel.cs`)**:
-  - Added new **Performance & Adaptive Rendering** category (Sidebar index 6, glyph `\uE9E9`).
+  - Added **Performance & Adaptive Rendering** category (Sidebar index 6, glyph `\uE9E9`).
   - Rendering mode selector `ComboBox` with `Auto (Recommended)`, `Prefer Hardware`, and `Compatibility Mode`.
   - 3-Card Summary Strip: Active Backend, Graphics Adapter (name + VRAM), and Direct3D Feature Level + Vendor.
   - Adaptive Resource Profile notification banner informing user of current GPU status.
   - In-memory performance telemetry toggle switch (`EnablePerformanceDiagnostics`).
+  - **Live Performance Telemetry Monitor**:
+    - Embedded compact, responsive performance telemetry panel directly below the existing rendering mode and adapter cards inside `SettingsPage.xaml`.
+    - Live pulse indicator (coral accent `#FF5252` / `{ThemeResource AppAccentBrush}`) and badge indicating ~1-second lightweight in-memory sampling without disk writes.
+    - Two-column responsive layout on wide screens (`VisualStateManager` `MinWindowWidth="720"`), stacking single-column on narrow screens without horizontal overflow.
+    - Resource usage cards: Process CPU usage (%) normalized across all cores, physical working-set memory (MB), and transparent ETW policy note for GPU.
+    - Presentation & Capture cards: Live Presentation Output FPS (`Direct3D11PresentationRenderer`), Live Preview FPS (`Direct3D11PreviewRenderer`), Dropped/Superseded Frame Counter, Presentation Startup Latency (ms), and Last Source Switch Latency (ms).
+    - Graphics & Pipeline cards: Active backend description, hardware vs software WARP indication, detected DXGI primary adapter, D3D11 device reset count, and pipeline recovery health status.
+    - Authoritative idle states: "Not Presenting" when presentation stopped, "Idle" when preview stopped, "Not Available" for unmeasured latencies, "Not Initialized" for uninitialized GPU.
+    - Lightweight 1-second `DispatcherQueueTimer` running only when telemetry is enabled, page is loaded, and Performance category is active.
+    - Compact "Performance Monitor is Idle" placeholder card displayed when telemetry is disabled.
   - "Refresh Hardware Info" button bound to `RefreshPerformanceDataCommand`.
 - **Persistence**: Persists `RenderingMode` and `EnablePerformanceDiagnostics` in `settings.json`.
 
 ### 6. Validation & Regression Gates
 - **Debug x64 Build**: 0 Warnings, 0 Errors.
-- **Unit Test Suite**: 463 tests passing (100% pass rate).
+- **Unit Test Suite**: 476 tests passing (100% pass rate).
 - **Release x64 Build**: 0 Warnings, 0 Errors.
 - **Functional Invariants**: Background Music, Video Player, Dual-Player Isolation, PowerPoint, Camera, SwitchDeck, Cursor toggle, and Window lifecycle all remain 100% functional with zero regressions.
 
