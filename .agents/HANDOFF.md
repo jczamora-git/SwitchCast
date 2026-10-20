@@ -3,9 +3,9 @@
 ---
 
 ## Task Details
-- **Task**: SWITCHCAST — Minimal 'Buy me a coffee' sidebar link
-- **Date**: 2026-10-20T18:55:00+08:00 (UTC+8)
-- **Status**: Completed (Committed locally; 480 automated tests passing; 0 build warnings/errors)
+- **Task**: SWITCHCAST — Professional Branded Windows Installer Wizard (Inno Setup 6)
+- **Date**: 2026-10-20T19:25:00+08:00 (UTC+8)
+- **Status**: Completed (Installer built, tested, and verified: SwitchCast-Setup-v1.5.0-x64.exe; 480 automated tests passing; 0 build warnings/errors)
 
 ---
 

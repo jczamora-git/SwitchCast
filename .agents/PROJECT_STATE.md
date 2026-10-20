@@ -8,17 +8,27 @@ This is the authoritative progress, state, and environmental tracking document f
 
 - **Project**: SwitchCast
 - **Current Version**: v1.5.0 (Released & Tagged), v1.4.0 (Tagged), v1.3.0 (Released & Tagged)
-- **Overall Status**: **Built, Packaged & Verified (480 automated tests passing; 0 build warnings/errors; minimal 'Buy me a coffee' sidebar link added)**
-- **Last Updated**: 2026-10-20T18:55:00+08:00 (UTC+8)
+- **Overall Status**: **Built, Packaged & Verified (Official Inno Setup Windows installer created: SwitchCast-Setup-v1.5.0-x64.exe; 480 automated tests passing; 0 build warnings/errors)**
+- **Last Updated**: 2026-10-20T19:25:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **SwitchCast v1.5.0 Windows Installation Wizard (`installer/`)**:
+  - Implemented single-file standalone installer (`SwitchCast-Setup-v1.5.0-x64.exe`, 42.37 MB) built using Inno Setup 6 with LZMA2/ultra64 solid compression.
+  - Fixed persistent `AppId={{E5D91C08-36D4-4B7E-9721-7B32F7FEA780}}` ensuring clean in-place upgrades and zero duplicate uninstall entries.
+  - Per-user installation by default (`%LOCALAPPDATA%\Programs\SwitchCast`) with optional elevation dialog (`PrivilegesRequired=lowest`, `PrivilegesRequiredOverridesAllowed=dialog`).
+  - Running application safety watchdog via WMI (`IsAppRunning`) prompting users to close SwitchCast before installing or uninstalling without force-killing active sessions.
+  - Complete user data preservation: `%LOCALAPPDATA%\SwitchCast` (`settings.json`, `music_playlists.json`, logs) and imported media are never touched or deleted during upgrades or uninstall.
+  - Start Menu shortcut and optional Desktop shortcut with SwitchCast icon.
+  - Standard Windows Settings > Installed Apps uninstallation support.
+  - Automated build script (`installer/build-installer.ps1`) verifying build prerequisites, payload integrity, compilation, size calculation, and SHA-256 generation.
+  - Comprehensive documentation guide in `installer/README.md`.
 - [x] **Main Sidebar 'Buy me a coffee' Link**:
   - Embedded minimal `NavigationViewItem` within `<NavigationView.FooterMenuItems>` anchored directly above `Settings`.
-  - Styled with Segoe MDL2 Cafe glyph `&#xE765;` in coral accent (`{ThemeResource AppAccentBrush}`) and subtle external-link icon `&#xE8A7;`.
+  - Styled with Segoe MDL2 Cafe glyph `&#xEC32;` in coral accent (`{ThemeResource AppAccentBrush}`) and subtle external-link icon `&#xE8A7;`.
   - Configured with `SelectsOnInvoked="False"`, full screen-reader accessibility (`AutomationProperties.Name`), and hover tooltip.
   - Bound to `OpenCoffeeLinkCommand` in `MainViewModel` opening `https://paypal.me/itsjczamora` via `Windows.System.Launcher.LaunchUriAsync` without navigating away from the current page or interrupting presentations, music, or SwitchDeck.
 - [x] **v1.5.0 Live Performance Telemetry UI & Monitor**:

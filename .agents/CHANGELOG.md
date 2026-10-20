@@ -20,10 +20,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Bumped project versions in `SwitchCast.csproj`, `app.manifest`, `SettingsViewModel.cs`, and `README.md`.
   - Created annotated release git tags `v1.4.0` and `v1.5.0`.
 
-### Added (feat / perf / telemetry / ui / sidebar)
+### Added (feat / installer / packaging / ui / sidebar)
+- **SwitchCast v1.5.0 Windows Installation Wizard (`installer/SwitchCast.iss`, `installer/build-installer.ps1`, `installer/README.md`)**:
+  - Implemented professional, branded standalone setup wizard (`SwitchCast-Setup-v1.5.0-x64.exe`, 42.37 MB) utilizing Inno Setup 6 with LZMA2/ultra64 solid compression.
+  - Established permanent fixed application identity `AppId={{E5D91C08-36D4-4B7E-9721-7B32F7FEA780}}` for clean future in-place upgrades without duplicate uninstall records.
+  - Implemented per-user default installation (`%LOCALAPPDATA%\Programs\SwitchCast`) requiring no administrator UAC elevation for standard users, with optional elevation dialog for machine-wide setup.
+  - Implemented running process watchdog using WMI (`IsAppRunning`), prompting presenters to cleanly close SwitchCast without force-killing active sessions.
+  - Guaranteed user data preservation: user settings (`settings.json`), music playlists (`music_playlists.json`), and diagnostic logs under `%LOCALAPPDATA%\SwitchCast` are never touched or deleted during upgrades or uninstallation.
+  - Created automated build pipeline `build-installer.ps1` that publishes self-contained WinUI 3 binaries, validates payload integrity, executes Inno Setup compiler, and computes SHA-256 checksums.
+  - Authored comprehensive installer maintenance guide in `installer/README.md`.
 - **Main Sidebar 'Buy me a coffee' Link (`MainWindow.xaml`, `MainWindow.xaml.cs`, `MainViewModel.cs`)**:
   - Added minimal `NavigationViewItem` inside `<NavigationView.FooterMenuItems>` positioned directly above the Settings item.
-  - Features Segoe MDL2 Cafe glyph `&#xE765;` in coral accent (`{ThemeResource AppAccentBrush}`), two-line label (12px "Buy me a coffee" + 10px "Support development"), and subtle external-link icon `&#xE8A7;`.
+  - Features Segoe MDL2 Cafe glyph `&#xEC32;` in coral accent (`{ThemeResource AppAccentBrush}`), two-line label (12px "Buy me a coffee" + 10px "Support development"), and subtle external-link icon `&#xE8A7;`.
   - Configured with `SelectsOnInvoked="False"` so clicking does not select the item or navigate away from the current page.
   - Invokes `OpenCoffeeLinkCommand` opening `https://paypal.me/itsjczamora` in the default browser without interrupting presentations, music, or SwitchDeck.
   - Preserves standard WinUI 3 hover states, light/dark theme brushes, collapsed icon-only rendering, keyboard focus navigation, screen-reader accessibility (`AutomationProperties.Name`), and hover tooltip.
