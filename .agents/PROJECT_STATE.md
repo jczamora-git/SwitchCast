@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Version**: v1.5.0 (Released & Tagged) & v1.4.0 (Released & Tagged)
-- **Overall Status**: **Built, Packaged & Tagged (v1.4.0 & v1.5.0 release archives generated with SHA256; 476 automated tests passing; 0 build warnings/errors)**
-- **Last Updated**: 2026-10-20T10:45:00+08:00 (UTC+8)
+- **Current Version**: v1.5.0 (Released & Tagged), v1.4.0 (Tagged), v1.3.0 (Released & Tagged)
+- **Overall Status**: **v1.3.0, v1.4.0 & v1.5.0 Packaged & Tagged on GitHub (v1.3.0 & v1.5.0 release archives published with SHA256 and release notes; 476 automated tests passing; 0 build warnings/errors)**
+- **Last Updated**: 2026-10-20T18:35:00+08:00 (UTC+8)
 
 ---
 

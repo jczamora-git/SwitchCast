@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [v1.5.0 — Lightweight Performance & Adaptive Rendering] - 2026-10-20
 
 ### Release (chore / release / packaging)
+- **v1.3.0 GitHub Release Publishing**:
+  - Created and pushed annotated git tag `v1.3.0` pointing to commit `8bc358f21d832be4bf1f53326d0d007276f7ce5a`.
+  - Triggered and verified successful GitHub Actions `Build & Release SwitchCast` workflow run (run ID `39408321410`).
+  - Published official GitHub Release `SwitchCast v1.3.0` with markdown release notes (`docs/releases/v1.3.0.md`), `SwitchCast-v1.3.0-win-x64.zip`, and `SwitchCast-v1.3.0-win-x64.sha256`.
 - **v1.5.0 & v1.4.0 Release Packaging**:
   - Published and packaged standalone distributions `SwitchCast-v1.4.0-win-x64.zip` and `SwitchCast-v1.5.0-win-x64.zip` with verified SHA-256 checksums.
   - Authored official release notes in `docs/releases/v1.4.0.md` and `docs/releases/v1.5.0.md`.

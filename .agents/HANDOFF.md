@@ -3,9 +3,9 @@
 ---
 
 ## Task Details
-- **Task**: SWITCHCAST — Build and Release v1.4.0 and v1.5.0
-- **Date**: 2026-10-20T10:45:00+08:00 (UTC+8)
-- **Status**: Completed, Built, Packaged & Tagged (476 Tests Passing, Release Archives Generated, Git Tags v1.4.0 & v1.5.0 Created)
+- **Task**: SWITCHCAST — GitHub Release Publishing for v1.3.0 with Markdown Release Notes
+- **Date**: 2026-10-20T18:35:00+08:00 (UTC+8)
+- **Status**: Completed (v1.3.0 Tagged & Pushed, GitHub Actions Workflow 39408321410 Succeeded, GitHub Release Published with v1.3.0.md Notes & Binaries)
 
 ---
 
