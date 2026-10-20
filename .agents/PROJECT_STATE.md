@@ -7,9 +7,9 @@ This is the authoritative progress, state, and environmental tracking document f
 ## 1. EXECUTIVE SUMMARY
 
 - **Project**: SwitchCast
-- **Current Version**: v1.5.0 — Live Performance Telemetry UI & Adaptive Rendering
-- **Overall Status**: **Implemented & Validated (476 Automated Unit & Contract Tests Passing, Debug & Release x64 Builds Clean [0 warnings, 0 errors])**
-- **Last Updated**: 2026-10-20T03:33:00+08:00 (UTC+8)
+- **Current Version**: v1.5.0 (Released & Tagged) & v1.4.0 (Released & Tagged)
+- **Overall Status**: **Built, Packaged & Tagged (v1.4.0 & v1.5.0 release archives generated with SHA256; 476 automated tests passing; 0 build warnings/errors)**
+- **Last Updated**: 2026-10-20T10:45:00+08:00 (UTC+8)
 
 ---
 

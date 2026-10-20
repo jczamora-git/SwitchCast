@@ -3,9 +3,9 @@
 ---
 
 ## Task Details
-- **Task**: SWITCHCAST v1.5.0 — Live Performance Telemetry UI
-- **Date**: 2026-10-20T03:33:00+08:00 (UTC+8)
-- **Status**: Completed, Validated & Tested (476 Tests Passing, 0 Build Warnings/Errors, Clean Architecture)
+- **Task**: SWITCHCAST — Build and Release v1.4.0 and v1.5.0
+- **Date**: 2026-10-20T10:45:00+08:00 (UTC+8)
+- **Status**: Completed, Built, Packaged & Tagged (476 Tests Passing, Release Archives Generated, Git Tags v1.4.0 & v1.5.0 Created)
 
 ---
 

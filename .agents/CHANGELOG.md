@@ -9,6 +9,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [v1.5.0 — Lightweight Performance & Adaptive Rendering] - 2026-10-20
 
+### Release (chore / release / packaging)
+- **v1.5.0 & v1.4.0 Release Packaging**:
+  - Published and packaged standalone distributions `SwitchCast-v1.4.0-win-x64.zip` and `SwitchCast-v1.5.0-win-x64.zip` with verified SHA-256 checksums.
+  - Authored official release notes in `docs/releases/v1.4.0.md` and `docs/releases/v1.5.0.md`.
+  - Bumped project versions in `SwitchCast.csproj`, `app.manifest`, `SettingsViewModel.cs`, and `README.md`.
+  - Created annotated release git tags `v1.4.0` and `v1.5.0`.
+
 ### Added (feat / perf / telemetry / ui)
 - **Live Performance Telemetry UI Monitor (`SettingsPage.xaml`, `SettingsViewModel.cs`)**:
   - Implemented live performance telemetry panel directly within `Settings > Performance` when `EnablePerformanceDiagnostics` is toggled on.
