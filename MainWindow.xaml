@@ -84,7 +84,7 @@
                                     ToolTipService.ToolTip="Buy me a coffee — Support development (opens in browser)"
                                     AutomationProperties.Name="Buy me a coffee, Support development">
                     <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE765;"
+                        <FontIcon Glyph="&#xEC32;"
                                   FontSize="14"
                                   Foreground="{ThemeResource AppAccentBrush}" />
                     </NavigationViewItem.Icon>
