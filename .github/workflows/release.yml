@@ -31,12 +31,21 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path ./releases -Force
-          $tagName = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { "v1.3.0" }
+          $tagName = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { "v1.5.0" }
           $zipName = "SwitchCast-$tagName-win-x64.zip"
           $shaName = "SwitchCast-$tagName-win-x64.sha256"
           Compress-Archive -Path ./publish/* -DestinationPath "./releases/$zipName" -Force
           $hash = (Get-FileHash -Path "./releases/$zipName" -Algorithm SHA256).Hash
           Set-Content -Path "./releases/$shaName" -Value "$hash  $zipName"
+
+      - name: Build Windows Installer Wizard
+        shell: pwsh
+        run: |
+          if (-not (Get-Command iscc.exe -ErrorAction SilentlyContinue) -and -not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") -and -not (Test-Path "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup -y --no-progress
+          }
+          $ver = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME.TrimStart('v') } else { "1.5.0" }
+          .\installer\build-installer.ps1 -Version $ver -SkipPublish
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -47,3 +56,5 @@ jobs:
           files: |
             releases/SwitchCast-*-win-x64.zip
             releases/SwitchCast-*-win-x64.sha256
+            releases/SwitchCast-Setup-*-x64.exe
+            releases/SwitchCast-Setup-*-x64.sha256

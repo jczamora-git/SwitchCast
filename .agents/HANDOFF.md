@@ -3,7 +3,7 @@
 ---
 
 ## Task Details
-- **Task**: SWITCHCAST — Professional Branded Windows Installer Wizard (Inno Setup 6)
+- **Task**: SWITCHCAST — Professional Branded Windows Installer Wizard & v1.5.0 Re-Release
 - **Date**: 2026-10-20T19:25:00+08:00 (UTC+8)
 - **Status**: Completed (Installer built, tested, and verified: SwitchCast-Setup-v1.5.0-x64.exe; 480 automated tests passing; 0 build warnings/errors)
 
@@ -11,76 +11,52 @@
 
 ## 1. Objectives & Outcomes
 
-1. **Settings > Performance Live Telemetry Monitor**:
-   - Reused existing single-source telemetry engine (`IPerformanceMetricsService`, `PerformanceMetricsService`, `PerformanceSnapshot`, `IDirect3D11DeviceProvider`, `IGraphicsCapabilityService`).
-   - Integrated a compact, responsive Performance Monitor panel inside `Views/SettingsPage.xaml` directly beneath the existing rendering mode and adapter cards.
-   - Added live pulse indicator (coral accent `#FF5252` / `{ThemeResource AppAccentBrush}`) and badge indicating ~1-second lightweight in-memory sampling without disk writes.
-   - Added adaptive layout via `VisualStateManager` (`WideLayout` with 2 columns, `NarrowLayout` stacked vertically) preventing any horizontal overflow or clipping.
+1. **Windows Installer Wizard (Inno Setup 6)**:
+   - Configured `installer/SwitchCast.iss` with stable GUID `AppId={{E5D91C08-36D4-4B7E-9721-7B32F7FEA780}}`.
+   - Per-user installation by default without UAC requirement, supporting optional elevation dialog.
+   - WMI process detection (`IsAppRunning`) guarding against installing or uninstalling while SwitchCast is running.
+   - Guaranteed user settings, playlists, and logs preservation.
+   - Created automated `installer/build-installer.ps1` script generating `releases/SwitchCast-Setup-v1.5.0-x64.exe` (42.37 MB) and SHA-256 checksums.
 
-2. **Genuinely Measured Performance Metrics**:
-   - **Resource Usage**:
-     - Process CPU usage (%) via `Process.TotalProcessorTime` elapsed delta normalized across all cores (`Environment.ProcessorCount * 100.0`).
-     - Physical working-set memory footprint (MB) via `Process.WorkingSet64`.
-     - GPU utilization transparently reported as unsupported without elevated ETW session tracing, maintaining zero-overhead offline privacy policy without fabricating numbers.
-   - **Presentation & Capture**:
-     - Audience Presentation Output FPS (`Direct3D11PresentationRenderer`).
-     - Presenter Preview FPS (`Direct3D11PreviewRenderer`).
-     - Dropped / Superseded Frame Counter across capture and presentation pipeline.
-     - Presentation Startup Latency (ms) from request to initial displayed frame.
-     - Last Source Switch Latency (ms) across queued sources.
-   - **Graphics & Direct3D 11 Pipeline**:
-     - Active Backend description (`IDirect3D11DeviceProvider.ActiveBackendDescription`).
-     - Hardware Acceleration / Software (WARP) indication.
-     - Primary detected DXGI graphics adapter.
-     - Direct3D 11 device reset count (genuine device removal/loss events).
-     - Pipeline recovery health status ("Operational", "Recovered", "WARP Fallback Active", "Compatibility Mode (WARP)", or "Not Initialized").
+2. **Main Navigation Sidebar 'Buy me a coffee' Link**:
+   - Added minimal, elegant donation link in `MainWindow.xaml` above Settings.
+   - Configured with `SelectsOnInvoked="False"`, Segoe MDL2 Cafe glyph `&#xEC32;`, coral accent, and PayPal URL.
+   - Opens user's default browser without interrupting presentations or SwitchDeck.
+   - Added 4 unit tests in `MainViewModelTests.cs`.
 
-3. **Authoritative Idle States**:
-   - Output FPS displays `"Not Presenting"` when presentation session is inactive.
-   - Preview FPS displays `"Idle"` when no preview capture is rendering.
-   - Latencies not yet recorded display `"Not Available"` (never fake zero numbers).
-   - Uninitialized GPU pipelines display `"Not Initialized"`.
-
-4. **Telemetry Toggle Lifecycle & Zero Performance Impact**:
-   - Governed by authoritative `EnablePerformanceDiagnostics` toggle.
-   - Lightweight 1-second `DispatcherQueueTimer` runs only when telemetry is enabled, page is loaded, and Performance tab (Category 6) is selected.
-   - Automatically pauses when switching tabs or navigating away from SettingsPage.
-   - Stops immediately and displays compact "Performance Monitor is Idle" placeholder when disabled.
-   - ViewModel implements `IDisposable` with clean teardown.
+3. **v1.5.0 GitHub Re-Release Automation**:
+   - Updated `.github/workflows/release.yml` with Inno Setup installation and installer build step.
+   - Configured upload of both `SwitchCast-Setup-*-x64.exe` and `SwitchCast-*-win-x64.zip` plus SHA-256 checksums.
+   - Updated release notes in `docs/releases/v1.5.0.md`.
 
 ---
 
 ## 2. Verification Evidence
 
 1. **Automated Unit & Contract Test Suite**:
-   - Total Tests: **476 Passed, 0 Failed, 0 Skipped (100% Pass Rate)**.
-   - Added 5 new unit tests:
-     - `ProcessCpuPercent_Snapshot_CalculatesValidRange` in `PerformanceMetricsServiceTests.cs`
-     - `TelemetryDisabled_ShowsDisabledPlaceholderAndHidesMonitor` in `SettingsViewModelTests.cs`
-     - `TelemetryEnabled_IdleStates_DisplayCorrectPlaceholderValues` in `SettingsViewModelTests.cs`
-     - `TelemetryEnabled_ActivePresentation_DisplaysMeasuredRates` in `SettingsViewModelTests.cs`
-     - `PresentationStatusChange_UpdatesLiveOutputFpsText` in `SettingsViewModelTests.cs`
-   - Hardened `RenamePlaylist_UpdatesName_AndPersists` in `BackgroundMusicServiceTests.cs` with `await service.SavePlaylistsAsync();` to eliminate asynchronous fire-and-forget I/O race condition.
+   - Total Tests: **480 Passed, 0 Failed, 0 Skipped (100% Pass Rate)**.
+   - Added unit test suite `MainViewModelTests.cs` (4 tests).
 
 2. **Compiler Quality Gate**:
    - `Debug x64`: **0 Warnings, 0 Errors**
    - `Release x64`: **0 Warnings, 0 Errors**
 
-3. **Native Runtime Verification**:
-   - Logic, state transitions, idle formatting, and timer management validated through unit tests.
-   - Runtime GUI session verification in interactive Windows desktop environment: PENDING user runtime test.
+3. **Installer Verification**:
+   - Payload: 54 files (178.69 MB uncompressed) compressed to 42.37 MB.
+   - Output: `releases/SwitchCast-Setup-v1.5.0-x64.exe`
+   - Checksum: `1F495B269D3E9348D1082AC147C509F6028669349E270726CE5550D68A29B576`
 
 ---
 
 ## 3. Important Files Modified
 
-- [Models/Performance/PerformanceSnapshot.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Models/Performance/PerformanceSnapshot.cs)
-- [Services/Performance/PerformanceMetricsService.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Performance/PerformanceMetricsService.cs)
-- [Services/Capture/IDirect3D11DeviceProvider.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/IDirect3D11DeviceProvider.cs)
-- [Services/Capture/Direct3D11DeviceProvider.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Services/Capture/Direct3D11DeviceProvider.cs)
-- [ViewModels/SettingsViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/SettingsViewModel.cs)
-- [Views/SettingsPage.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SettingsPage.xaml)
-- [Views/SettingsPage.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/Views/SettingsPage.xaml.cs)
-- [SwitchCast.Tests/Services/PerformanceMetricsServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/PerformanceMetricsServiceTests.cs)
-- [SwitchCast.Tests/ViewModels/SettingsViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/SettingsViewModelTests.cs)
-- [SwitchCast.Tests/Services/BackgroundMusicServiceTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/Services/BackgroundMusicServiceTests.cs)
+- [installer/SwitchCast.iss](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/installer/SwitchCast.iss)
+- [installer/build-installer.ps1](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/installer/build-installer.ps1)
+- [installer/README.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/installer/README.md)
+- [MainWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/MainWindow.xaml)
+- [MainWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/MainWindow.xaml.cs)
+- [ViewModels/MainViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/MainViewModel.cs)
+- [SwitchCast.Tests/ViewModels/MainViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/MainViewModelTests.cs)
+- [docs/releases/v1.5.0.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/releases/v1.5.0.md)
+- [.github/workflows/release.yml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.github/workflows/release.yml)
+

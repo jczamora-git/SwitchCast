@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [v1.5.0 — Lightweight Performance & Adaptive Rendering] - 2026-10-20
 
 ### Release (chore / release / packaging)
+- **v1.5.0 Windows Installer Wizard & GitHub Re-Release Automation**:
+  - Authored Inno Setup 6 packaging system (`installer/SwitchCast.iss`, `installer/build-installer.ps1`, `installer/README.md`) generating standalone setup wizard `SwitchCast-Setup-v1.5.0-x64.exe` (42.37 MB).
+  - Updated release workflow `.github/workflows/release.yml` to automatically provision Inno Setup, build the installer, and publish both the setup wizard and standalone portable zip archive.
+  - Updated release documentation in `docs/releases/v1.5.0.md` highlighting setup wizard installation, Buy me a coffee link, and 480 test matrix.
 - **v1.3.0 GitHub Release Publishing**:
   - Created and pushed annotated git tag `v1.3.0` pointing to commit `8bc358f21d832be4bf1f53326d0d007276f7ce5a`.
   - Triggered and verified successful GitHub Actions `Build & Release SwitchCast` workflow run (run ID `39408321410`).
