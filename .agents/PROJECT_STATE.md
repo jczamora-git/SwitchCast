@@ -8,14 +8,23 @@ This is the authoritative progress, state, and environmental tracking document f
 
 - **Project**: SwitchCast
 - **Current Version**: v1.5.0 (Released & Tagged), v1.4.0 (Tagged), v1.3.0 (Released & Tagged)
-- **Overall Status**: **Built, Packaged & Verified (Official Inno Setup Windows installer created: SwitchCast-Setup-v1.5.0-x64.exe; 480 automated tests passing; 0 build warnings/errors)**
-- **Last Updated**: 2026-10-20T19:25:00+08:00 (UTC+8)
+- **Overall Status**: **Built, Packaged & Signing-Ready (Inno Setup Windows installer created: SwitchCast-Setup-v1.5.0-x64.exe; Authenticode signing pipeline & SmartScreen readiness implemented; 480 automated tests passing; 0 build warnings/errors)**
+- **Last Updated**: 2026-10-20T21:00:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **SwitchCast v1.5.0 Installer SmartScreen & Code Signing Readiness (`installer/`)**:
+  - Implemented production-grade Authenticode signing engine (`installer/sign-target.ps1` and `installer/sign-file.cmd`) utilizing Windows SDK `SignTool` (`signtool.exe`), SHA-256 hashing (`/fd SHA256`), and RFC 3161 timestamping (`/tr http://timestamp.digicert.com /td SHA256`) with automatic Sectigo fallback.
+  - Configured Inno Setup script (`installer/SwitchCast.iss`) with conditional `SignTool=standard` and `SignedUninstaller=yes` under `#ifdef EnableSigning` to cryptographically sign both the setup wizard and uninstaller.
+  - Enhanced `installer/build-installer.ps1` with optional `-Sign` workflow, supporting Windows Certificate Store (CurrentUser / LocalMachine by Thumbprint or Subject) and PFX files with passwords.
+  - Implemented safe credential handling: passwords and keys are strictly excluded from source control and console logs, securely bridged to child processes via memory/environment variables.
+  - Added `-CheckSignatureOnly` mode to query Authenticode signatures of published executables and installers without rebuilding.
+  - Added strict signature verification gate (`signtool verify /pa /v` and `Get-AuthenticodeSignature`), failing the production-signed build if signing or verification fails.
+  - Preserved fast, zero-dependency unsigned local development build workflow (`.\installer\build-installer.ps1`), clearly labeling unsigned development artifacts vs production-signed releases.
+  - Authored comprehensive documentation in `installer/README.md` and `docs/releases/v1.5.0.md` detailing SmartScreen cloud reputation mechanics, the necessity of building reputation on certificate identity across versions, and viable options (SignPath Foundation, Azure Trusted Signing, Commercial OV with HSM token, Microsoft Store MSIX).
 - [x] **SwitchCast v1.5.0 Windows Installation Wizard (`installer/`)**:
   - Implemented single-file standalone installer (`SwitchCast-Setup-v1.5.0-x64.exe`, 42.37 MB) built using Inno Setup 6 with LZMA2/ultra64 solid compression.
   - Fixed persistent `AppId={{E5D91C08-36D4-4B7E-9721-7B32F7FEA780}}` ensuring clean in-place upgrades and zero duplicate uninstall entries.

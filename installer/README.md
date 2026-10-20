@@ -122,3 +122,85 @@ The uninstaller removes:
 - Registry uninstall registrations
 
 Personal settings, playlists, and diagnostic history remain safely intact in `%LOCALAPPDATA%\SwitchCast`.
+
+---
+
+## 8. Distribution Security & SmartScreen Reputation
+
+### The Windows Defender SmartScreen Warning
+When users download and launch `SwitchCast-Setup-v1.5.0-x64.exe` from the web, Windows Defender SmartScreen queries Microsoft's cloud reputation service based on the file's SHA-256 hash and digital signature.
+
+```
+Windows protected your PC
+Microsoft Defender SmartScreen prevented an unrecognized app from starting.
+Running this app might put your PC at risk.
+```
+
+#### Why Does This Warning Appear?
+1. **Unsigned Binaries (`NotSigned`)**: Development and unsigned release builds have no cryptographic Authenticode signature. SmartScreen evaluates only the raw SHA-256 binary hash. Because every release has a new hash with zero prior download history, SmartScreen flags it as "unrecognized".
+2. **Mark of the Web (MOTW)**: Files downloaded via browsers carry an NTFS `Zone.Identifier` alternate data stream (Zone 3 = Internet), which triggers the SmartScreen security check upon execution.
+
+> [!WARNING]
+> **Critical Reality: Code Signing Does NOT Grant Instant SmartScreen Reputation.**
+> A common misconception is that purchasing an Authenticode certificate immediately removes the SmartScreen warning.
+> - **Reputation is Earned, Not Bought**: SmartScreen reputation is an algorithmically calculated score maintained in Microsoft cloud telemetry based on download volume, runtime installation success rate, absence of malware reports, and publisher history.
+> - **The Value of Code Signing**: An Authenticode certificate attaches reputation to the **certificate identity (Subject + Public Key)** rather than individual binary hashes. Once a certificate establishes reputation across its initial downloads, all subsequent releases (v1.5.1, v1.6.0, v2.0.0) signed by that same certificate inherit the established reputation immediately without repeating the warning period.
+> - In June 2023, the CA/Browser Forum deprecated software-only `.pfx` issuance for publicly trusted OV/EV certificates, requiring all keys to be hosted on hardware security modules (HSM) or certified cloud signing services.
+
+---
+
+## 9. Production Code Signing Architecture
+
+SwitchCast includes a dedicated, production-grade Authenticode signing pipeline using Windows SDK `SignTool` (`signtool.exe`), SHA-256 digests, and RFC 3161 trusted timestamping.
+
+### Complete Delivery Chain Signing
+When code signing is enabled, the pipeline signs every tier of the distribution:
+1. **Application Payload**: `publish\SwitchCast.exe` is signed before packaging.
+2. **Uninstaller**: Inno Setup generates and signs `unins000.exe` before embedding it in the installer.
+3. **Setup Wizard**: The final `SwitchCast-Setup-v<Version>-x64.exe` is signed and timestamped.
+4. **Verification Gate**: Every binary is strictly verified using `signtool verify /pa /v` against the Windows Authenticode verification policy.
+
+### Safe Credential Management
+- Private keys, PFX passwords, and API tokens are **strictly excluded** from source control.
+- Passwords passed via `-CertPassword` or environment variable `$env:SWITCHCAST_CERT_PASSWORD` are never echoed to console logs or stored on disk.
+- Inno Setup communicates with the signing engine via a transient environment bridge (`installer/sign-file.cmd` -> `installer/sign-target.ps1`).
+
+### How to Build a Production-Signed Release
+
+#### Option A: Windows Certificate Store (Hardware Token / YubiKey / Installed Cert)
+```powershell
+.\installer\build-installer.ps1 -Sign -CertThumbprint "YOUR_CERTIFICATE_SHA1_THUMBPRINT"
+```
+
+#### Option B: PKCS#12 / PFX File
+```powershell
+$env:SWITCHCAST_CERT_PASSWORD = "YourSecurePassword"
+.\installer\build-installer.ps1 -Sign -CertPath "C:\path\to\certificate.pfx"
+```
+
+#### Option C: Check Current Signature Status
+```powershell
+.\installer\build-installer.ps1 -CheckSignatureOnly
+```
+
+#### Option D: Default Unsigned Development Build
+```powershell
+# Preserves fast, zero-dependency local builds for developers
+.\installer\build-installer.ps1
+```
+
+---
+
+## 10. Code Signing Options for SwitchCast
+
+| Option | Cost | HSM / Token Required | SmartScreen Behavior | Ideal For |
+| :--- | :--- | :--- | :--- | :--- |
+| **SignPath Foundation** | **Free** (for open source) | Cloud HSM (Managed by SignPath) | Builds reputation on certificate identity across versions | **Recommended for open-source GitHub releases** |
+| **Azure Trusted Signing** | Low (~$10/month + ~$9/cert) | Cloud HSM (Microsoft Azure) | Builds reputation; integrated directly with Microsoft identity | Professional cloud CI/CD pipelines |
+| **Commercial OV Certificate** (DigiCert, Sectigo, etc.) | High ($300–$600/year) | Physical FIPS 140-2 Level 2 USB token or Cloud HSM | Builds reputation over initial download period | Traditional enterprise desktop distribution |
+| **Microsoft Store (MSIX)** | Free ($19 one-time dev registration) | None (Microsoft signs package) | **Instant Trust** (Zero SmartScreen warning) | Broad consumer and enterprise discovery |
+
+### Recommended Roadmap for SwitchCast:
+1. **Short Term (Current)**: Keep the codebase 100% signing-ready with `build-installer.ps1 -Sign`. For open-source GitHub distribution, apply to the [SignPath Foundation](https://about.signpath.io/programs/open-source) to receive free, trusted cloud code signing integrated directly into GitHub Actions.
+2. **Medium Term**: Package SwitchCast as an MSIX desktop application and submit to the Microsoft Store to gain instant trust and seamless automatic background updates.
+

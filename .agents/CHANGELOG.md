@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [v1.5.0 — Lightweight Performance & Adaptive Rendering] - 2026-10-20
 
 ### Release (chore / release / packaging)
+- **Installer SmartScreen & Authenticode Code Signing Readiness (`installer/`)**:
+  - Implemented production Authenticode code-signing engine (`installer/sign-target.ps1`, `installer/sign-file.cmd`) utilizing Windows SDK `SignTool`, SHA-256 digests (`/fd SHA256`), and RFC 3161 trusted timestamping (`/tr http://timestamp.digicert.com /td SHA256`) with automatic fallback to Sectigo.
+  - Configured Inno Setup script (`installer/SwitchCast.iss`) with conditional `SignTool=standard` and `SignedUninstaller=yes` to sign uninstaller and setup wizard executable.
+  - Enhanced `installer/build-installer.ps1` with optional `-Sign` workflow, supporting Windows Certificate Store (CurrentUser/LocalMachine) and PFX files with password masking.
+  - Added `-CheckSignatureOnly` mode to inspect Authenticode signature status of application binaries and installer.
+  - Added strict signature verification gate (`signtool verify /pa /v`), failing production builds if signing or verification fails.
+  - Preserved unsigned local development build workflow (`.\installer\build-installer.ps1`), clearly labeling unsigned development artifacts vs production-signed releases.
+  - Documented SmartScreen cloud reputation mechanics, publisher identity, and code signing options (SignPath Foundation, Azure Trusted Signing, Commercial OV with HSM, Microsoft Store MSIX) in `installer/README.md` and `docs/releases/v1.5.0.md`.
 - **v1.5.0 Windows Installer Wizard & GitHub Re-Release Automation**:
   - Authored Inno Setup 6 packaging system (`installer/SwitchCast.iss`, `installer/build-installer.ps1`, `installer/README.md`) generating standalone setup wizard `SwitchCast-Setup-v1.5.0-x64.exe` (42.37 MB).
   - Updated release workflow `.github/workflows/release.yml` to automatically provision Inno Setup, build the installer, and publish both the setup wizard and standalone portable zip archive.

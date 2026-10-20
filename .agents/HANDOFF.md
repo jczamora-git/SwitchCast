@@ -3,31 +3,34 @@
 ---
 
 ## Task Details
-- **Task**: SWITCHCAST — Professional Branded Windows Installer Wizard & v1.5.0 Re-Release
-- **Date**: 2026-10-20T19:25:00+08:00 (UTC+8)
-- **Status**: Completed (Installer built, tested, and verified: SwitchCast-Setup-v1.5.0-x64.exe; 480 automated tests passing; 0 build warnings/errors)
+- **Task**: SWITCHCAST — Installer SmartScreen & Code Signing Readiness
+- **Date**: 2026-10-20T21:00:00+08:00 (UTC+8)
+- **Status**: Completed (Authenticode signing toolchain implemented, verified end-to-end, dev/prod workflows distinguished; 480 automated tests passing; 0 build warnings/errors)
 
 ---
 
 ## 1. Objectives & Outcomes
 
-1. **Windows Installer Wizard (Inno Setup 6)**:
-   - Configured `installer/SwitchCast.iss` with stable GUID `AppId={{E5D91C08-36D4-4B7E-9721-7B32F7FEA780}}`.
-   - Per-user installation by default without UAC requirement, supporting optional elevation dialog.
-   - WMI process detection (`IsAppRunning`) guarding against installing or uninstalling while SwitchCast is running.
-   - Guaranteed user settings, playlists, and logs preservation.
-   - Created automated `installer/build-installer.ps1` script generating `releases/SwitchCast-Setup-v1.5.0-x64.exe` (42.37 MB) and SHA-256 checksums.
+1. **Authenticode Signature Investigation**:
+   - Inspected `publish/SwitchCast.exe` and `releases/SwitchCast-Setup-v1.5.0-x64.exe`.
+   - Verified that prior binaries were `NotSigned`, causing Windows Defender SmartScreen to evaluate only the raw binary SHA-256 hash and display the "Windows protected your PC — Microsoft Defender SmartScreen prevented an unrecognized app from starting" dialog.
 
-2. **Main Navigation Sidebar 'Buy me a coffee' Link**:
-   - Added minimal, elegant donation link in `MainWindow.xaml` above Settings.
-   - Configured with `SelectsOnInvoked="False"`, Segoe MDL2 Cafe glyph `&#xEC32;`, coral accent, and PayPal URL.
-   - Opens user's default browser without interrupting presentations or SwitchDeck.
-   - Added 4 unit tests in `MainViewModelTests.cs`.
+2. **Dedicated SignTool Signing Engine (`installer/sign-target.ps1`, `installer/sign-file.cmd`)**:
+   - Implemented automated Windows SDK SignTool discovery across Windows 10/11 SDK directories.
+   - Built support for SHA-256 hashing (`/fd SHA256`) and RFC 3161 trusted timestamping (`/tr http://timestamp.digicert.com /td SHA256`) with automatic fallback to Sectigo (`http://timestamp.sectigo.com`).
+   - Supports both Windows Certificate Store (CurrentUser / LocalMachine by SHA-1 Thumbprint or Subject) and PFX files with password.
+   - Implemented safe credential handling: passwords and private keys are never logged to console or stored on disk; passwords are masked in error reports.
 
-3. **v1.5.0 GitHub Re-Release Automation**:
-   - Updated `.github/workflows/release.yml` with Inno Setup installation and installer build step.
-   - Configured upload of both `SwitchCast-Setup-*-x64.exe` and `SwitchCast-*-win-x64.zip` plus SHA-256 checksums.
-   - Updated release notes in `docs/releases/v1.5.0.md`.
+3. **Inno Setup Full Delivery Chain Integration (`installer/SwitchCast.iss`, `installer/build-installer.ps1`)**:
+   - Added conditional `SignTool=standard` and `SignedUninstaller=yes` under `#ifdef EnableSigning`.
+   - Signs application binaries (`SwitchCast.exe`), the uninstaller (`unins000.exe`), and the installer wizard (`SwitchCast-Setup-v1.5.0-x64.exe`).
+   - Integrated `-CheckSignatureOnly` mode to query Authenticode signatures without rebuilding.
+   - Preserved fast, zero-dependency unsigned local development workflow (`.\installer\build-installer.ps1`), with clear labeling of unsigned development artifacts.
+   - Implemented strict verification gates using `signtool verify /pa /v` and `Get-AuthenticodeSignature`, failing production builds (`-Sign`) if signing or verification fails.
+
+4. **Documentation & SmartScreen Reputation Guidance**:
+   - Detailed in `installer/README.md` and `docs/releases/v1.5.0.md` why code signing does NOT grant instant SmartScreen reputation (reputation is algorithmically calculated on telemetry history and download count; signing binds reputation to the certificate identity across version updates).
+   - Documented viable code-signing options: SignPath Foundation (free for open source), Azure Trusted Signing, Commercial OV with HSM token, and Microsoft Store (MSIX).
 
 ---
 
@@ -35,28 +38,32 @@
 
 1. **Automated Unit & Contract Test Suite**:
    - Total Tests: **480 Passed, 0 Failed, 0 Skipped (100% Pass Rate)**.
-   - Added unit test suite `MainViewModelTests.cs` (4 tests).
+   - Command: `dotnet test SwitchCast.Tests/SwitchCast.Tests.csproj -c Release`
 
-2. **Compiler Quality Gate**:
+2. **Compiler & Build Quality Gate**:
    - `Debug x64`: **0 Warnings, 0 Errors**
    - `Release x64`: **0 Warnings, 0 Errors**
 
-3. **Installer Verification**:
-   - Payload: 54 files (178.69 MB uncompressed) compressed to 42.37 MB.
-   - Output: `releases/SwitchCast-Setup-v1.5.0-x64.exe`
-   - Checksum: `1F495B269D3E9348D1082AC147C509F6028669349E270726CE5550D68A29B576`
+3. **Production Signing Toolchain Verification**:
+   - Verified `-Sign` failure gate with missing credentials (aborts with descriptive guidance).
+   - Verified end-to-end signing with DigiCert RFC 3161 timestamping (`CN=DigiCert SHA256 RSA4096 Timestamp Responder 2026 1`) and `signtool verify /pa /v`.
+   - Verified `-CheckSignatureOnly` reporting.
+
+4. **Clean Unsigned Development Artifacts Restored**:
+   - Output: `releases/SwitchCast-Setup-v1.5.0-x64.exe` (42.37 MB)
+   - SHA-256: `FB80496874BF178E699A1C6384A91D793697B4143D32246329377555DC2623E4`
+   - Checksum File: `releases/SwitchCast-Setup-v1.5.0-x64.sha256`
 
 ---
 
-## 3. Important Files Modified
+## 3. Important Files Modified & Created
 
+- [installer/sign-target.ps1](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/installer/sign-target.ps1) (Created)
+- [installer/sign-file.cmd](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/installer/sign-file.cmd) (Created)
 - [installer/SwitchCast.iss](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/installer/SwitchCast.iss)
 - [installer/build-installer.ps1](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/installer/build-installer.ps1)
 - [installer/README.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/installer/README.md)
-- [MainWindow.xaml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/MainWindow.xaml)
-- [MainWindow.xaml.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/MainWindow.xaml.cs)
-- [ViewModels/MainViewModel.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/ViewModels/MainViewModel.cs)
-- [SwitchCast.Tests/ViewModels/MainViewModelTests.cs](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/SwitchCast.Tests/ViewModels/MainViewModelTests.cs)
 - [docs/releases/v1.5.0.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/docs/releases/v1.5.0.md)
-- [.github/workflows/release.yml](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.github/workflows/release.yml)
-
+- [.agents/PROJECT_STATE.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/PROJECT_STATE.md)
+- [.agents/HANDOFF.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/HANDOFF.md)
+- [.agents/CHANGELOG.md](file:///c:/Users/JC%20Zamora/source/repos/SwitchCast/SwitchCast/.agents/CHANGELOG.md)

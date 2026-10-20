@@ -58,6 +58,14 @@ CloseApplications=yes
 CloseApplicationsFilter=*.exe
 RestartApplications=no
 
+; Authenticode Code Signing & Uninstaller Protection (enabled via /DEnableSigning)
+#ifdef EnableSigning
+SignTool=standard $f
+SignedUninstaller=yes
+SignToolRetryCount=3
+SignToolRetryDelay=2000
+#endif
+
 ; Add/Remove Programs display properties
 UninstallDisplayName={#MyAppName} v{#MyAppVersion}
 VersionInfoVersion={#MyAppVersion}.0
