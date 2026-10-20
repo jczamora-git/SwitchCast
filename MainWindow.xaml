@@ -53,6 +53,7 @@
                         IsBackButtonVisible="Collapsed"
                         IsSettingsVisible="True"
                         SelectionChanged="OnNavViewSelectionChanged"
+                        ItemInvoked="OnNavViewItemInvoked"
                         Loaded="OnNavViewLoaded"
                         OpenPaneLength="200"
                         CompactPaneLength="48"
@@ -75,6 +76,44 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
+
+            <NavigationView.FooterMenuItems>
+                <NavigationViewItem x:Name="CoffeeNavItem"
+                                    Tag="BuyCoffee"
+                                    SelectsOnInvoked="False"
+                                    ToolTipService.ToolTip="Buy me a coffee — Support development (opens in browser)"
+                                    AutomationProperties.Name="Buy me a coffee, Support development">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE765;"
+                                  FontSize="14"
+                                  Foreground="{ThemeResource AppAccentBrush}" />
+                    </NavigationViewItem.Icon>
+                    <NavigationViewItem.Content>
+                        <Grid Margin="0,0,4,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="1">
+                                <TextBlock Text="Buy me a coffee"
+                                           FontSize="12"
+                                           Foreground="{ThemeResource AppTextPrimaryBrush}"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="Support development"
+                                           FontSize="10"
+                                           Foreground="{ThemeResource AppTextSecondaryBrush}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <FontIcon Grid.Column="1"
+                                      Glyph="&#xE8A7;"
+                                      FontSize="10"
+                                      Foreground="{ThemeResource AppTextTertiaryBrush}"
+                                      VerticalAlignment="Center"
+                                      Margin="6,0,0,0" />
+                        </Grid>
+                    </NavigationViewItem.Content>
+                </NavigationViewItem>
+            </NavigationView.FooterMenuItems>
 
             <NavigationView.HeaderTemplate>
                 <DataTemplate>

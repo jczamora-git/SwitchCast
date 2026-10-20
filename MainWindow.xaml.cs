@@ -238,6 +238,14 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async void OnNavViewItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
+    {
+        if (args.InvokedItemContainer is NavigationViewItem item && item.Tag?.ToString() == "BuyCoffee")
+        {
+            await _viewModel.OpenCoffeeLinkCommand.ExecuteAsync(null);
+        }
+    }
+
     private void OnNavigationServiceNavigated(object? sender, Type pageType)
     {
         if (pageType == typeof(SettingsPage))

@@ -33,8 +33,28 @@ public partial class MainViewModel : ObservableObject
         _settingsService.ThemeChanged += OnThemeChanged;
     }
 
+    public const string CoffeeUrl = "https://paypal.me/itsjczamora";
+
     public INavigationService NavigationService => _navigationService;
     public IPresentationStateService PresentationStateService => _presentationStateService;
+
+    [RelayCommand]
+    public async Task OpenCoffeeLinkAsync()
+    {
+        try
+        {
+            var uri = new Uri(CoffeeUrl);
+            bool launched = await Windows.System.Launcher.LaunchUriAsync(uri);
+            if (!launched)
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(CoffeeUrl) { UseShellExecute = true });
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MainViewModel] Failed to open coffee link: {ex.Message}");
+        }
+    }
 
     private void OnThemeChanged(object? sender, ApplicationThemeOption newTheme)
     {
