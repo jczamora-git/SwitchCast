@@ -63,11 +63,16 @@ Presenters share one dedicated, stable **Presentation Output** window in their m
 
 ### Installation
 
-1. Download the latest `SwitchCast-v1.5.0-win-x64.zip` release from [Releases](https://github.com/jczamora-git/SwitchCast/releases).
-2. Extract the archive to any folder on your computer.
-3. Run `SwitchCast.exe`.
+**Option A: Windows Setup Wizard (Recommended)**
+1. Download `SwitchCast-Setup-v1.5.0-x64.exe` from [Releases](https://github.com/jczamora-git/SwitchCast/releases).
+2. Run the installer to set up SwitchCast with Start Menu integration and automatic upgrade support.
 
-*Note: SwitchCast is configured as a standalone, unpackaged desktop application. No installation of external .NET runtimes is required.*
+**Option B: Portable Standalone Package**
+1. Download `SwitchCast-v1.5.0-win-x64.zip` from [Releases](https://github.com/jczamora-git/SwitchCast/releases).
+2. Extract the archive to any folder on your computer.
+3. Launch `SwitchCast.exe`.
+
+*Note: SwitchCast is configured as a standalone, unpackaged desktop application. No installation of external .NET runtimes or Visual Studio dependencies is required.*
 
 ---
 
@@ -115,6 +120,22 @@ Presenters share one dedicated, stable **Presentation Output** window in their m
 
 ---
 
+## Contributing
+
+We welcome community contributions! Please read our [Contributing Guidelines](CONTRIBUTING.md) to understand our architectural principles, 480+ automated test requirements, and Pull Request submission workflow.
+
+All external contributions must be submitted via Pull Requests. Official merge and release authority remains with authorized project maintainers. Maintainers can refer to the [Maintainer Setup Guide](docs/MAINTAINER_GUIDE.md).
+
+---
+
+## Security & Privacy
+
+SwitchCast is engineered as a 100% offline, privacy-first desktop application. Captured frames and window titles remain strictly in local system memory and are never transmitted over networks.
+
+To report a vulnerability or review our security practices, please consult our [Security Policy](SECURITY.md) and [Security Architecture Model](docs/SECURITY_MODEL.md).
+
+---
+
 ## Creator & Attribution
 
 Created by **John Christopher King Zamora**  
@@ -125,5 +146,5 @@ Created by **John Christopher King Zamora**
 
 ## Releases
 
-Official builds and release packages are published on the [GitHub Releases](https://github.com/jczamora-git/SwitchCast/releases) page.
+Official builds, installation wizards, and standalone release packages are published on the [GitHub Releases](https://github.com/jczamora-git/SwitchCast/releases) page.
 

@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [v1.5.0 — Lightweight Performance & Adaptive Rendering] - 2026-10-20
 
 ### Release (chore / release / packaging)
+- **Community Governance Setup & Maintainer Tooling (`.github/`, `SECURITY.md`, `CONTRIBUTING.md`, `docs/`)**:
+  - Authored `SECURITY.md` defining supported versions, 100% offline security architecture, private vulnerability reporting, and policy boundaries (no bug bounty, no response guarantees).
+  - Authored `CONTRIBUTING.md` requiring all community contributions to arrive via Pull Requests, reserving sole merge and release authority with `@jczamora-git`, and defining Clean Architecture and 480+ unit test gates.
+  - Added `.github/CODEOWNERS` assigning primary repository ownership and review authority to `@jczamora-git`.
+  - Added GitHub Issue Forms in `.github/ISSUE_TEMPLATE/` (`bug_report.yml`, `feature_request.yml`, `config.yml`), verified against strict YAML validation.
+  - Added `.github/pull_request_template.md` with layer boundary impact checks, test verification checklist, and privacy compliance.
+  - Authored `docs/MAINTAINER_GUIDE.md` detailing maintainer authority, review protocols, release checklists, and explicit documentation of manual GitHub settings (Branch rulesets, Private vulnerability reporting, Actions workflow permissions).
+  - Updated `README.md` with concise Contributing and Security references and installer/portable download options.
 - **Installer SmartScreen & Authenticode Code Signing Readiness (`installer/`)**:
   - Implemented production Authenticode code-signing engine (`installer/sign-target.ps1`, `installer/sign-file.cmd`) utilizing Windows SDK `SignTool`, SHA-256 digests (`/fd SHA256`), and RFC 3161 trusted timestamping (`/tr http://timestamp.digicert.com /td SHA256`) with automatic fallback to Sectigo.
   - Configured Inno Setup script (`installer/SwitchCast.iss`) with conditional `SignTool=standard` and `SignedUninstaller=yes` to sign uninstaller and setup wizard executable.

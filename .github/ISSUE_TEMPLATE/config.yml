@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security Vulnerability Reporting
+    url: https://github.com/jczamora-git/SwitchCast/security/advisories/new
+    about: Please report potential security vulnerabilities privately rather than creating a public issue.
+  - name: Technical Documentation
+    url: https://github.com/jczamora-git/SwitchCast/tree/main/docs
+    about: Review system architecture, development roadmap, coding standards, and testing strategy.

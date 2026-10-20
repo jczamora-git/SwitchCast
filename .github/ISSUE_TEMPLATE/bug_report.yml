@@ -1,0 +1,108 @@
+name: Bug Report
+description: Report a reproducible bug, crash, or unexpected behavior in SwitchCast.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve SwitchCast! Please provide as much detail as possible so we can reproduce and address the issue.
+        If you are reporting a security vulnerability, please do NOT use this form; refer to [SECURITY.md](../../SECURITY.md) instead.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: What happened? What did you observe?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: Steps to Reproduce
+      description: Specific step-by-step instructions to reproduce the issue.
+      placeholder: |
+        1. Launch SwitchCast v1.5.0
+        2. Navigate to Sources tab
+        3. Queue an application window (e.g. Visual Studio)
+        4. Start presentation output
+        5. Observe unexpected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: A concise description of what you expected to happen.
+      placeholder: What should have happened instead?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: version
+    attributes:
+      label: SwitchCast Version
+      description: Which version of SwitchCast are you running?
+      options:
+        - "v1.5.0 (Latest Release)"
+        - "v1.4.0"
+        - "v1.3.0"
+        - "Built from source (main branch)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: package-type
+    attributes:
+      label: Distribution Package Type
+      description: How did you install or run SwitchCast?
+      options:
+        - "Windows Setup Wizard (.exe Installer)"
+        - "Portable Standalone Archive (.zip)"
+        - "Visual Studio / dotnet run (Local Build)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: windows-version
+    attributes:
+      label: Windows OS Version
+      description: Which Windows operating system are you using?
+      options:
+        - "Windows 11 23H2 or later"
+        - "Windows 11 22H2 / 21H2"
+        - "Windows 10 22H2 (Build 19045)"
+        - "Windows 10 21H2 or earlier (Build 17763+)"
+    validations:
+      required: true
+
+  - type: input
+    id: graphics-hardware
+    attributes:
+      label: Graphics Hardware & Adapter
+      description: Dedicated GPU model and display adapter (if known).
+      placeholder: "e.g., NVIDIA GeForce RTX 3070, Intel Iris Xe, AMD Radeon"
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs-and-screenshots
+    attributes:
+      label: Diagnostic Logs or Screenshots
+      description: Paste relevant exception messages or log excerpts from `%LOCALAPPDATA%\SwitchCast\Logs\` (never include sensitive private info).
+      placeholder: Paste error stack trace or attach screenshots here.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Verification & Confirmation
+      options:
+        - label: I have verified this is not a duplicate of an existing issue.
+          required: true
+        - label: I confirmed that no sensitive, personal, or confidential information is included in attached logs or screenshots.
+          required: true

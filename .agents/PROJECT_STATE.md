@@ -8,14 +8,22 @@ This is the authoritative progress, state, and environmental tracking document f
 
 - **Project**: SwitchCast
 - **Current Version**: v1.5.0 (Released & Tagged), v1.4.0 (Tagged), v1.3.0 (Released & Tagged)
-- **Overall Status**: **Built, Packaged & Signing-Ready (Inno Setup Windows installer created: SwitchCast-Setup-v1.5.0-x64.exe; Authenticode signing pipeline & SmartScreen readiness implemented; 480 automated tests passing; 0 build warnings/errors)**
-- **Last Updated**: 2026-10-20T21:00:00+08:00 (UTC+8)
+- **Overall Status**: **Built, Packaged & Governed (Inno Setup installer created; Authenticode signing pipeline implemented; Community Governance Kit integrated; 480 automated tests passing; 0 build warnings/errors)**
+- **Last Updated**: 2026-10-20T21:15:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **SwitchCast GitHub Community Governance Kit (`.github/`, `SECURITY.md`, `CONTRIBUTING.md`, `docs/`)**:
+  - Implemented `SECURITY.md` establishing supported versions, offline local architecture alignment, private vulnerability reporting channels, and policy boundaries (no bug bounty, no SLAs/guarantees).
+  - Implemented `CONTRIBUTING.md` enforcing that all community contributions must arrive via Pull Requests, preserving sole merge and release authority with `@jczamora-git`, Clean Architecture compliance, and 480+ unit test gates.
+  - Implemented `.github/CODEOWNERS` assigning global repository ownership and review authority to `@jczamora-git`.
+  - Implemented GitHub Issue Forms in `.github/ISSUE_TEMPLATE/` (`bug_report.yml`, `feature_request.yml`, `config.yml`), validated against strict YAML syntax.
+  - Implemented `.github/pull_request_template.md` with layer boundary impact checks, test checklists, and privacy compliance.
+  - Authored `docs/MAINTAINER_GUIDE.md` detailing maintainer authority, PR review protocols, release checklists, and explicit documentation of manual GitHub settings requiring owner configuration (Branch rulesets on `main`, Private vulnerability reporting, Actions workflow write permissions).
+  - Updated `README.md` with concise Contributing and Security references and installer/portable download options.
 - [x] **SwitchCast v1.5.0 Installer SmartScreen & Code Signing Readiness (`installer/`)**:
   - Implemented production-grade Authenticode signing engine (`installer/sign-target.ps1` and `installer/sign-file.cmd`) utilizing Windows SDK `SignTool` (`signtool.exe`), SHA-256 hashing (`/fd SHA256`), and RFC 3161 timestamping (`/tr http://timestamp.digicert.com /td SHA256`) with automatic Sectigo fallback.
   - Configured Inno Setup script (`installer/SwitchCast.iss`) with conditional `SignTool=standard` and `SignedUninstaller=yes` under `#ifdef EnableSigning` to cryptographically sign both the setup wizard and uninstaller.

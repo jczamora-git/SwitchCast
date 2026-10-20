@@ -1,0 +1,64 @@
+name: Feature Request
+description: Propose an idea, workflow improvement, or new capability for SwitchCast.
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping shape the future of SwitchCast!
+        Please describe the proposed feature, the problem it solves for presenters, and any architectural context.
+
+  - type: textarea
+    id: problem-statement
+    attributes:
+      label: Presenter Problem or Use Case
+      description: Is your feature request related to a specific presenter challenge, frustration, or workflow gap?
+      placeholder: "As a presenter, I struggle to... because..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution or Behavior
+      description: Describe what you would like SwitchCast to do and how it should behave.
+      placeholder: Provide a clear description of the proposed feature, UI interactions, or shortcuts.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives-considered
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative workarounds, shortcuts, or designs?
+      placeholder: Describe any alternative approaches or existing solutions you tested.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Functional Area
+      description: Which part of the application does this proposal touch?
+      options:
+        - "Window & Display Capture"
+        - "Media Presentation (Images / Video)"
+        - "Floating Presenter Dock"
+        - "Control Dashboard & UI Layout"
+        - "Audio & Volume Controls"
+        - "Shortcuts & Hotkeys"
+        - "Installer & Distribution"
+        - "Other / General"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: architectural-alignment
+    attributes:
+      label: Architectural Alignment
+      options:
+        - label: This proposal adheres to SwitchCast's 100% offline, privacy-first principle (no cloud telemetry, no remote transmission).
+          required: true
+        - label: I have searched existing issues and feature requests to confirm this is not a duplicate.
+          required: true
