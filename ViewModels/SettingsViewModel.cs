@@ -148,7 +148,7 @@ public partial class SettingsViewModel : ObservableObject
                 return infoVer.Split('+')[0];
             }
 
-            return Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.3.0";
+            return Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.4.0";
         }
     }
 
