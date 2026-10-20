@@ -3,9 +3,9 @@
 ---
 
 ## Task Details
-- **Task**: SWITCHCAST — GitHub Release Publishing for v1.3.0 with Markdown Release Notes
-- **Date**: 2026-10-20T18:35:00+08:00 (UTC+8)
-- **Status**: Completed (v1.3.0 Tagged & Pushed, GitHub Actions Workflow 39408321410 Succeeded, GitHub Release Published with v1.3.0.md Notes & Binaries)
+- **Task**: SWITCHCAST — Minimal 'Buy me a coffee' sidebar link
+- **Date**: 2026-10-20T18:55:00+08:00 (UTC+8)
+- **Status**: Completed (Committed locally; 480 automated tests passing; 0 build warnings/errors)
 
 ---
 

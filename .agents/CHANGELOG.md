@@ -20,7 +20,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Bumped project versions in `SwitchCast.csproj`, `app.manifest`, `SettingsViewModel.cs`, and `README.md`.
   - Created annotated release git tags `v1.4.0` and `v1.5.0`.
 
-### Added (feat / perf / telemetry / ui)
+### Added (feat / perf / telemetry / ui / sidebar)
+- **Main Sidebar 'Buy me a coffee' Link (`MainWindow.xaml`, `MainWindow.xaml.cs`, `MainViewModel.cs`)**:
+  - Added minimal `NavigationViewItem` inside `<NavigationView.FooterMenuItems>` positioned directly above the Settings item.
+  - Features Segoe MDL2 Cafe glyph `&#xE765;` in coral accent (`{ThemeResource AppAccentBrush}`), two-line label (12px "Buy me a coffee" + 10px "Support development"), and subtle external-link icon `&#xE8A7;`.
+  - Configured with `SelectsOnInvoked="False"` so clicking does not select the item or navigate away from the current page.
+  - Invokes `OpenCoffeeLinkCommand` opening `https://paypal.me/itsjczamora` in the default browser without interrupting presentations, music, or SwitchDeck.
+  - Preserves standard WinUI 3 hover states, light/dark theme brushes, collapsed icon-only rendering, keyboard focus navigation, screen-reader accessibility (`AutomationProperties.Name`), and hover tooltip.
+  - Added automated unit test suite `MainViewModelTests.cs` (4 passing tests).
 - **Live Performance Telemetry UI Monitor (`SettingsPage.xaml`, `SettingsViewModel.cs`)**:
   - Implemented live performance telemetry panel directly within `Settings > Performance` when `EnablePerformanceDiagnostics` is toggled on.
   - Displays real, measured metrics:

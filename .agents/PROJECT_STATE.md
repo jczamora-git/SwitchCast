@@ -8,14 +8,19 @@ This is the authoritative progress, state, and environmental tracking document f
 
 - **Project**: SwitchCast
 - **Current Version**: v1.5.0 (Released & Tagged), v1.4.0 (Tagged), v1.3.0 (Released & Tagged)
-- **Overall Status**: **v1.3.0, v1.4.0 & v1.5.0 Packaged & Tagged on GitHub (v1.3.0 & v1.5.0 release archives published with SHA256 and release notes; 476 automated tests passing; 0 build warnings/errors)**
-- **Last Updated**: 2026-10-20T18:35:00+08:00 (UTC+8)
+- **Overall Status**: **Built, Packaged & Verified (480 automated tests passing; 0 build warnings/errors; minimal 'Buy me a coffee' sidebar link added)**
+- **Last Updated**: 2026-10-20T18:55:00+08:00 (UTC+8)
 
 ---
 
 ## 2. FUNCTIONALITY STATUS
 
 ### Implemented & Verified
+- [x] **Main Sidebar 'Buy me a coffee' Link**:
+  - Embedded minimal `NavigationViewItem` within `<NavigationView.FooterMenuItems>` anchored directly above `Settings`.
+  - Styled with Segoe MDL2 Cafe glyph `&#xE765;` in coral accent (`{ThemeResource AppAccentBrush}`) and subtle external-link icon `&#xE8A7;`.
+  - Configured with `SelectsOnInvoked="False"`, full screen-reader accessibility (`AutomationProperties.Name`), and hover tooltip.
+  - Bound to `OpenCoffeeLinkCommand` in `MainViewModel` opening `https://paypal.me/itsjczamora` via `Windows.System.Launcher.LaunchUriAsync` without navigating away from the current page or interrupting presentations, music, or SwitchDeck.
 - [x] **v1.5.0 Live Performance Telemetry UI & Monitor**:
   - **Live Performance Monitor in Settings > Performance**:
     - Embedded compact, responsive performance telemetry panel directly below the existing rendering mode and adapter cards inside `SettingsPage.xaml`.
